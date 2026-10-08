@@ -60,9 +60,14 @@ async function loadMqttConnections() {
 }
 
 function _mqttConnectionRow(connection) {
+    // The same light panel as the settings blocks of this page; .bg-features forces
+    // display:block, so the flex layout lives on an inner div.
+    const panel = document.createElement('div');
+    panel.className = 'bg-features rounded';
+    panel.id = `mqtt-connection-row-${connection.id}`;
     const row = document.createElement('div');
-    row.className = 'mqtt-connection-row border rounded p-2 d-flex flex-wrap align-items-center gap-2';
-    row.id = `mqtt-connection-row-${connection.id}`;
+    row.className = 'mqtt-connection-row d-flex flex-wrap align-items-center gap-2';
+    panel.appendChild(row);
 
     const info = document.createElement('div');
     info.className = 'mqtt-connection-info flex-grow-1';
@@ -107,7 +112,7 @@ function _mqttConnectionRow(connection) {
 
     row.appendChild(info);
     row.appendChild(actions);
-    return row;
+    return panel;
 }
 
 function _mqttConnectionButton(icon, labelKey, variant, onClick) {

@@ -137,21 +137,19 @@ def public_connection(config: dict[str, Any], connection: dict[str, Any]) -> dic
     return public
 
 
-def overlay_connection(block: dict[str, Any] | None, config: dict[str, Any], field: str) -> dict[str, Any]:
-    """A connector block with the broker fields of its chosen connection laid over it.
+def connection_for(cls: Any, block: dict[str, Any] | None, config: dict[str, Any]) -> dict[str, Any] | None:
+    """The connection a connector block picks, to hand to ``cls(block, connection=...)``.
 
-    ``url``, ``username`` and ``tls_insecure`` come from the connection, so the connector reads
-    them as before. The password is deliberately left out: callers fetch it with
-    ``connection_password`` and hand it over explicitly (see connectors/mqtt_publisher.py on
-    why it must not share a dict with routine reads). A missing connection leaves ``url``
-    blank, which every connector reads as "not configured".
+    ``{id, name, url, username, tls_insecure}``, or None for a connector without a
+    ``CONNECTION_FIELD``, a block that picks none, or a connection that no longer exists. The
+    password is deliberately left out: callers fetch it with ``connection_password`` and pass it
+    explicitly (see connectors/mqtt_publisher.py on why it must not share a dict with routine
+    reads).
     """
-    merged = dict(block or {})
-    connection = get_connection(config, merged.get(field))
-    merged['url'] = connection['url'] if connection else ''
-    merged['username'] = connection['username'] if connection else ''
-    merged['tls_insecure'] = connection['tls_insecure'] if connection else False
-    return merged
+    field = getattr(cls, 'CONNECTION_FIELD', '')
+    if not field:
+        return None
+    return get_connection(config, (block or {}).get(field))
 
 
 def client_id_conflict(config: dict[str, Any], name: str, connection_id: str, client_id: str) -> str | None:

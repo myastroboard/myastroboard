@@ -167,11 +167,11 @@ This page lists the HTTP routes currently declared across `backend/blueprints/*.
 
 - `GET /api/connectors` — List all registered connectors with installed/enabled state, module config, `target_modules` (app tabs the connector surfaces in), and a config block whose `SECRET_FIELDS` are masked (`****` + last 4, plus a `has_<field>` boolean). A connector on a shared MQTT connection also carries `connection_field` and `connection_options` (`[{id, name}]`)
 - `POST /api/connectors/<name>/config` (admin) — Save one connector's config; merged server-side, `int` / `bool` fields coerced to their declared type, and a blank or still-masked secret means "keep current". Secrets are written to the connector secrets store, never to the configuration. A connector on a shared MQTT connection: 400 for an unknown connection id, or for a `client_id` another connector already uses on the same connection
-- `GET /api/connectors/allsky/status` — Return cached AllSky sensor data (`allskydata.json`); requires `sensor_data` module enabled
+- `GET /api/connectors/allsky/status` — AllSky sensor data: the variables of the last MQTT message from AllSky's Publish Data module, plus `_received_at` (when the board received it); `{}` while none arrived or the last one is older than 15 min. Requires the `sensor_data` module enabled
 - `GET /api/connectors/allsky/health` — Run a per-module health check against the AllSky instance; accepts `?fresh=1` to bypass cache
 - `GET /api/connectors/allsky/urls` — Return proxy URLs for all enabled AllSky modules; accepts `?date=YYYYMMDD`
 - `GET /api/connectors/allsky/proxy` — Proxy an AllSky resource through the backend; params: `module=<slug>` and optional `date=YYYYMMDD`
-- `GET|POST /api/connectors/mqtt/health` (admin) - One real MQTT connect against the broker. POST `{mqtt_connection_id}` probes the connection picked on the card (400 when missing or unknown); GET probes the saved connector's connection and reports module toggles. A failed probe is a 200 with `reachable: false` and an `error` string
+- `GET /api/connectors/mqtt/health` (admin) - One real MQTT connect against the saved connector's connection, with the module toggles (a connection picked on the card is tested through `POST /api/mqtt-connections/health`). A failed probe is a 200 with `reachable: false` and an `error` string
 - `GET /api/connectors/mqtt/status` - What the publisher thread is doing: `enabled`, `connected`, `broker`, `last_publish_at`, `last_error`, `devices[]`, `messages_total` (read from the status file the thread writes, so any worker can answer)
 - `POST /api/connectors/mqtt/publish` (admin) - Ask the publisher for a full republish (discovery + every state) on its next tick
 - `POST /api/connectors/mqtt/remove` (admin) - Switch the connector off and purge every retained MyAstroBoard topic from the broker (Home Assistant drops the devices)
@@ -184,7 +184,7 @@ Brokers shared by the MQTT connectors (Parameters -> Configuration). All admin-o
 - `POST /api/mqtt-connections` (admin) - Create from `{name, url, username?, password?, tls_insecure?}`; 201, or 400 with the reason (name required or taken, invalid URL...)
 - `PUT /api/mqtt-connections/<connection_id>` (admin) - Edit; a blank or still-masked password keeps the stored one, a blank username drops it. 404 for an unknown id
 - `DELETE /api/mqtt-connections/<connection_id>` (admin) - Delete; 409 `{error, used_by}` while a connector uses it
-- `POST /api/mqtt-connections/health` (admin) - One real MQTT connect with `{url, username?, password?, tls_insecure?, id?}` as typed; a blank or masked password uses the stored one of connection `id` only when `url` is that connection's saved URL. A failed probe is a 200 with `reachable: false` and an `error` string
+- `POST /api/mqtt-connections/health` (admin) - One real MQTT connect with `{url, username?, password?, tls_insecure?, id?}` as typed; a blank or masked password uses the stored one of connection `id` only when `url` is that connection's saved URL. `{id}` alone probes that saved connection (the connectors' picker). A failed probe is a 200 with `reachable: false` and an `error` string
 
 ## Object Lookup
 

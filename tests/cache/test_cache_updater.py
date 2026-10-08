@@ -2114,45 +2114,13 @@ def test_cache_updater_masked_location_log_safe_coord_exceptions():
     assert "lat=?" in masked and "lon=?" in masked
 
 
-def test_update_allsky_sensor_cache_paths(monkeypatch):
-    from cache import cache_store, cache_updater
-
-    monkeypatch.setattr(
-        cache_updater,
-        "AllSkyConnector",
-        lambda _cfg: types.SimpleNamespace(fetch_sensor_data=lambda: {"temp": 1}),
-    )
-    cache_store._allsky_sensor_cache = {"data": None, "timestamp": 0}
-    cache_updater.update_allsky_sensor_cache(
-        {
-            "connectors": {
-                "allsky": {
-                    "enabled": True,
-                    "url": "http://x",
-                    "modules": {"sensor_data": {"enabled": True}},
-                }
-            }
-        }
-    )
-    assert cache_store._allsky_sensor_cache["data"] == {"temp": 1}
-
-
-def test_update_allsky_sensor_cache_none_config_and_early_returns(monkeypatch):
-    from cache import cache_updater
-
-    monkeypatch.setattr(cache_updater, "load_config", lambda: {"connectors": {"allsky": {"enabled": False}}})
-    cache_updater.update_allsky_sensor_cache()
-
-    cache_updater.update_allsky_sensor_cache({"connectors": {"allsky": {"enabled": True, "url": "http://x"}}})
-
-
 def test_update_allsky_health_cache_paths(monkeypatch):
     from cache import cache_store, cache_updater
 
     monkeypatch.setattr(
         cache_updater,
         "AllSkyConnector",
-        lambda _cfg: types.SimpleNamespace(health_check=lambda: {"ok": True}),
+        lambda _cfg, connection=None: types.SimpleNamespace(health_check=lambda: {"ok": True}),
     )
     cache_store._allsky_health_cache = {"data": None, "timestamp": 0}
     cache_updater.update_allsky_health_cache(
@@ -2237,7 +2205,6 @@ def test_fully_initialize_caches_multi_location_labels_and_missing_id(monkeypatc
     mock_cs._spaceflight_astronauts_cache = {"data": {}, "timestamp": 1}
     mock_cs._spaceflight_events_cache = {"data": {}, "timestamp": 1}
     mock_cs._iers_cache = {"data": None, "timestamp": 0}
-    mock_cs._allsky_sensor_cache = {"data": None, "timestamp": 0}
     mock_cs._allsky_health_cache = {"data": None, "timestamp": 0}
 
     monkeypatch.setattr(cache_updater, "check_and_handle_config_changes", lambda: False)

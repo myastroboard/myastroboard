@@ -10,6 +10,7 @@ Covers every branch of all four routes:
 import sys
 import time
 import types
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -27,6 +28,7 @@ from cache import cache_store
 _CFG_ALLSKY_ENABLED = {
     "url": "http://allsky.local",
     "enabled": True,
+    "mqtt_topic": "allsky",
     "modules": {
         "live_image": {"enabled": True},
         "sensor_data": {"enabled": True},
@@ -60,11 +62,27 @@ def _config(allsky_cfg=None):
 @pytest.fixture(autouse=True)
 def _clear_allsky_caches():
     """Reset connector caches before each test."""
-    cache_store._allsky_sensor_cache.update({"timestamp": 0, "data": None})
     cache_store._allsky_health_cache.update({"timestamp": 0, "data": None})
     yield
-    cache_store._allsky_sensor_cache.update({"timestamp": 0, "data": None})
     cache_store._allsky_health_cache.update({"timestamp": 0, "data": None})
+
+
+@pytest.fixture
+def mqtt_message(tmp_path, monkeypatch):
+    """Plant the last MQTT message the subscriber would have stored for AllSky."""
+    from connectors import mqtt_subscriber
+
+    monkeypatch.setattr(mqtt_subscriber, "DATA_DIR_CACHE", str(tmp_path))
+
+    def _plant(payload, topic="allsky", age_seconds=10):
+        received = datetime.now(UTC) - timedelta(seconds=age_seconds)
+        mqtt_subscriber._write_json(
+            mqtt_subscriber.last_message_file("allsky"),
+            {"topic": topic, "received_at": received.isoformat(timespec="seconds"), "payload": payload},
+        )
+        return received.isoformat(timespec="seconds")
+
+    return _plant
 
 
 # ---------------------------------------------------------------------------
@@ -92,57 +110,22 @@ class TestAllSkyStatus:
             resp = client_user.get('/api/connectors/allsky/status')
         assert resp.status_code == 404
 
-    def test_returns_cached_data(self, client_user):
-        cached_data = {"AS_TEMPERATURE_C": 12.5, "ALLSKY_VERSION": "v2024.12"}
-        cache_store._allsky_sensor_cache["data"] = cached_data
-        cache_store._allsky_sensor_cache["timestamp"] = time.time()
-
+    def test_returns_the_last_mqtt_message(self, client_user, mqtt_message):
+        """The route answers with the normalised variables of the last message and its receive time."""
+        received = mqtt_message({"AS_TEMPERATURE_C": 12.5, "AS_DAY_OR_NIGHT": "NIGHT", "utc": 1791443507})
         with patch('blueprints.connectors_allsky.load_config', return_value=_config(_CFG_ALLSKY_ENABLED)):
             resp = client_user.get('/api/connectors/allsky/status')
         assert resp.status_code == 200
-        assert resp.get_json() == cached_data
+        body = resp.get_json()
+        assert body["AS_TEMPERATURE_C"] == 12.5
+        assert body["DAY_OR_NIGHT"] == "NIGHT"
+        assert body["_received_at"] == received
 
-    def test_fetches_when_cache_empty(self, client_user):
-        fresh_data = {"AS_TEMPERATURE_C": 8.0}
-        mock_connector = MagicMock()
-        mock_connector.fetch_sensor_data.return_value = fresh_data
-
+    def test_empty_until_a_message_arrives(self, client_user, mqtt_message):
+        """No message stored yet: an empty object, which the card shows as "no reading yet"."""
         with patch('blueprints.connectors_allsky.load_config', return_value=_config(_CFG_ALLSKY_ENABLED)):
-            with patch('blueprints.connectors_allsky.AllSkyConnector', return_value=mock_connector):
-                resp = client_user.get('/api/connectors/allsky/status')
+            resp = client_user.get('/api/connectors/allsky/status')
         assert resp.status_code == 200
-        assert resp.get_json() == fresh_data
-        assert cache_store._allsky_sensor_cache["data"] == fresh_data
-
-    def _get_status(self, client_user, fetched):
-        mock_connector = MagicMock()
-        mock_connector.fetch_sensor_data.return_value = fetched
-        with patch('blueprints.connectors_allsky.load_config', return_value=_config(_CFG_ALLSKY_ENABLED)):
-            with patch('blueprints.connectors_allsky.AllSkyConnector', return_value=mock_connector):
-                resp = client_user.get('/api/connectors/allsky/status')
-        return resp, mock_connector
-
-    def test_refetches_when_cache_older_than_ttl(self, client_user):
-        """The scheduler refreshes this cache in its own process only - the route checks age itself."""
-        cache_store._allsky_sensor_cache["data"] = {"AS_TEMPERATURE_C": 1.0}
-        cache_store._allsky_sensor_cache["timestamp"] = time.time() - 301
-        resp, connector = self._get_status(client_user, {"AS_TEMPERATURE_C": 9.0})
-        connector.fetch_sensor_data.assert_called_once()
-        assert resp.get_json() == {"AS_TEMPERATURE_C": 9.0}
-
-    def test_empty_result_retried_after_a_minute(self, client_user):
-        """An empty read (Export file not written yet) must not stick for the whole TTL."""
-        cache_store._allsky_sensor_cache["data"] = {}
-        cache_store._allsky_sensor_cache["timestamp"] = time.time() - 61
-        resp, connector = self._get_status(client_user, {"AS_TEMPERATURE_C": 9.0})
-        connector.fetch_sensor_data.assert_called_once()
-        assert resp.get_json() == {"AS_TEMPERATURE_C": 9.0}
-
-    def test_recent_empty_result_not_refetched(self, client_user):
-        cache_store._allsky_sensor_cache["data"] = {}
-        cache_store._allsky_sensor_cache["timestamp"] = time.time() - 10
-        resp, connector = self._get_status(client_user, {"AS_TEMPERATURE_C": 9.0})
-        connector.fetch_sensor_data.assert_not_called()
         assert resp.get_json() == {}
 
 

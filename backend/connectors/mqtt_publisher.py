@@ -36,7 +36,7 @@ from typing import Any
 from connectors.mqtt_connector import MqttConnector
 from utils.constants import DATA_DIR_CACHE
 from utils.logging_config import get_logger
-from utils.mqtt_connections import connection_password, overlay_connection
+from utils.mqtt_connections import connection_for, connection_password
 
 # Windows-compatible file locking (same split as cache_scheduler.py)
 if sys.platform == "win32":
@@ -344,7 +344,7 @@ class MqttPublisher:
         block = (config.get("connectors") or {}).get("mqtt") or {}
         # The broker comes from the shared connection the block picks (utils/mqtt_connections.py);
         # an edit to that connection bumps the same two revisions, so it is picked up here too.
-        connector = MqttConnector(overlay_connection(block, config, MqttConnector.CONNECTION_FIELD))
+        connector = MqttConnector(block, connection=connection_for(MqttConnector, block, config))
         password = connection_password(block.get(MqttConnector.CONNECTION_FIELD))
         previous, previous_password = self._connector, self._password
         self._config = config
@@ -361,7 +361,7 @@ class MqttPublisher:
     # ------------------------------------------------------------------
 
     def _effective_client_id(self, connector: MqttConnector) -> str:
-        configured = connector.client_id()
+        configured = connector.mqtt_client_id()
         if configured:
             return configured
         if not self._generated_client_id:
@@ -382,7 +382,7 @@ class MqttPublisher:
             client.on_connect = self._on_connect
             client.on_disconnect = self._on_disconnect
             client.on_message = self._on_message
-            username = str(connector.config.get("username") or "")
+            username = connector.username()
             if username:
                 client.username_pw_set(username, self._password or None)
             if tls:
@@ -615,7 +615,7 @@ class MqttPublisher:
                     "enabled": connector.is_enabled(),
                     "configured": connector.is_configured(),
                     "broker": broker,
-                    "client_id": connector.client_id() or self._generated_client_id,
+                    "client_id": connector.mqtt_client_id() or self._generated_client_id,
                     "discovery_enabled": connector.discovery_enabled(),
                     # Lets the card say "no user has opted in yet" instead of a silent absence
                     "user_modules_enabled": connector.is_module_enabled("user_activity")
@@ -646,16 +646,15 @@ class MqttPublisher:
 
 def _relevant_config(connector: MqttConnector, password: str) -> str:
     """The part of the connector config whose change warrants a reconnect / full republish."""
-    cfg = connector.config
     relevant = {
         "url": connector.base_url,
         "enabled": connector.is_enabled(),
-        "username": cfg.get("username"),
+        "username": connector.username(),
         "password": password,
         "base_topic": connector.base_topic(),
         "discovery_enabled": connector.discovery_enabled(),
         "discovery_prefix": connector.discovery_prefix(),
-        "client_id": connector.client_id(),
+        "client_id": connector.mqtt_client_id(),
         "tls_insecure": connector.tls_insecure(),
         "modules": {m["slug"]: connector.is_module_enabled(m["slug"]) for m in connector.MODULES},
     }

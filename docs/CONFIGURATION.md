@@ -176,9 +176,11 @@ Connector configuration is stored in the configuration under `connectors.<name>`
     "url": "http://allsky.local",
     "label": "My AllSky",
     "enabled": true,
-    "image_path": "current/tmp",
+    "image_path": "current",
     "image_filename": "image.jpg",
-    "export_json_path": "allskydata.json",
+    "mqtt_connection_id": "home-assistant",
+    "mqtt_topic": "allsky",
+    "client_id": "",
     "modules": {
       "live_image":      { "enabled": true },
       "sensor_data":     { "enabled": false },

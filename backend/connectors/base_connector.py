@@ -48,19 +48,32 @@ class BaseConnector(ABC):
     ENUM_FIELDS: dict[str, tuple[str, ...]] = {}
 
     # Config key holding the id of the shared MQTT connection this connector talks through
-    # (utils/mqtt_connections.py), or "" for a connector that does not use one. The broker
-    # URL, username, password and TLS switch then come from that connection, laid over the
-    # block before the connector is built; the card shows a picker instead of a URL field,
-    # and the connection cannot be deleted while this connector points at it.
+    # (utils/mqtt_connections.py), or "" for a connector that does not use one. The connection
+    # (broker URL, username, TLS switch - never the password, see connection_password()) is
+    # handed to the constructor apart from the block, so a connector keeps its own `url` (AllSky:
+    # its web interface) next to the broker. The card shows a connection picker, and the
+    # connection cannot be deleted while this connector points at it.
     CONNECTION_FIELD: str = ""
 
-    def __init__(self, config: dict):
+    def __init__(self, config: dict, connection: dict | None = None):
         """
         Args:
             config: The connector's config dict from config["connectors"][name]
+            connection: The shared MQTT connection its CONNECTION_FIELD picks
+                (utils.mqtt_connections.connection_for), or None
         """
         self.config = config
+        self.connection = connection
         self.base_url = config.get("url", "").rstrip("/")
+
+    @classmethod
+    def validate_config(cls, block: dict) -> str | None:
+        """Why a config block about to be saved is refused, or None.
+
+        Called by the shared save after the typed coercion of CONFIG_FIELDS, for checks the
+        types alone cannot express (AllSky: an MQTT topic without wildcard).
+        """
+        return None
 
     def is_configured(self) -> bool:
         """Whether the connector has everything it needs to be usable.
@@ -94,6 +107,23 @@ class BaseConnector(ABC):
         (images, video) has URLs to resolve.
         """
         return {}
+
+    def mqtt_subscriptions(self) -> list[str]:
+        """MQTT topics this connector reads through its connection (connectors/mqtt_subscriber.py).
+
+        Defaults to none: only a connector that consumes data published on a broker lists any.
+        The subscriber keeps the last message of each and the connector reads it back with
+        ``mqtt_subscriber.read_last_message(name)``.
+        """
+        return []
+
+    def mqtt_client_id(self) -> str:
+        """The MQTT client id configured for this connector, or "" to have one generated.
+
+        A broker keeps one session per client id, so connectors sharing a connection must not
+        share it (the shared save refuses a duplicate - utils.mqtt_connections.client_id_conflict).
+        """
+        return str(self.config.get("client_id") or "").strip()
 
     def fetch_sensor_data(self) -> dict[str, Any]:
         """

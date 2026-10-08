@@ -18,25 +18,34 @@ When the AllSky connector is enabled, the Observatory renders panels for each ac
 
 Auto-refreshing all-sky camera image, reloaded every 30 seconds via the MyAstroBoard proxy. If the image fails to load (AllSky offline or path misconfigured), an "unavailable" placeholder is shown and a reload is retried after 5 minutes.
 
-When sensor data is also enabled, a day/night badge is displayed alongside the image title (sourced from `DAY_OR_NIGHT` in the AllSky Export JSON).
+When sensor data is also enabled, a day/night badge is displayed alongside the image title (sourced from `AS_DAY_OR_NIGHT` in the AllSky sensor data).
 
 ### Sensor data
 
-Live camera and environment readings polled every 60 seconds from the AllSky Export JSON. Requires the **AllSky Export** overlay module to be added to both Day and Night pipelines in AllSky settings.
+Camera and environment readings, received over MQTT from AllSky's *Publish Data to
+Redis/MQTT/REST/influxDB* module (`allsky_publishdata`) and polled by the card every 60 seconds.
+Setup: [CONNECTORS.md - Sensor data module](CONNECTORS.md#sensor-data-module).
 
-Displayed fields (when available in the JSON):
+Displayed fields (when present in the message):
 
-| Label | AllSky key |
-|-------|-----------|
-| Dome temperature | `AS_DEWCONTROLAMBIENT` (Dew Heater module, optional), else the first fan's `AS_FANS_TEMPERATURE1` (v2024: `OTH_TEMPERATURE`) |
-| Camera sensor temperature (hidden when AllSky exports its `0` placeholder) | `AS_TEMPERATURE_C` |
-| Humidity | `AS_DEWCONTROLHUMIDITY` or `AS_HUMIDITY` |
-| Dew point | `AS_DEWCONTROLDEW` |
+| Field | AllSky variable |
+|-------|-----------------|
+| Dome temperature | `AS_TEMP` (the environment sensor, AllSky v2026), else `AS_DEWCONTROLAMBIENT` (Dew Heater), else the first fan's `AS_FANS_TEMPERATURE1` (v2024: `OTH_TEMPERATURE`) |
+| Camera sensor temperature (hidden when AllSky sends its `0` placeholder) | `AS_TEMPERATURE_C` |
+| Humidity | `AS_HUMIDITY`, else `AS_DEWCONTROLHUMIDITY` |
+| Dew point | `AS_DEW`, else `AS_DEWCONTROLDEW` |
 | Dew heater | `AS_DEWCONTROLHEATER` |
 | Gain | `AS_GAIN` |
-| Exposure | `AS_sEXPOSURE` or `AS_EXPOSURE_US` |
-| Mean brightness | `AS_MEAN` |
-| AllSky version | `ALLSKY_VERSION` |
+| Exposure | `AS_EXPOSURE_US`, formatted as µs / ms / s |
+| Brightness | `AS_MEAN` |
+| Fan (state, PWM duty %, threshold) | `AS_FANS_FAN_STATE1` / `2`, `AS_FANS_PWM_DUTY_PERCENT1` / `2`, `AS_FANS_TEMP_LIMIT1` / `2` (v2024: `OTH_FANS`, `OTH_FANT`) |
+| Fan control temperature, only when it is not already the dome temperature (same variable or same reading) | `AS_FANS_TEMPERATURE1` / `2` |
+| AllSky version (v2024.12 only: v2026 cannot publish it) | `ALLSKY_VERSION` |
+| Updated (when the board received the readings) | the message receive time |
+
+AllSky v2026 declares **one** environment sensor (*Environment* group: `AS_TEMP`, `AS_HUMIDITY`,
+`AS_DEW`, `AS_TEMPSENSOR`) that the Dew Heater and Fans modules reuse, so their readings repeat it:
+it is read first, so each quantity shows once. v2024 has a sensor per module, read as the fallback.
 
 ### Keogram
 

@@ -1079,25 +1079,6 @@ def update_iers_cache():
         logger.error("Failed to refresh IERS-A data: %s. Will retry next scheduler cycle.", e)
 
 
-def update_allsky_sensor_cache(config=None):
-    """Fetches live sensor data from the AllSky Export JSON and stores it in cache."""
-    if config is None:
-        config = load_config()
-
-    allsky_cfg = config.get("connectors", {}).get("allsky", {})
-    if not allsky_cfg.get("enabled") or not allsky_cfg.get("url"):
-        return
-    if not allsky_cfg.get("modules", {}).get("sensor_data", {}).get("enabled"):
-        return
-
-    connector = AllSkyConnector(allsky_cfg)
-    data = connector.fetch_sensor_data()
-    now_ts = time.time()
-    cache_store._allsky_sensor_cache["data"] = data
-    cache_store._allsky_sensor_cache["timestamp"] = now_ts
-    logger.debug("AllSky sensor cache updated")
-
-
 def update_allsky_health_cache(config=None):
     """Runs per-module reachability checks against the AllSky instance and stores results in cache."""
     if config is None:
@@ -1107,7 +1088,10 @@ def update_allsky_health_cache(config=None):
     if not allsky_cfg.get("enabled") or not allsky_cfg.get("url"):
         return
 
-    result = AllSkyConnector(allsky_cfg).health_check()
+    # Lazy: utils.mqtt_connections is only needed by this job (keeps cache_updater's imports lean).
+    from utils.mqtt_connections import connection_for
+
+    result = AllSkyConnector(allsky_cfg, connection=connection_for(AllSkyConnector, allsky_cfg, config)).health_check()
     cache_store._allsky_health_cache["data"] = result
     cache_store._allsky_health_cache["timestamp"] = time.time()
     logger.debug("AllSky health cache updated")
@@ -1308,16 +1292,7 @@ def fully_initialize_caches():
         # Add AllSky jobs only when the connector is enabled
         allsky_cfg = config.get("connectors", {}).get("allsky", {})
         if allsky_cfg.get("enabled") and allsky_cfg.get("url"):
-            if allsky_cfg.get("modules", {}).get("sensor_data", {}).get("enabled"):
-                global_jobs.append(
-                    (
-                        "allsky_sensor",
-                        None,
-                        partial(update_allsky_sensor_cache, config=config),
-                        AllSkyConnector.SENSOR_CACHE_TTL,
-                        cache_store._allsky_sensor_cache,
-                    )
-                )
+            # No sensor job: sensor data arrives over MQTT (connectors/mqtt_subscriber.py).
             global_jobs.append(
                 (
                     "allsky_health",

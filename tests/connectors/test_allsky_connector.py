@@ -1,16 +1,73 @@
 """Unit tests for AllSkyConnector and BaseConnector."""
 
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
 import requests as _requests
 
-from connectors import allsky_connector
+from connectors import allsky_connector, mqtt_subscriber
 from connectors.allsky_connector import AllSkyConnector, _normalize_sensor_data
+
+# A real message of AllSky v2026.10's Publish Data module (topic "allsky", captured on the
+# maintainer's install on 2026-10-08), with the variable list the connector card recommends.
+REAL_PUBLISH_DATA_PAYLOAD = {
+    "AS_DEWCONTROLAMBIENT": 25.09,
+    "utc": 1791443507,
+    "AS_DEWCONTROLDEW": 7.91,
+    "AS_DEWCONTROLMARGIN": 17.18,
+    "AS_DEWCONTROLHUMIDITY": 33.5,
+    "AS_DEWCONTROLHEATER": False,
+    "AS_DEWCONTROLLIMIT": 3.0,
+    "AS_DEWCONTROLHEATERINT": 0,
+    "AS_TEMPSENSOR": "DHT22",
+    "AS_TEMPSENSORNAME": "Allsky",
+    "AS_TEMP": 25.0,
+    "AS_DEW": 7.84,
+    "AS_HUMIDITY": 33.5,
+    "AS_FANS_FAN_STATE1": False,
+    "AS_FANS_TEMPERATURE1": 25.0,
+    "AS_FANS_TEMP_LIMIT1": 35,
+    "AS_DAY_OR_NIGHT": "DAY",
+    "AS_EXPOSURE_US": 3831,
+    "AS_GAIN": 1.0,
+    "AS_MEAN": 0.43385,
+    "AS_TEMPERATURE_C": 19.0,
+}
+
+CONNECTION = {"id": "c1", "name": "Home", "url": "mqtt://broker.lan:1883", "username": "u", "tls_insecure": False}
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _mqtt_files(tmp_path, monkeypatch):
+    """The subscriber's last-message and status files live in a per-test directory."""
+    monkeypatch.setattr(mqtt_subscriber, "DATA_DIR_CACHE", str(tmp_path))
+    monkeypatch.setattr(mqtt_subscriber, "STATUS_FILE", str(tmp_path / "mqtt_subscriber_status.json"))
+
+
+def _plant_message(payload, topic="allsky", age_seconds=10, received_at=None):
+    """Store a last message for AllSky, as the subscriber would."""
+    if received_at is None:
+        received_at = (datetime.now(UTC) - timedelta(seconds=age_seconds)).isoformat(timespec="seconds")
+    mqtt_subscriber._write_json(
+        mqtt_subscriber.last_message_file("allsky"),
+        {"topic": topic, "received_at": received_at, "payload": payload},
+    )
+    return received_at
+
+
+def _plant_status(**state):
+    mqtt_subscriber._write_json(mqtt_subscriber.STATUS_FILE, {"connectors": {"allsky": state}})
+
+
+def _sensor_connector(connection=CONNECTION, **cfg):
+    block = {"url": "http://allsky.local", "enabled": True, "modules": {"sensor_data": {"enabled": True}}}
+    block.update(cfg)
+    return AllSkyConnector(block, connection=connection)
 
 
 @pytest.fixture(autouse=True)
@@ -123,22 +180,6 @@ class TestUrlBuilders:
         )
         assert c._image_url() == "http://allsky.local/custom/path/live.jpg"
 
-    def test_sensor_data_url_defaults(self):
-        c = _make()
-        assert c._sensor_data_url() == "http://allsky.local/current/allskydata.json"
-
-    def test_sensor_data_url_custom(self):
-        c = _make(
-            {
-                "url": "http://allsky.local",
-                "enabled": True,
-                "modules": {},
-                "image_path": "data",
-                "export_json_path": "export.json",
-            }
-        )
-        assert c._sensor_data_url() == "http://allsky.local/data/export.json"
-
     def test_keogram_url(self):
         c = _make()
         assert c._keogram_url("20260101") == "http://allsky.local/images/20260101/keogram/keogram-20260101.jpg"
@@ -241,9 +282,11 @@ class TestHealthCheck:
         with patch("requests.head", return_value=mock_resp):
             result = _make().health_check()
         assert result["reachable"] is True
-        for slug in ["live_image", "sensor_data", "keogram", "startrails", "daily_timelapse"]:
+        for slug in ["live_image", "keogram", "startrails", "daily_timelapse"]:
             assert result["modules"][slug]["ok"] is True
             assert result["modules"][slug]["detail"] == "200 OK"
+        # Sensor data is not an HTTP file any more: its line says what MQTT brought
+        assert result["modules"]["sensor_data"] == {"ok": False, "detail": "No MQTT connection chosen"}
 
     def test_404_shows_hint_for_known_module(self):
         def _head_side(url, **kwargs):
@@ -253,38 +296,39 @@ class TestHealthCheck:
         with patch("requests.head", side_effect=_head_side):
             result = _make().health_check()
 
-        assert result["modules"]["sensor_data"]["detail"].startswith("404 —")
-        assert "Export module" in result["modules"]["sensor_data"]["detail"]
+        assert result["modules"]["live_image"]["detail"].startswith("404 —")
+        assert "current/tmp/" in result["modules"]["live_image"]["detail"]
 
-    def test_404_generic_for_unknown_module(self):
-        """live_image has no hint in _MODULE_404_HINTS → generic fallback."""
+    def test_404_generic_for_unknown_module(self, monkeypatch):
+        """A module without an entry in _MODULE_404_HINTS gets the generic hint."""
+        monkeypatch.delitem(allsky_connector._MODULE_404_HINTS, "keogram")
 
-        def _head_side(url, **kwargs):
-            return MagicMock(status_code=404)
-
-        with patch("requests.head", side_effect=_head_side):
+        with patch("requests.head", return_value=MagicMock(status_code=404)):
             result = _make().health_check()
 
-        assert result["modules"]["live_image"]["detail"].startswith("404 —")
+        assert result["modules"]["keogram"]["detail"] == "404 — File not found on AllSky server"
 
     def test_connection_refused_detail(self):
         with patch("requests.head", side_effect=_requests.exceptions.ConnectionError):
             result = _make().health_check()
-        for v in result["modules"].values():
-            assert v["detail"] == "Connection refused"
+        for slug, v in result["modules"].items():
+            if slug != "sensor_data":
+                assert v["detail"] == "Connection refused"
         assert result["reachable"] is False
 
     def test_timeout_detail(self):
         with patch("requests.head", side_effect=_requests.exceptions.Timeout):
             result = _make().health_check()
-        for v in result["modules"].values():
-            assert v["detail"] == "Timeout"
+        for slug, v in result["modules"].items():
+            if slug != "sensor_data":
+                assert v["detail"] == "Timeout"
 
     def test_other_status_code(self):
         with patch("requests.head", return_value=MagicMock(status_code=500)):
             result = _make().health_check()
-        for v in result["modules"].values():
-            assert "HTTP 500" in v["detail"]
+        for slug, v in result["modules"].items():
+            if slug != "sensor_data":
+                assert "HTTP 500" in v["detail"]
 
     def test_reachable_when_base_fails_but_module_ok(self):
         responses = iter(
@@ -323,11 +367,6 @@ class TestGetModuleUrls:
         assert "live_image" in urls
         assert urls["live_image"] == "http://allsky.local/current/image.jpg"
 
-    def test_sensor_data_included_when_enabled(self):
-        c = _make({"url": "http://allsky.local", "enabled": True, "modules": {"sensor_data": {"enabled": True}}})
-        urls = c.get_module_urls()
-        assert "sensor_data" in urls
-
     def test_keogram_included_when_enabled(self):
         c = _make({"url": "http://allsky.local", "enabled": True, "modules": {"keogram": {"enabled": True}}})
         urls = c.get_module_urls(date_str="20260101")
@@ -346,7 +385,7 @@ class TestGetModuleUrls:
     def test_all_modules_enabled(self):
         c = _make_all_modules(enabled=True)
         urls = c.get_module_urls(date_str="20260101")
-        assert len(urls) == 5  # live_image, sensor_data, keogram, startrails, daily_timelapse
+        assert sorted(urls) == ["daily_timelapse", "keogram", "live_image", "startrails"]  # sensor data: MQTT
 
     def test_date_defaults_to_last_night_when_not_provided(self):
         c = _make({"url": "http://allsky.local", "enabled": True, "modules": {"keogram": {"enabled": True}}})
@@ -361,62 +400,143 @@ class TestGetModuleUrls:
 
 
 class TestFetchSensorData:
-    @pytest.fixture(autouse=True)
-    def _layout_probe_ok(self):
-        """Every layout probe answers 200, so the configured image_path is kept."""
-        with patch("requests.head", return_value=MagicMock(status_code=200)):
-            yield
-
-    def _sensor_enabled(self):
-        return _make({"url": "http://allsky.local", "enabled": True, "modules": {"sensor_data": {"enabled": True}}})
-
     def test_returns_empty_when_module_disabled(self):
-        c = _make()  # sensor_data not enabled
-        assert c.fetch_sensor_data() == {}
+        _plant_message({"AS_TEMPERATURE_C": 12.5})
+        assert _make().fetch_sensor_data() == {}
 
-    def test_returns_json_on_success(self):
-        data = {"AS_TEMPERATURE_C": 12.5, "ALLSKY_VERSION": "v2024.12"}
-        mock_resp = MagicMock()
-        mock_resp.raise_for_status.return_value = None
-        mock_resp.json.return_value = data
-        with patch("requests.get", return_value=mock_resp):
-            result = self._sensor_enabled().fetch_sensor_data()
-        assert result == data
+    def test_returns_the_last_message_normalised_with_its_receive_time(self):
+        """The real Publish Data payload comes back with DAY_OR_NIGHT and _received_at added."""
+        received_at = _plant_message(REAL_PUBLISH_DATA_PAYLOAD)
+        result = _sensor_connector().fetch_sensor_data()
+        assert result["AS_TEMP"] == 25.0
+        assert result["AS_DEWCONTROLHEATER"] is False
+        assert result["DAY_OR_NIGHT"] == "DAY"
+        assert result["_received_at"] == received_at
+        assert {k: v for k, v in result.items() if k not in ("DAY_OR_NIGHT", "_received_at")} == (
+            REAL_PUBLISH_DATA_PAYLOAD
+        )
 
-    def test_returns_empty_on_http_error(self):
-        mock_resp = MagicMock()
-        mock_resp.raise_for_status.side_effect = _requests.exceptions.HTTPError("404")
-        with patch("requests.get", return_value=mock_resp):
-            result = self._sensor_enabled().fetch_sensor_data()
-        assert result == {}
+    def test_empty_until_a_message_arrives(self):
+        assert _sensor_connector().fetch_sensor_data() == {}
 
-    def test_returns_empty_on_connection_error(self):
-        with patch("requests.get", side_effect=_requests.exceptions.ConnectionError):
-            result = self._sensor_enabled().fetch_sensor_data()
-        assert result == {}
+    def test_stale_message_is_not_shown(self):
+        """Readings older than MQTT_STALE_AFTER_SECONDS are dropped rather than shown as current."""
+        _plant_message({"AS_TEMPERATURE_C": 12.5}, age_seconds=AllSkyConnector.MQTT_STALE_AFTER_SECONDS + 60)
+        assert _sensor_connector().fetch_sensor_data() == {}
 
-    def test_returns_empty_on_timeout(self):
-        with patch("requests.get", side_effect=_requests.exceptions.Timeout):
-            result = self._sensor_enabled().fetch_sensor_data()
-        assert result == {}
+    def test_message_from_another_topic_is_ignored(self):
+        """After a topic change, the message kept for the old one no longer counts."""
+        _plant_message({"AS_TEMPERATURE_C": 12.5}, topic="old/topic")
+        assert _sensor_connector(mqtt_topic="allsky").fetch_sensor_data() == {}
 
-    def test_returns_empty_on_unexpected_error(self):
-        with patch("requests.get", side_effect=RuntimeError("unexpected")):
-            result = self._sensor_enabled().fetch_sensor_data()
-        assert result == {}
+    def test_unreadable_receive_time_is_ignored(self):
+        _plant_message({"AS_TEMPERATURE_C": 12.5}, received_at="not a date")
+        assert _sensor_connector().fetch_sensor_data() == {}
 
-    def test_new_format_keys_are_normalized(self):
-        """AllSky v2026 exports keys without the AS_ prefix; they come back under the legacy name too."""
-        data = {"TEMPERATURE_C": 12.5, "DAY_OR_NIGHT": "NIGHT", "ALLSKY_VERSION": "v2026.10.01"}
-        mock_resp = MagicMock()
-        mock_resp.raise_for_status.return_value = None
-        mock_resp.json.return_value = data
-        with patch("requests.get", return_value=mock_resp):
-            result = self._sensor_enabled().fetch_sensor_data()
+    def test_naive_receive_time_is_read_as_utc(self):
+        naive = (datetime.now(UTC) - timedelta(seconds=5)).replace(tzinfo=None).isoformat(timespec="seconds")
+        _plant_message({"AS_TEMPERATURE_C": 12.5}, received_at=naive)
+        assert _sensor_connector().fetch_sensor_data()["AS_TEMPERATURE_C"] == 12.5
+
+    def test_prefix_less_keys_are_normalised(self):
+        """A variable listed without AS_ (as the old v2026 Export wrote it) reads the same."""
+        _plant_message({"TEMPERATURE_C": 12.5, "DAY_OR_NIGHT": "NIGHT"})
+        result = _sensor_connector().fetch_sensor_data()
         assert result["AS_TEMPERATURE_C"] == 12.5
-        assert result["TEMPERATURE_C"] == 12.5
         assert result["DAY_OR_NIGHT"] == "NIGHT"
-        assert result["ALLSKY_VERSION"] == "v2026.10.01"
+
+
+# ---------------------------------------------------------------------------
+# MQTT configuration and subscriptions
+# ---------------------------------------------------------------------------
+
+
+class TestMqttConfig:
+    def test_declares_a_connection_and_publish_data_defaults(self):
+        assert AllSkyConnector.CONNECTION_FIELD == "mqtt_connection_id"
+        assert AllSkyConnector.CONFIG_FIELDS["mqtt_topic"] == "allsky"
+        assert "export_json_path" not in AllSkyConnector.CONFIG_FIELDS
+
+    def test_topic_defaults_to_allsky(self):
+        assert _make().mqtt_topic() == "allsky"
+        assert _make({"mqtt_topic": "  "}).mqtt_topic() == "allsky"
+        assert _make({"mqtt_topic": " obs/allsky "}).mqtt_topic() == "obs/allsky"
+
+    @pytest.mark.parametrize(
+        "topic, error",
+        [
+            ("allsky", None),
+            ("observatory/allsky", None),
+            ("", "topic required"),
+            ("allsky/#", "topic must not contain + or # (an exact topic, no wildcard)"),
+            ("+/allsky", "topic must not contain + or # (an exact topic, no wildcard)"),
+            ("a\x00b", "topic must not contain + or # (an exact topic, no wildcard)"),
+            ("t" * 257, "topic must be at most 256 characters"),
+        ],
+    )
+    def test_topic_validation(self, topic, error):
+        assert AllSkyConnector.topic_error(topic) == error
+
+    def test_validate_config_checks_the_topic_and_accepts_the_default(self):
+        assert AllSkyConnector.validate_config({"mqtt_topic": "allsky/#"}) is not None
+        assert AllSkyConnector.validate_config({"mqtt_topic": ""}) is None  # blank = the default
+        assert AllSkyConnector.validate_config({}) is None
+
+    def test_subscribes_to_its_topic_when_enabled_with_a_connection(self):
+        assert _sensor_connector(mqtt_topic="obs/allsky").mqtt_subscriptions() == ["obs/allsky"]
+
+    @pytest.mark.parametrize(
+        "connector",
+        [
+            lambda: _sensor_connector(connection=None),
+            lambda: _sensor_connector(enabled=False),
+            lambda: _sensor_connector(modules={"sensor_data": {"enabled": False}}),
+            lambda: _sensor_connector(mqtt_topic="allsky/#"),
+        ],
+    )
+    def test_no_subscription_otherwise(self, connector):
+        """No connection, connector or module off, or an unusable topic: nothing to listen to."""
+        assert connector().mqtt_subscriptions() == []
+
+    def test_client_id_is_the_configured_one(self):
+        assert _make({"client_id": " sky-1 "}).mqtt_client_id() == "sky-1"
+        assert _make().mqtt_client_id() == ""
+
+
+class TestSensorHealth:
+    def test_fresh_message_is_ok(self):
+        _plant_message({"AS_TEMP": 20}, age_seconds=30)
+        health = _sensor_connector()._sensor_health()
+        assert health["ok"] is True
+        assert health["detail"].startswith("Last message ") and health["detail"].endswith(" on allsky")
+
+    def test_no_message_points_at_publish_data(self):
+        health = _sensor_connector()._sensor_health()
+        assert health == {
+            "ok": False,
+            "detail": "No message received on allsky yet - check AllSky's Publish Data module",
+        }
+
+    def test_stale_message_points_at_the_periodic_jobs(self):
+        _plant_message({"AS_TEMP": 20}, age_seconds=3600)
+        health = _sensor_connector()._sensor_health()
+        assert health["ok"] is False
+        assert health["detail"] == ("Last message 60 min ago on allsky - is AllSky still capturing images?")
+
+    def test_subscriber_error_or_disconnection_is_appended(self):
+        _plant_status(connected=False, last_error="broker refused the connection: Not authorized")
+        assert (
+            _sensor_connector()._sensor_health()["detail"].endswith("(broker refused the connection: Not authorized)")
+        )
+        _plant_status(connected=False, last_error=None)
+        assert _sensor_connector()._sensor_health()["detail"].endswith("(not connected to the broker)")
+
+    def test_health_check_carries_the_sensor_line(self):
+        _plant_message({"AS_TEMP": 20})
+        with patch("requests.head", return_value=MagicMock(status_code=200)):
+            result = _sensor_connector().health_check()
+        assert result["modules"]["sensor_data"]["ok"] is True
+        assert "url" not in result["modules"]["sensor_data"]
 
 
 # ---------------------------------------------------------------------------
@@ -521,20 +641,6 @@ class TestLayoutDetection:
             with patch("connectors.allsky_connector.time.time", return_value=10**12):
                 connector.get_module_urls()
         assert head.call_count > calls
-
-    def test_sensor_data_resolved_independently(self):
-        """The live image and the Export JSON are each looked up on their own."""
-        connector = _make(
-            {
-                "url": "http://allsky.local",
-                "enabled": True,
-                "modules": {"live_image": {"enabled": True}, "sensor_data": {"enabled": True}},
-            }
-        )
-        with patch("requests.head", side_effect=_head_ok_for("/current/image.jpg", "/current/tmp/allskydata.json")):
-            urls = connector.get_module_urls()
-        assert urls["live_image"] == "http://allsky.local/current/image.jpg"
-        assert urls["sensor_data"] == "http://allsky.local/current/tmp/allskydata.json"
 
     def test_health_check_reports_fallback_url(self):
         with patch("requests.head", side_effect=_head_ok_for("/current/tmp/image.jpg")):

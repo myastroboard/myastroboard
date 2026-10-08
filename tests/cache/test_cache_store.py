@@ -265,8 +265,8 @@ class TestCacheInitStatus:
         assert "allsky_health" not in status["ttls"]
 
     def test_get_cache_init_status_allsky_configured(self, monkeypatch):
-        """AllSky connector fully enabled (incl. the sensor_data module toggle)
-        -> both jobs appear in status and ttls."""
+        """AllSky connector enabled -> its health job appears in status and ttls; sensor data has
+        no job any more (it arrives over MQTT), even with the sensor_data module on."""
         monkeypatch.setattr(
             "utils.repo_config.load_config",
             lambda: {
@@ -280,9 +280,9 @@ class TestCacheInitStatus:
             },
         )
         status = get_cache_init_status()
-        assert "allsky_sensor" in status
+        assert "allsky_sensor" not in status
         assert "allsky_health" in status
-        assert "allsky_sensor" in status["ttls"]
+        assert "allsky_sensor" not in status["ttls"]
         assert "allsky_health" in status["ttls"]
 
     def test_set_cache_initialization_in_progress(self):
@@ -738,7 +738,7 @@ def test_cache_store_allsky_job_availability_handles_exception(monkeypatch):
     from cache import cache_store
 
     monkeypatch.setattr("utils.repo_config.load_config", lambda: (_ for _ in ()).throw(RuntimeError("boom")))
-    assert cache_store._allsky_job_availability() == (False, False)
+    assert cache_store._allsky_job_availability() is False
 
 
 # ---------------------------------------------------------------------------

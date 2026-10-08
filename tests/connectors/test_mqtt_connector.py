@@ -191,27 +191,30 @@ class TestDeclaration:
         ]
 
     def test_is_configured_needs_a_parseable_mqtt_url_only(self):
+        """The broker is the connection's URL; the block's own url is never read."""
         assert MqttConnector({}).is_configured() is False
-        assert MqttConnector({'url': 'http://broker'}).is_configured() is False
-        assert MqttConnector({'url': 'mqtt://broker'}).is_configured() is True
-        assert MqttConnector({'url': 'mqtt://broker', 'enabled': True}).is_enabled() is True
+        assert MqttConnector({}, connection={'url': 'http://broker'}).is_configured() is False
+        assert MqttConnector({}, connection={'url': 'mqtt://broker'}).is_configured() is True
+        assert MqttConnector({'enabled': True}, connection={'url': 'mqtt://broker'}).is_enabled() is True
+        assert MqttConnector({'url': 'mqtt://broker'}).is_configured() is False
 
     def test_accessors_apply_defaults_sanitizing_and_clamping(self):
         c = MqttConnector(
             {
-                'url': 'mqtt://b',
                 'base_topic': ' my/base# ',
                 'discovery_prefix': '',
                 'publish_interval_seconds': '3',
                 'client_id': ' abc ',
-                'tls_insecure': 1,
-            }
+            },
+            connection={'url': 'mqtt://b', 'username': 'u', 'tls_insecure': 1},
         )
         assert c.base_topic() == 'my_base_'
         assert c.discovery_prefix() == 'homeassistant'
         assert c.publish_interval_seconds() == MqttConnector.MIN_PUBLISH_INTERVAL_SECONDS
-        assert c.client_id() == 'abc'
+        assert c.mqtt_client_id() == 'abc'
         assert c.tls_insecure() is True
+        assert c.username() == 'u'
+        assert MqttConnector({}).tls_insecure() is False and MqttConnector({}).username() == ''
         assert c.discovery_enabled() is True
         assert MqttConnector({'publish_interval_seconds': 'x'}).publish_interval_seconds() == 60
         assert MqttConnector({'publish_interval_seconds': 600}).publish_interval_seconds() == 600
@@ -224,7 +227,7 @@ class TestDeclaration:
 
 class TestTopicLayout:
     def test_topics_follow_the_documented_layout(self):
-        c = MqttConnector({'url': 'mqtt://b', 'base_topic': 'mab', 'discovery_prefix': 'ha'})
+        c = MqttConnector({'base_topic': 'mab', 'discovery_prefix': 'ha'}, connection={'url': 'mqtt://b'})
         assert c.availability_topic() == 'mab/status'
         assert c.state_topic('board') == 'mab/board/state'
         assert c.state_topic('location', 'loc-1') == 'mab/location/loc-1/state'
@@ -246,8 +249,8 @@ class TestTopicLayout:
 class TestProbe:
     def test_successful_connect_uses_credentials_and_the_vetted_ip(self):
         created = []
-        c = MqttConnector({'url': 'mqtt://broker.lan:1884', 'username': 'u', 'password': 'p'})
-        result = c.probe(client_factory=_factory('ok', created))
+        c = MqttConnector({}, connection={'url': 'mqtt://broker.lan:1884', 'username': 'u'})
+        result = c.probe(password='p', client_factory=_factory('ok', created))
         assert result == {'reachable': True, 'error': None}
         client = created[0]
         assert client.connected_to == ('192.0.2.10', 1884)
@@ -259,7 +262,7 @@ class TestProbe:
 
     def test_tls_url_connects_by_hostname_and_honours_insecure(self):
         created = []
-        c = MqttConnector({'url': 'mqtts://broker.lan', 'tls_insecure': True})
+        c = MqttConnector({}, connection={'url': 'mqtts://broker.lan', 'tls_insecure': True})
         assert c.probe(client_factory=_factory('ok', created))['reachable'] is True
         client = created[0]
         assert client.connected_to == ('broker.lan', 8883)
@@ -267,14 +270,14 @@ class TestProbe:
 
     def test_tls_url_with_insecure_false_skips_tls_insecure_set(self):
         created = []
-        c = MqttConnector({'url': 'mqtts://broker.lan', 'tls_insecure': False})
+        c = MqttConnector({}, connection={'url': 'mqtts://broker.lan', 'tls_insecure': False})
         assert c.probe(client_factory=_factory('ok', created))['reachable'] is True
         client = created[0]
         assert client.tls is True and client.insecure is False
 
     def test_explicit_arguments_override_the_configured_ones(self):
         created = []
-        c = MqttConnector({'url': 'mqtt://saved', 'username': 'saved-u', 'password': 'saved-p'})
+        c = MqttConnector({}, connection={'url': 'mqtt://saved', 'username': 'saved-u'})
         c.probe(
             url='mqtt://other',
             username='typed',
@@ -286,18 +289,18 @@ class TestProbe:
 
     def test_anonymous_probe_sets_no_credentials(self):
         created = []
-        MqttConnector({'url': 'mqtt://b'}).probe(client_factory=_factory('ok', created))
+        MqttConnector({}, connection={'url': 'mqtt://b'}).probe(client_factory=_factory('ok', created))
         assert created[0].username is None
 
     def test_bad_url_and_unresolvable_host(self, monkeypatch):
-        c = MqttConnector({'url': 'http://b'})
+        c = MqttConnector({}, connection={'url': 'http://b'})
         assert c.probe(client_factory=_factory('ok', [])) == {
             'reachable': False,
             'error': 'url must start with mqtt:// or mqtts://',
         }
         monkeypatch.setattr(mc, 'resolve_broker_host', lambda host, port: (None, 'url host is not allowed'))
         assert (
-            MqttConnector({'url': 'mqtt://b'}).probe(client_factory=_factory('ok', []))['error']
+            MqttConnector({}, connection={'url': 'mqtt://b'}).probe(client_factory=_factory('ok', []))['error']
             == 'url host is not allowed'
         )
 
@@ -315,13 +318,15 @@ class TestProbe:
     )
     def test_failure_modes_are_reported_without_raising(self, behaviour, expected):
         created = []
-        result = MqttConnector({'url': 'mqtt://b'}).probe(client_factory=_factory(behaviour, created))
+        result = MqttConnector({}, connection={'url': 'mqtt://b'}).probe(client_factory=_factory(behaviour, created))
         assert result['reachable'] is False
         assert result['error'] == expected
         assert created[0].calls[-1] == 'disconnect'
 
     def test_disconnect_failure_is_swallowed(self):
-        result = MqttConnector({'url': 'mqtt://b'}).probe(client_factory=_factory('disconnect-raises', []))
+        result = MqttConnector({}, connection={'url': 'mqtt://b'}).probe(
+            client_factory=_factory('disconnect-raises', [])
+        )
         assert result['reachable'] is False  # the fake never answered, and disconnect raising did not propagate
 
     def test_default_factory_builds_a_paho_v2_client(self):
@@ -358,7 +363,7 @@ class TestHealthCheck:
         assert MqttConnector({}).health_check() == {'reachable': False, 'modules': {}, 'error': 'url required'}
 
     def test_reports_reachability_and_module_toggles(self, monkeypatch):
-        c = MqttConnector({'url': 'mqtt://b', 'modules': {'sky_conditions': {'enabled': True}}})
+        c = MqttConnector({'modules': {'sky_conditions': {'enabled': True}}}, connection={'url': 'mqtt://b'})
         monkeypatch.setattr(c, 'probe', lambda **kw: {'reachable': True, 'error': None})
         health = c.health_check()
         assert health['reachable'] is True
@@ -367,7 +372,7 @@ class TestHealthCheck:
         assert 'error' not in health
 
     def test_unreachable_carries_the_probe_error(self, monkeypatch):
-        c = MqttConnector({'url': 'mqtt://b', 'modules': {'sky_conditions': {'enabled': True}}})
+        c = MqttConnector({'modules': {'sky_conditions': {'enabled': True}}}, connection={'url': 'mqtt://b'})
         monkeypatch.setattr(c, 'probe', lambda **kw: {'reachable': False, 'error': 'connection refused'})
         health = c.health_check()
         assert health['reachable'] is False

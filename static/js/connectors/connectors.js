@@ -40,6 +40,28 @@ async function loadConnectorsStore() {
     sorted.forEach(c => _bindConnectorEvents(c));
 }
 
+// The variables AllSky's Publish Data module must send ("Extra data to export"): only those the
+// Observatory sensor card shows.
+//
+// AllSky v2026 picks them in a list (the "..." button), grouped like below - Environment is the one
+// sensor the Dew Heater and Fans modules reuse, so their own temperature / humidity are not needed.
+// `optionalKey` marks a group that only exists when that AllSky module is installed.
+const ALLSKY_V2026_VARIABLE_GROUPS = [
+    { group: 'Image Data', variables: ['AS_DAY_OR_NIGHT', 'AS_EXPOSURE_US', 'AS_GAIN', 'AS_MEAN', 'AS_TEMPERATURE_C'] },
+    { group: 'Environment', variables: ['AS_TEMP', 'AS_HUMIDITY', 'AS_DEW'] },
+    { group: 'Dew Heater', variables: ['AS_DEWCONTROLHEATER'], optionalKey: 'allsky_mqtt_group_if_installed' },
+    { group: 'Fan', variables: ['AS_FANS_FAN_STATE1', 'AS_FANS_TEMP_LIMIT1', 'AS_FANS_PWM_DUTY_PERCENT1'],
+      optionalKey: 'allsky_mqtt_group_if_installed' },
+];
+
+// AllSky v2024.12 takes a typed, comma-separated list. No shared sensor there: the Dew Heater and
+// Fans modules have their own, and the day/night flag and the version are unprefixed.
+const ALLSKY_V2024_VARIABLES = [
+    'DAY_OR_NIGHT', 'ALLSKY_VERSION', 'AS_TEMPERATURE_C', 'AS_GAIN', 'AS_EXPOSURE_US', 'AS_MEAN',
+    'AS_DEWCONTROLAMBIENT', 'AS_DEWCONTROLHUMIDITY', 'AS_DEWCONTROLDEW', 'AS_DEWCONTROLHEATER',
+    'OTH_FANS', 'OTH_TEMPERATURE', 'OTH_FANT',
+].join(',');
+
 // Per-connector presentation. Everything else about a connector comes from
 // GET /api/connectors; this covers only what the card cannot infer: which icon to use,
 // which i18n key labels its URL field, and the config inputs beyond the common
@@ -50,10 +72,20 @@ const _CONNECTOR_UI = {
     allsky: {
         icon: 'bi bi-camera-video me-2 text-info',
         urlLabelKey: 'url_field',
+        // Sensor data arrives over MQTT (AllSky's Publish Data module): the shared connection
+        // and the topic are picked inside the sensor_data module, next to its setup steps -
+        // the URL above stays AllSky's web interface (images).
+        connectionField: 'mqtt_connection_id',
+        connectionModule: 'sensor_data',
+        moduleFields: {
+            sensor_data: [
+                { key: 'mqtt_topic', labelKey: 'allsky_mqtt_topic_field', placeholder: 'allsky', helpKey: 'allsky_mqtt_topic_help' },
+            ],
+        },
         advanced: [
-            { key: 'image_path',       labelKey: 'allsky_image_path',       placeholder: 'current' },
-            { key: 'image_filename',   labelKey: 'allsky_image_filename',   placeholder: 'image.jpg' },
-            { key: 'export_json_path', labelKey: 'allsky_export_json_path', placeholder: 'allskydata.json' },
+            { key: 'image_path',     labelKey: 'allsky_image_path',     placeholder: 'current' },
+            { key: 'image_filename', labelKey: 'allsky_image_filename', placeholder: 'image.jpg' },
+            { key: 'client_id',      labelKey: 'mqtt_client_id_field',  helpKey: 'mqtt_client_id_hint' },
         ],
         // Setup to do on the AllSky side, shown under the module it concerns. A step's
         // `value` (a string, or a function of the saved config) gets a read-only field with a
@@ -61,22 +93,19 @@ const _CONNECTOR_UI = {
         moduleSetup: {
             sensor_data: {
                 sections: [
-                    { steps: [{ textKey: 'allsky_sensor_setup_pipelines' }] },
                     {
-                        headingKey: 'allsky_sensor_setup_v2026_heading',
                         steps: [
-                            { textKey: 'allsky_sensor_setup_file_location',
-                              value: cfg => `\${ALLSKY_TMP}/current_images/${cfg.export_json_path || 'allskydata.json'}` },
-                            { textKey: 'allsky_sensor_setup_extra_data',
-                              value: 'DAY_OR_NIGHT,ALLSKY_VERSION,AS_TEMPERATURE_C,AS_GAIN,AS_EXPOSURE_US,AS_MEAN' },
-                            { textKey: 'allsky_sensor_setup_dew_heater',
-                              value: 'AS_DEWCONTROLAMBIENT,AS_DEWCONTROLHUMIDITY,AS_DEWCONTROLDEW,AS_DEWCONTROLHEATER' },
-                            { textKey: 'allsky_sensor_setup_fans',
-                              value: 'AS_FANS_FAN_STATE1,AS_FANS_TEMPERATURE1,AS_FANS_TEMP_LIMIT1,AS_FANS_PWM_DUTY_PERCENT1' },
+                            { textKey: 'allsky_mqtt_setup_install' },
+                            { textKey: 'allsky_mqtt_setup_broker' },
+                            { textKey: 'allsky_mqtt_setup_tls' },
+                            { textKey: 'allsky_mqtt_setup_topic', value: cfg => cfg.mqtt_topic || 'allsky' },
+                            { textKey: 'allsky_mqtt_setup_extra_data', variableGroups: ALLSKY_V2026_VARIABLE_GROUPS },
+                            { textKey: 'allsky_mqtt_setup_extra_data_v2024', value: ALLSKY_V2024_VARIABLES },
+                            { textKey: 'allsky_mqtt_setup_test' },
                         ],
                     },
                 ],
-                noteKey: 'allsky_sensor_setup_legacy_note',
+                noteKey: 'allsky_mqtt_setup_note',
             },
         },
     },
@@ -103,6 +132,7 @@ const _CONNECTOR_UI = {
         // The broker is a shared MQTT connection (Parameters -> Configuration), picked here
         // in place of a URL - the backend's CONNECTION_FIELD.
         connectionField: 'mqtt_connection_id',
+        connectionReplacesUrl: true,
         unreachableHintKey: 'mqtt_test_offline_hint',
         checkboxes: [
             { key: 'discovery_enabled', labelKey: 'mqtt_discovery_field' },
@@ -199,15 +229,6 @@ function _mqttStatusLine(status) {
 
 function _connectorUI(name) {
     return _CONNECTOR_UI[name] || {};
-}
-
-/**
- * Every declared input for a connector, main and advanced, so the save path can collect
- * them without knowing which connector it is looking at.
- */
-function _connectorFieldSpecs(name) {
-    const ui = _connectorUI(name);
-    return [...(ui.fields || []), ...(ui.checkboxes || []), ...(ui.advanced || [])];
 }
 
 function _fieldInputId(name, key) {
@@ -341,7 +362,7 @@ function _connectionPicker(c, field) {
     });
     const testBtn = document.createElement('button');
     testBtn.type = 'button';
-    testBtn.className = 'btn btn-outline-secondary connector-test-btn';
+    testBtn.className = 'btn btn-outline-secondary connector-connection-test-btn';
     testBtn.dataset.connector = c.name;
     testBtn.title = i18n.t('mqtt_connections.test');
     testBtn.setAttribute('aria-label', i18n.t('mqtt_connections.test'));
@@ -367,9 +388,12 @@ function _connectionPicker(c, field) {
     help.appendChild(manage);
     wrap.appendChild(help);
 
+    // When the picker stands in for the URL field, its result line is the card's one (the
+    // health check reports there too); otherwise it gets its own.
     const testResult = document.createElement('div');
     testResult.className = 'form-text connector-test-result';
-    testResult.id = `test-result-${c.name}`;
+    testResult.id = _connectorUI(c.name).connectionReplacesUrl ? `test-result-${c.name}` : `connection-test-result-${c.name}`;
+    testResult.dataset.connectionResult = c.name;
     wrap.appendChild(testResult);
     return wrap;
 }
@@ -570,7 +594,7 @@ function _connectorConfigForm(c) {
     // astrodex_stream, which is self-contained like MyAstroShine's SECRET_FIELDS but without
     // even a remote host to configure), and replaced by a connection picker for a connector
     // whose broker is a shared MQTT connection.
-    if (_connectorUI(c.name).connectionField) {
+    if (_connectorUI(c.name).connectionReplacesUrl) {
         frag.appendChild(_connectionPicker(c, _connectorUI(c.name).connectionField));
     } else if (!_connectorUI(c.name).hideUrl) {
         const urlDiv = document.createElement('div');
@@ -694,6 +718,13 @@ function _connectorConfigForm(c) {
         modDesc.textContent = i18n.t(`connectors.module_${m.slug}_desc`);
         info.appendChild(modLbl);
         info.appendChild(modDesc);
+        if (ui.connectionModule === m.slug && ui.connectionField) {
+            const moduleConfig = document.createElement('div');
+            moduleConfig.className = 'mt-2';
+            moduleConfig.appendChild(_connectionPicker(c, ui.connectionField));
+            ((ui.moduleFields || {})[m.slug] || []).forEach(spec => moduleConfig.appendChild(_connectorFieldInput(c, spec)));
+            info.appendChild(moduleConfig);
+        }
         const setup = (ui.moduleSetup || {})[m.slug];
         if (setup) info.appendChild(_moduleSetupBlock(c, m.slug, setup));
 
@@ -819,6 +850,7 @@ function _moduleSetupBlock(c, slug, setup) {
                 const value = typeof step.value === 'function' ? step.value(c.config || {}) : step.value;
                 item.appendChild(_copyableValue(value));
             }
+            if (step.variableGroups) item.appendChild(_variableGroups(step.variableGroups));
             list.appendChild(item);
         });
         body.appendChild(list);
@@ -834,6 +866,40 @@ function _moduleSetupBlock(c, slug, setup) {
 
     frag.appendChild(body);
     return frag;
+}
+
+/**
+ * Variables to tick in a remote tool's picker, one block per group (named as the tool names it),
+ * every name visible at once - for a picker where nothing can be pasted.
+ */
+function _variableGroups(groups) {
+    const wrap = document.createElement('div');
+    wrap.className = 'mt-1';
+    groups.forEach(({ group, variables, optionalKey }) => {
+        const block = document.createElement('div');
+        block.className = 'mb-1';
+        const title = document.createElement('div');
+        title.className = 'fw-semibold';
+        title.textContent = group;
+        if (optionalKey) {
+            const hint = document.createElement('span');
+            hint.className = 'fw-normal text-muted ms-1';
+            hint.textContent = i18n.t(`connectors.${optionalKey}`);
+            title.appendChild(hint);
+        }
+        block.appendChild(title);
+        const chips = document.createElement('div');
+        chips.className = 'd-flex flex-wrap gap-1';
+        variables.forEach(name => {
+            const chip = document.createElement('span');
+            chip.className = 'badge bg-light text-dark border font-monospace fw-normal';
+            chip.textContent = name;
+            chips.appendChild(chip);
+        });
+        block.appendChild(chips);
+        wrap.appendChild(block);
+    });
+    return wrap;
 }
 
 /** Read-only monospace field + copy button, for a value to paste elsewhere as-is. */
@@ -960,6 +1026,11 @@ function _bindConnectorEvents(c) {
     const testBtn = document.querySelector(`.connector-test-btn[data-connector="${c.name}"]`);
     if (testBtn) testBtn.addEventListener('click', () => _testConnector(c.name));
 
+    const connectionTestBtn = document.querySelector(`.connector-connection-test-btn[data-connector="${c.name}"]`);
+    if (connectionTestBtn) {
+        connectionTestBtn.addEventListener('click', () => _testConnectorConnection(c.name, _connectorUI(c.name).connectionField));
+    }
+
     const healthBtn = document.querySelector(`.connector-health-btn[data-connector="${c.name}"]`);
     if (healthBtn) healthBtn.addEventListener('click', () => _runHealthCheck(c.name));
 
@@ -1012,11 +1083,6 @@ function _setResultSpinner(resultDiv, text) {
 }
 
 async function _testConnector(name) {
-    const connectionField = _connectorUI(name).connectionField;
-    if (connectionField) {
-        _testConnectorConnection(name, connectionField);
-        return;
-    }
     const urlInput  = document.getElementById(`connector-url-${name}`);
     const resultDiv = document.getElementById(`test-result-${name}`);
     if (!urlInput || !resultDiv) return;
@@ -1052,20 +1118,20 @@ async function _testConnector(name) {
     }
 }
 
-/** Probe the connection picked on the card, before it is saved. */
+/** Probe the connection picked on the card (the saved connection, with its stored credentials). */
 async function _testConnectorConnection(name, field) {
     const select    = document.getElementById(_fieldInputId(name, field));
-    const resultDiv = document.getElementById(`test-result-${name}`);
+    const resultDiv = document.querySelector(`[data-connection-result="${name}"]`);
     if (!select || !resultDiv) return;
     if (!select.value) {
         _setResultMessage(resultDiv, i18n.t('connectors.mqtt_connection_required'), 'text-danger');
         return;
     }
     _setResultSpinner(resultDiv, i18n.t('connectors.testing'));
-    const result = await fetchJSONOnce(`/api/connectors/${name}/health`, {
+    const result = await fetchJSONOnce(appUrl('/api/mqtt-connections/health'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [field]: select.value }),
+        body: JSON.stringify({ id: select.value }),
     }).catch(() => null);
 
     if (!result) {
@@ -1073,7 +1139,13 @@ async function _testConnectorConnection(name, field) {
     } else if (result.reachable) {
         _setResultMessage(resultDiv, i18n.t('connectors.reachable'), 'text-success', 'bi bi-check-circle');
     } else {
-        _setUnreachable(name, resultDiv, result.error);
+        _setResultMessage(resultDiv, i18n.t('connectors.mqtt_test_offline_hint'), 'text-warning', 'bi bi-exclamation-triangle');
+        if (result.error) {
+            const span = document.createElement('span');
+            span.className = 'text-muted ms-1';
+            span.textContent = `(${result.error})`;
+            resultDiv.appendChild(span);
+        }
     }
 }
 

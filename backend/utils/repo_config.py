@@ -262,6 +262,10 @@ def _read_merged_config(raw):
         merged['astrodex']['map_private'] = False
     # MQTT connector blocks from 1.7.1 or earlier carried their own broker: read them as a connection
     normalize_legacy_mqtt(merged)
+    # The AllSky Export file is no longer read (sensor data arrives over MQTT): drop its setting
+    allsky_block = (merged.get('connectors') or {}).get('allsky')
+    if isinstance(allsky_block, dict) and 'export_json_path' in allsky_block:
+        merged['connectors']['allsky'] = {k: v for k, v in allsky_block.items() if k != 'export_json_path'}
     return merged
 
 

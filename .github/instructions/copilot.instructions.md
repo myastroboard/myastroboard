@@ -57,6 +57,7 @@ myastroboard/
 │   │   ├── i18n_utils.py                # Translation backend helpers
 │   │   ├── image_privacy.py             # Lossless EXIF/GPS metadata stripping for uploaded pictures
 │   │   ├── logging_config.py            # Centralized logger setup
+│   │   ├── mqtt_connections.py          # Shared MQTT broker connections (Parameters -> Configuration), picked by the MQTT connectors
 │   │   ├── metrics_collector.py         # Metrics collection service
 │   │   ├── on_demand_translate.py       # On-demand DeepL/LibreTranslate integration
 │   │   ├── push_manager.py              # VAPID key management, Web Push send wrapper
@@ -74,6 +75,7 @@ myastroboard/
 │   │   ├── connectors_allsky.py     # /api/connectors/allsky/*
 │   │   ├── connectors_myastroshine.py # /api/connectors/myastroshine/health, /api/astrodex/integration/*
 │   │   ├── connectors_mqtt.py       # /api/connectors/mqtt/* (health, status, publish, remove)
+│   │   ├── mqtt_connections.py      # /api/mqtt-connections/* (shared MQTT broker connections)
 │   │   ├── admin.py                 # /api/admin/*, /api/metrics, /api/backup/*, /api/logs/*, /api/config/export
 │   │   ├── misc.py                  # /api/skyquality, /api/convert-coordinates, /api/timezones, /api/health, /api/cache, /api/version
 │   │   ├── weather.py               # /api/weather/*, /api/moon/*, /api/aurora/predictions, /api/seeing-forecast
@@ -125,6 +127,7 @@ myastroboard/
 │   │   ├── myastroshine_connector.py    # MyAstroShine photo round-trip (Astrodex)
 │   │   ├── mqtt_connector.py            # MQTT / Home Assistant publisher - declaration + broker probe (no feature imports!)
 │   │   ├── mqtt_publisher.py            # Background publisher thread (lock file, paho client, cycles, cleanup manifest)
+│   │   ├── mqtt_subscriber.py           # Background subscriber thread: topics the connectors read (AllSky sensor data), last message per connector
 │   │   └── mqtt_payloads.py             # HA discovery + state builders (lazy feature imports) - see docs/HOME_ASSISTANT.md
 │   ├── equipment/                   # Equipment profiles business logic
 │   │   └── equipment_profiles.py        # Equipment profiles API helpers
@@ -528,7 +531,7 @@ night, events <-> skytonight, skytonight <-> weather) and are being unwound one 
   - Observation Log (v1.3, self-scoped; see `docs/OBSERVATION_LOG.md`): `GET/POST /api/observation-sessions`, `GET/PUT/DELETE /api/observation-sessions/<session_id>`, `POST /api/observation-sessions/from-plan`, `POST /api/observation-sessions/<session_id>/entries`, `PUT/DELETE /api/observation-sessions/<session_id>/entries/<entry_id>`, `POST /api/observation-sessions/<session_id>/entries/<entry_id>/astrodex-picture`. Adding/updating an entry with `frame_count > 0` auto-registers its target in Astrodex (never auto-reversed); attaching the picture stays a manual step reusing `POST /api/astrodex/upload`.
   - SkyTonight debug helper: `GET /api/skytonight/target-debug`
   - Localized manifest route: `GET /manifest.<lang>.webmanifest` (public)
-  - MQTT / Home Assistant connector (admin unless noted; see `docs/HOME_ASSISTANT.md`): `GET|POST /api/connectors/mqtt/health`, `GET /api/connectors/mqtt/status` (login), `POST /api/connectors/mqtt/publish`, `POST /api/connectors/mqtt/remove`. The publisher itself is a background thread (`connectors/mqtt_publisher.py`) started from `app.py` next to the push scheduler.
+  - MQTT / Home Assistant connector (admin unless noted; see `docs/HOME_ASSISTANT.md`): `GET /api/connectors/mqtt/health`, `GET /api/connectors/mqtt/status` (login), `POST /api/connectors/mqtt/publish`, `POST /api/connectors/mqtt/remove`. The publisher itself is a background thread (`connectors/mqtt_publisher.py`) started from `app.py` next to the push scheduler.
 - **Error Handling**: Return appropriate HTTP status codes with JSON error objects
   - 401 Unauthorized - Not authenticated
   - 403 Forbidden - Insufficient permissions (not admin)

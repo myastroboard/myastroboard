@@ -109,7 +109,7 @@ class MqttConnector(BaseConnector):
     target_modules: list[str] = []
 
     # The broker (URL, username, password, TLS switch) is a shared MQTT connection, picked by
-    # id: see utils/mqtt_connections.py. Callers lay it over the block with overlay_connection()
+    # id: see utils/mqtt_connections.py. Callers hand it to the constructor (connection_for())
     # and pass the password explicitly, so it never sits in this connector's config.
     CONNECTION_FIELD = "mqtt_connection_id"
 
@@ -172,6 +172,11 @@ class MqttConnector(BaseConnector):
         },
     ]
 
+    def __init__(self, config: dict, connection: dict | None = None):
+        super().__init__(config, connection)
+        # The broker is the connection's URL: this connector has no web address of its own.
+        self.base_url = str((connection or {}).get("url") or "").rstrip("/")
+
     # ------------------------------------------------------------------
     # Configuration accessors
     # ------------------------------------------------------------------
@@ -208,11 +213,11 @@ class MqttConnector(BaseConnector):
             value = int(self.CONFIG_FIELDS["publish_interval_seconds"])
         return max(self.MIN_PUBLISH_INTERVAL_SECONDS, value)
 
-    def client_id(self) -> str:
-        return str(self.config.get("client_id") or "").strip()
+    def username(self) -> str:
+        return str((self.connection or {}).get("username") or "")
 
     def tls_insecure(self) -> bool:
-        return bool(self.config.get("tls_insecure", False))
+        return bool((self.connection or {}).get("tls_insecure", False))
 
     @staticmethod
     def generate_client_id() -> str:
@@ -271,9 +276,9 @@ class MqttConnector(BaseConnector):
     ) -> dict:
         """One MQTT CONNECT / DISCONNECT against *url* (default: the configured broker).
 
-        Returns ``{"reachable": bool, "error": str | None}``. Credentials default to the
-        configured ones only when *url* is the configured URL - the caller decides whether a
-        stored password may be paired with the host it is probing.
+        Returns ``{"reachable": bool, "error": str | None}``. The username and TLS switch
+        default to the connection's; the password is never read here - the caller passes it,
+        and decides whether a stored password may be paired with the host it is probing.
         """
         target = str(url if url is not None else self.base_url or "").strip().rstrip("/")
         host, port, tls, url_error = parse_broker_url(target)
@@ -284,8 +289,8 @@ class MqttConnector(BaseConnector):
         if error or resolved_ip is None:
             return {"reachable": False, "error": error or "unable to resolve host"}
 
-        user = username if username is not None else str(self.config.get("username") or "")
-        secret = password if password is not None else str(self.config.get("password") or "")
+        user = username if username is not None else self.username()
+        secret = password or ""
         insecure = self.tls_insecure() if tls_insecure is None else bool(tls_insecure)
 
         factory = client_factory or self._default_client_factory
@@ -334,10 +339,10 @@ class MqttConnector(BaseConnector):
     def health_check(self, password: str | None = None) -> dict:
         """Connection probe against the saved broker plus one line per module.
 
-        *password* lets a caller supply the credential explicitly rather than through
-        ``self.config`` - see ``connectors_mqtt.py``'s ``_saved_connector()``, which builds
-        this connector from a secret-free config block precisely so a plain informational
-        read of ``base_url``/``client_id`` elsewhere is never mistaken for a credential.
+        *password* is the connection's stored password, passed explicitly - see
+        ``connectors_mqtt.py``'s ``_saved_connector()``: the connector itself never holds it, so
+        a plain informational read of ``base_url``/``client_id`` elsewhere is never mistaken
+        for a credential.
 
         Module lines only reflect the toggles here; the publisher's own status route says
         what is actually being published.

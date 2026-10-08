@@ -101,13 +101,20 @@ def mqtt_connection_health_api():
     ``{"url", "username"?, "password"?, "tls_insecure"?, "id"?}``. A blank or still-masked
     password is replaced by the stored one of connection ``id`` **only when the URL is that
     connection's saved URL**: a stored credential is never sent to a host the caller just typed.
+    ``{"id"}`` alone probes that saved connection as it is (the connectors' picker test button).
 
     A failed probe is a 200 with ``reachable: false`` and an ``error`` string; 400 is reserved
-    for a missing URL.
+    for a missing URL (or an unknown id given alone).
     """
     try:
         data = request.get_json(silent=True) or {}
         url = str(data.get('url') or '').strip().rstrip('/')
+        if not url and data.get('id'):
+            saved = get_connection(load_config(), data.get('id'))
+            if saved is None:
+                return jsonify({'reachable': False, 'error': 'unknown connection'}), 400
+            data = {**saved, 'password': ''}
+            url = saved['url']
         if not url:
             return jsonify({'reachable': False, 'error': 'url required'}), 400
 

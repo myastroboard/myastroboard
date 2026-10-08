@@ -404,7 +404,9 @@ function _allSkyFans(hasValue) {
 
 /**
  * Rows for the fans: a state row (+ PWM duty %, + activation threshold) per fan, and a
- * temperature row for a fan whose control temperature is not already shown as the dome one.
+ * temperature row for a fan whose control temperature is not already shown as the dome one -
+ * either the same variable, or (AllSky v2026, where the Fans module reuses the shared
+ * environment sensor) the same reading.
  */
 function _allSkyFanRows(data, hasValue, fans, domeTempKey) {
     const rows = [];
@@ -425,7 +427,9 @@ function _allSkyFanRows(data, hasValue, fans, domeTempKey) {
                 return `${state}${duty}${limit}`;
             },
         });
-        if (fan.temperature !== domeTempKey) {
+        const sameAsDome = domeTempKey
+            && (fan.temperature === domeTempKey || Number(data[fan.temperature]) === Number(data[domeTempKey]));
+        if (!sameAsDome) {
             rows.push({
                 key: fan.temperature, label: `${i18n.t('observatory.fan_temperature')}${suffix}`, unit: '', icon: 'bi-thermometer',
                 format: value => `${_num(value)} °C`,
@@ -435,7 +439,7 @@ function _allSkyFanRows(data, hasValue, fans, domeTempKey) {
     return rows;
 }
 
-/** Exposure in microseconds -> "250 µs", "1.5 ms", "30 s" (what AllSky's sEXPOSURE showed). */
+/** Exposure in microseconds -> "250 µs", "1.5 ms", "30 s". */
 function _formatExposureUs(raw) {
     const us = Number(raw);
     if (!Number.isFinite(us)) return raw;
@@ -472,40 +476,48 @@ async function _pollAllSkySensor() {
 
     // AllSky v2026+ exports a requested variable it has no value for as "" or null
     const hasValue = key => data[key] != null && data[key] !== '';
-    const humidityKey  = hasValue('AS_DEWCONTROLHUMIDITY') ? 'AS_DEWCONTROLHUMIDITY' : 'AS_HUMIDITY';
-    // AllSky v2026 leaves sEXPOSURE empty (no module publishes it): format EXPOSURE_US instead
-    const exposureKey  = hasValue('AS_sEXPOSURE') ? 'AS_sEXPOSURE' : 'AS_EXPOSURE_US';
+    const firstKey = keys => keys.find(key => key && hasValue(key)) || null;
+
+    // AllSky v2026 declares one environment sensor (AS_TEMP / AS_HUMIDITY / AS_DEW) that the
+    // Dew Heater and Fans modules then reuse: read it first, so each quantity shows once. v2024
+    // has a sensor per module, read as the fallback.
+    const humidityKey  = firstKey(['AS_HUMIDITY', 'AS_DEWCONTROLHUMIDITY']);
+    const dewPointKey  = firstKey(['AS_DEW', 'AS_DEWCONTROLDEW']);
 
     // TEMPERATURE_C is the camera sensor, not the air: AllSky v2026 exports 0 when the camera
     // reports none (most RPi cameras), so an exact 0 is its placeholder rather than a reading
     const sensorTempKnown = hasValue('AS_TEMPERATURE_C') && Number(data.AS_TEMPERATURE_C) !== 0;
 
-    // Dome temperature: the Dew Heater's ambient sensor, else the temperature the first fan is
-    // driven by (Pi CPU or the sensor chosen in the Fans module), both inside the housing
+    // Dome temperature: the environment sensor (v2026), else the Dew Heater's ambient sensor,
+    // else the temperature the first fan is driven by - all inside the housing
     const fans = _allSkyFans(hasValue);
-    const domeTempKey = ['AS_DEWCONTROLAMBIENT', fans[0]?.temperature].find(key => key && hasValue(key)) || null;
+    const domeTempKey = firstKey(['AS_TEMP', 'AS_DEWCONTROLAMBIENT', fans[0]?.temperature]);
 
     const rows = [
         { key: domeTempKey,           label: i18n.t('observatory.dome_temperature'), unit: '°C', icon: 'bi-thermometer-half',
           format: value => _num(value) },
         { key: sensorTempKnown ? 'AS_TEMPERATURE_C' : null, label: i18n.t('observatory.sensor_temperature'), unit: '°C', icon: 'bi-cpu' },
         { key: humidityKey,           label: i18n.t('observatory.humidity'),         unit: '%',  icon: 'bi-droplet-half' },
-        { key: 'AS_DEWCONTROLDEW',    label: i18n.t('observatory.dew_point'),        unit: '°C', icon: 'bi-water' },
+        { key: dewPointKey,           label: i18n.t('observatory.dew_point'),        unit: '°C', icon: 'bi-water' },
         { key: 'AS_DEWCONTROLHEATER', label: i18n.t('observatory.dew_heater'),       unit: '',   icon: 'bi-lightning-charge' },
         ..._allSkyFanRows(data, hasValue, fans, domeTempKey),
         { key: 'AS_GAIN',             label: i18n.t('observatory.gain'),             unit: '',   icon: 'bi-sliders' },
-        { key: exposureKey,           label: i18n.t('observatory.exposure'),         unit: '',   icon: 'bi-clock',
-          format: exposureKey === 'AS_EXPOSURE_US' ? _formatExposureUs : null },
+        { key: 'AS_EXPOSURE_US',      label: i18n.t('observatory.exposure'),         unit: '',   icon: 'bi-clock',
+          format: _formatExposureUs },
         { key: 'AS_MEAN',             label: i18n.t('observatory.mean_brightness'),  unit: '',   icon: 'bi-brightness-high' },
         { key: 'ALLSKY_VERSION',      label: i18n.t('observatory.version'),          unit: '',   icon: 'bi-info-circle' },
     ];
+    // When the board received these readings (AllSky publishes them over MQTT) - last, and only
+    // under actual readings
+    const updatedRow = { key: '_received_at', label: i18n.t('observatory.sensor_updated'), unit: '', icon: 'bi-arrow-repeat',
+        format: value => formatDateTime(value) };
 
     const table = document.createElement('table');
     table.className = 'table table-sm table-borderless mb-0 small';
     let hasRows = false;
 
-    for (const { key, label, unit, icon, format } of rows) {
-        if (!hasValue(key)) continue;
+    for (const { key, label, unit, icon, format } of [...rows, updatedRow]) {
+        if (!hasValue(key) || (key === updatedRow.key && !hasRows)) continue;
         hasRows = true;
         const tr = document.createElement('tr');
         const td1 = document.createElement('td');

@@ -7899,36 +7899,8 @@ class TestAllSkyStatusApi:
         resp = client_admin.get('/api/connectors/allsky/status')
         assert resp.status_code == 404
 
-    def test_returns_cached_data(self, client_admin, monkeypatch):
-        """A fresh cached reading is served as is, without contacting the AllSky instance."""
-        import time
-
-        cfg = {
-            "url": "http://allsky.local",
-            "enabled": True,
-            "modules": {"sensor_data": {"enabled": True}},
-        }
-        monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
-
-        def _no_live_fetch(self):
-            raise AssertionError("a fresh cached reading must not trigger a live fetch")
-
-        monkeypatch.setattr(_connectors_allsky_mod.AllSkyConnector, 'fetch_sensor_data', _no_live_fetch)
-        from cache import cache_store as cs
-
-        original = dict(cs._allsky_sensor_cache)
-        # Planted with a current timestamp: the route treats an older reading as stale and refetches.
-        cs._allsky_sensor_cache["data"] = {"AS_TEMPERATURE_C": 15.0}
-        cs._allsky_sensor_cache["timestamp"] = time.time()
-        try:
-            resp = client_admin.get('/api/connectors/allsky/status')
-            assert resp.status_code == 200
-            assert resp.get_json().get("AS_TEMPERATURE_C") == 15.0
-        finally:
-            cs._allsky_sensor_cache.update(original)
-            cs._allsky_sensor_cache["data"] = None
-
-    def test_fetches_live_when_cache_empty(self, client_admin, monkeypatch):
+    def test_serves_the_sensor_data_the_connector_reads(self, client_admin, monkeypatch):
+        """The route answers with the connector's reading of the last MQTT message, as is."""
         from unittest.mock import patch
 
         cfg = {
@@ -7937,15 +7909,12 @@ class TestAllSkyStatusApi:
             "modules": {"sensor_data": {"enabled": True}},
         }
         monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
-        from cache import cache_store as cs
-
-        cs._allsky_sensor_cache["data"] = None
         with patch(
             'connectors.allsky_connector.AllSkyConnector.fetch_sensor_data', return_value={"AS_TEMPERATURE_C": 20.0}
         ):
             resp = client_admin.get('/api/connectors/allsky/status')
         assert resp.status_code == 200
-        cs._allsky_sensor_cache["data"] = None
+        assert resp.get_json() == {"AS_TEMPERATURE_C": 20.0}
 
 
 class TestAllSkyHealthApi:

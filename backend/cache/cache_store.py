@@ -131,7 +131,6 @@ _iers_cache = {"timestamp": 0, "data": None}
 _version_update_cache = {"timestamp": 0, "data": None}
 
 # Connector caches
-_allsky_sensor_cache = {"timestamp": 0, "data": None}
 _allsky_health_cache = {"timestamp": 0, "data": None}
 
 _GLOBAL_SHARED_CACHES = {
@@ -526,7 +525,6 @@ def reset_all_caches():
         _spaceflight_launches_cache,
         _spaceflight_astronauts_cache,
         _spaceflight_events_cache,
-        _allsky_sensor_cache,
         _allsky_health_cache,
     ):
         entry["timestamp"] = 0
@@ -600,23 +598,19 @@ def _default_status_location_ids():
 
 
 def _allsky_job_availability():
-    """Whether each AllSky job can ever actually run (lazy config read).
+    """Whether the AllSky health job can ever actually run (lazy config read).
 
-    Mirrors the exact scheduling gate in cache_updater.fully_initialize_caches:
-    allsky_health only needs the connector enabled+url, allsky_sensor also
-    needs its own module toggle. A job that can never run must not appear in
-    the metrics table - it would just sit "stale" forever with no explanation.
-    Returns (sensor_available, health_available).
+    Mirrors the exact scheduling gate in cache_updater.fully_initialize_caches: the connector
+    enabled with a URL. A job that can never run must not appear in the metrics table - it would
+    just sit "stale" forever with no explanation. (Sensor data has no job: it arrives over MQTT.)
     """
     try:
         from utils.repo_config import load_config
 
         allsky_cfg = load_config().get("connectors", {}).get("allsky", {})
     except Exception:
-        return False, False
-    connector_ready = bool(allsky_cfg.get("enabled") and allsky_cfg.get("url"))
-    sensor_ready = connector_ready and bool(allsky_cfg.get("modules", {}).get("sensor_data", {}).get("enabled"))
-    return sensor_ready, connector_ready
+        return False
+    return bool(allsky_cfg.get("enabled") and allsky_cfg.get("url"))
 
 
 def _sync_all_from_shared():
@@ -723,7 +717,7 @@ def get_cache_init_status(location_ids=None):
             return False
         return is_cache_valid(get_location_cache_entry(name, location_id), LOCATION_SCOPED_CACHE_TTLS[name])
 
-    allsky_sensor_available, allsky_health_available = _allsky_job_availability()
+    allsky_health_available = _allsky_job_availability()
 
     status = {name: _loc_valid(name, primary_id) for name in LOCATION_SCOPED_CACHE_TTLS}
     status.update(
@@ -734,8 +728,6 @@ def get_cache_init_status(location_ids=None):
             "iers": is_cache_valid(_iers_cache, CACHE_TTL_IERS),
         }
     )
-    if allsky_sensor_available:
-        status["allsky_sensor"] = _is_execution_metrics_valid("allsky_sensor", AllSkyConnector.SENSOR_CACHE_TTL)
     if allsky_health_available:
         status["allsky_health"] = _is_execution_metrics_valid("allsky_health", AllSkyConnector.HEALTH_CACHE_TTL)
 
@@ -766,7 +758,6 @@ def get_cache_init_status(location_ids=None):
                 "iers": CACHE_TTL_IERS,
                 # Jobs that can never run (connector/module not configured)
                 # must not appear in the metrics table as permanently "stale".
-                **({"allsky_sensor": AllSkyConnector.SENSOR_CACHE_TTL} if allsky_sensor_available else {}),
                 **({"allsky_health": AllSkyConnector.HEALTH_CACHE_TTL} if allsky_health_available else {}),
             },
             "execution_metrics": get_cache_metrics(),

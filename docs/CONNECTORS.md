@@ -76,18 +76,25 @@ key and the VAPID keys already follow. Consequences:
 
 A broker is declared once, as a connection (`utils/mqtt_connections.py`, managed in
 Parameters -> Configuration through `blueprints/mqtt_connections.py`), and shared by every
-connector that talks MQTT - the Home Assistant publisher today, an AllSky reader or a Home
-Assistant sensor reader tomorrow, on the same broker or on separate ones.
+connector that talks MQTT - the Home Assistant publisher and the AllSky sensor reader today, a
+Home Assistant sensor reader tomorrow - on the same broker or on separate ones.
 
 - A connection is `{id, name, url, username, tls_insecure}` in `config["mqtt_connections"]`; its
   password is in the secrets store under `mqtt_connection:<id>`; API answers only carry a fixed
   `********` mask (no tail, unlike `SECRET_FIELDS` tokens).
-- A connector declares `CONNECTION_FIELD` (`MqttConnector`: `mqtt_connection_id`). Callers build it
-  from `overlay_connection(block, config, cls.CONNECTION_FIELD)`, which lays the connection's
-  `url` / `username` / `tls_insecure` over the block; the password is fetched with
-  `connection_password(id)` and passed explicitly, never mixed into the connector's config.
-- The card shows a connection picker in place of the URL field (`connectionField` in
-  `_CONNECTOR_UI`); `GET /api/connectors` lists the connections' names as `connection_options`.
+- A connector declares `CONNECTION_FIELD` (`mqtt_connection_id` for both). Callers build it as
+  `cls(block, connection=connection_for(cls, block, config))`: the connection
+  (`{id, name, url, username, tls_insecure}`) is kept apart from the block, so a connector keeps its
+  own `url` next to the broker (AllSky: its web interface). The password is fetched with
+  `connection_password(id)` and passed explicitly, never held by the connector.
+- A connector that **reads** topics lists them in `mqtt_subscriptions()`;
+  `connectors/mqtt_subscriber.py` (one background thread, like the publisher) keeps one client per
+  connector and stores its last message, read back with `mqtt_subscriber.read_last_message(name)`.
+- The card shows a connection picker (`connectionField` in `_CONNECTOR_UI`): in place of the URL
+  field (`connectionReplacesUrl`, Home Assistant), or inside one module (`connectionModule`, AllSky's
+  `sensor_data`). `GET /api/connectors` lists the connections' names as `connection_options`.
+- `BaseConnector.validate_config(block)` lets a connector refuse a save the typed coercion cannot
+  catch (AllSky: a topic with a wildcard).
 - The shared save refuses an unknown connection id, and refuses a `client_id` already used by
   another connector on the same connection: each connector opens its own client, and a broker
   disconnects a client when another one connects with the same id. A blank client id is generated
@@ -158,7 +165,9 @@ and action buttons under the save row.
 
 ## AllSky connector
 
-[AllSky](https://github.com/AllskyTeam/allsky) is an open-source all-sky camera system. It serves data entirely through file serving (no REST API).
+[AllSky](https://github.com/AllskyTeam/allsky) is an open-source all-sky camera system. Its images
+are files served by its web server; its sensor data is published over MQTT by its *Publish Data*
+module.
 
 **Minimum version**: v2024.12 (v2026.10 supported too)
 
@@ -166,70 +175,122 @@ and action buttons under the save row.
 
 ### AllSky versions
 
-AllSky v2026.10 changed two things the connector reads. Both versions work without reconfiguring:
+Both versions work without reconfiguring:
 
 | | v2024.12 | v2026.10 onwards |
 |---|---|---|
 | Live image URL | `/current/tmp/image.jpg` | `/current/image.jpg` (`/current/` now serves `tmp/current_images`) |
-| Export JSON | every `AS_*` / `ALLSKY_*` variable, full names | only the variables listed in *Extra data to export*, with the `AS_` prefix stripped (`AS_TEMPERATURE_C` -> `TEMPERATURE_C`) |
-| Export JSON default location | `${ALLSKY_TMP}/allskydata.json`, served as `/current/tmp/allskydata.json` | same file, but no longer served by the web server |
+| Publish Data module | *AllSKY Redis/MQTT/REST Data Publish* | *Publish Data to Redis/MQTT/REST/influxDB* |
+| Publish Data TLS | none (`mqtt://` only) | *Use SSL* switch, on by default |
+| Environment sensor | one sensor per module (Dew Heater, Fans) | one shared sensor (`AS_TEMP`, `AS_HUMIDITY`, `AS_DEW`) |
 
 - **Layout detection**: when `image_path` is `current` or `current/tmp`, the other one is tried too.
   The first that answers is remembered for 5 minutes (per worker), and the health check always probes again.
   A custom `image_path` is used as-is.
-- **Key normalisation**: each un-prefixed key of the Export JSON is also exposed under its `AS_` name,
-  so both formats display the same way.
+- **Variable names**: Publish Data sends the variables under their `AS_` names in both versions.
+  A prefix-less key (`TEMPERATURE_C`) is still also exposed under its `AS_` name, and
+  `AS_DAY_OR_NIGHT` as `DAY_OR_NIGHT`.
 
 ### Modules
 
 | Slug | Label | Default | Description |
 |------|-------|---------|-------------|
 | `live_image` | Live image | Enabled | Auto-refreshing live sky image (30 s interval) |
-| `sensor_data` | Sensor data | Disabled | Temperature, humidity, gain, exposure, brightness — requires the AllSky Export overlay module added to Day & Night pipelines |
+| `sensor_data` | Sensor data | Disabled | Temperature, humidity, gain, exposure, brightness - received over MQTT from AllSky's Publish Data module |
 | `keogram` | Keogram | Enabled | Daily keogram timeline strip (generated end-of-night) |
 | `startrails` | Startrails | Disabled | Stacked startrails image (generated end-of-night) |
 | `daily_timelapse` | Daily timelapse | Disabled | Full-night timelapse video (generated end-of-night) |
 
-### Advanced settings
+### Settings
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `image_path` | `current` | Path to the live image directory, relative to the base URL (`current/tmp` before AllSky v2026.10 - both are detected automatically) |
-| `image_filename` | `image.jpg` | Filename of the live image |
-| `export_json_path` | `allskydata.json` | Path to the AllSky Export JSON file, relative to `image_path` |
+| `url` | - | AllSky's web interface (images) |
+| `mqtt_connection_id` | - | The shared [MQTT connection](#mqtt-connections) the sensor data arrives on - the same broker as Home Assistant or another one |
+| `mqtt_topic` | `allsky` | *MQTT Topic* of the Publish Data module; an exact topic (no `+` / `#`) |
+| `image_path` (advanced) | `current` | Path to the live image directory, relative to the base URL (`current/tmp` before AllSky v2026.10 - both are detected automatically) |
+| `image_filename` (advanced) | `image.jpg` | Filename of the live image |
+| `client_id` (advanced) | generated | `myastroboard-allsky-<hex>` when blank; must differ from the other connectors on the same connection |
 
 ### Sensor data module
 
-The `sensor_data` module reads a JSON file produced by the AllSky **Export Allsky Data** module (`allsky_export`, built in - not *Allsky Kamera* / `allsky_allskykamera`, which uploads to allskykamera.space). This overlay must be added to **both the Day and Night pipelines** in AllSky settings, otherwise the file is never written.
+The `sensor_data` module listens over MQTT to AllSky's **Publish Data to Redis/MQTT/REST/influxDB**
+module (`allsky_publishdata`, named *AllSKY Redis/MQTT/REST Data Publish* in v2024.12 - an extra
+module, installed from the Module Manager). It replaces the *Export Allsky Data* file earlier
+releases downloaded, which needed a web-served file location and broke with AllSky v2026.
 
-The connector card shows these steps under the *Sensor data* module (*How to set it up in AllSky*), with a copy button for each value.
+The connector card shows these steps under the *Sensor data* module (*How to set it up in AllSky*),
+with a copy button for each value:
 
-**AllSky v2026.10 onwards**: in the Module Manager, open the Export module settings in both pipelines and set:
+1. Install the module and add it to the **Day and Night pipelines**: it then publishes at every
+   image, with that image's data (exposure, gain, brightness, day / night).
+   - AllSky v2024.12 needs the pipelines: its *Periodic jobs* run only sees the environment
+     (`variables.sh`, the Dew Heater / Fans extra files), not the image variables
+     (`DAY_OR_NIGHT`, `AS_GAIN`...), which only exist while an image is processed.
+   - AllSky v2026 can also run it in the *Periodic jobs* list (about once a minute, with the last
+     image's data): the choice when daytime capture is off, since no daytime image means no
+     daytime message.
+2. **MQTT** tab: *Publish to MQTT* on; *MQTT Host* and its port, *Username*, *Password*: the broker
+   of the MQTT connection chosen on the card. *Enable HA Discovery* is optional (it adds AllSky's own
+   sensors to Home Assistant).
+3. AllSky v2026: turn **off** *Use SSL* (*Secure Connection*) for a broker on `mqtt://` (port 1883).
+   v2024.12 has no TLS: its broker must accept `mqtt://`.
+4. **MQTT Topic**: the card's `mqtt_topic` (`allsky` by default).
+5. **General** tab, *Extra data to export*: the variables to send - only listed variables are
+   published (the default list is empty and sends only a `utc` timestamp). Only what the sensor
+   card shows; a variable an install does not have is left out of the message.
 
-- **File Location**: `${ALLSKY_TMP}/current_images/allskydata.json`. The default `${ALLSKY_TMP}/allskydata.json` is no longer reachable over HTTP.
-- **Extra data to export**: the variables to show. Only listed variables are exported now, for example:
-  `DAY_OR_NIGHT,ALLSKY_VERSION,AS_TEMPERATURE_C,AS_GAIN,AS_EXPOSURE_US,AS_MEAN`. Add
-  `AS_DEWCONTROLAMBIENT,AS_DEWCONTROLHUMIDITY,AS_DEWCONTROLDEW,AS_DEWCONTROLHEATER` when the Dew Heater module is installed, and
-  `AS_FANS_FAN_STATE1,AS_FANS_TEMPERATURE1,AS_FANS_TEMP_LIMIT1,AS_FANS_PWM_DUTY_PERCENT1` when the Fans module is
-  (same names ending in `2` for a second fan).
+   - **v2026**: ticked in the list of the *...* button (nothing can be pasted there), grouped as in
+     that list. *Environment* is the shared sensor, so the Dew Heater / Fan temperatures and
+     humidity are not needed:
+
+     | Group | Variables |
+     |---|---|
+     | Image Data | `AS_DAY_OR_NIGHT`, `AS_EXPOSURE_US`, `AS_GAIN`, `AS_MEAN`, `AS_TEMPERATURE_C` |
+     | Environment | `AS_TEMP`, `AS_HUMIDITY`, `AS_DEW` |
+     | Dew Heater (if installed) | `AS_DEWCONTROLHEATER` |
+     | Fan (if installed) | `AS_FANS_FAN_STATE1`, `AS_FANS_TEMP_LIMIT1`, `AS_FANS_PWM_DUTY_PERCENT1` |
+
+   - **v2024.12**: a typed field - paste (no shared sensor; the day/night flag and the version are
+     unprefixed, the Fans module publishes `OTH_*`):
+     `DAY_OR_NIGHT,ALLSKY_VERSION,AS_TEMPERATURE_C,AS_GAIN,AS_EXPOSURE_US,AS_MEAN,AS_DEWCONTROLAMBIENT,AS_DEWCONTROLHUMIDITY,AS_DEWCONTROLDEW,AS_DEWCONTROLHEATER,OTH_FANS,OTH_TEMPERATURE,OTH_FANT`
+6. *Save*, then *Test Module* (*Day* or *Night* is only the context of the test): a first message
+   goes out right away and the card's health check turns green.
+
+The message stays under 15 minutes old as long as the module runs: at every image (or every
+Periodic jobs run). With daytime capture off and the module in the pipelines only, the card shows no
+readings during the day.
+
+How the board receives it: `connectors/mqtt_subscriber.py` (one background thread, one client per
+connector, own client id) keeps the **last message** in `data/cache/mqtt_last_allsky.json`, which
+`GET /api/connectors/allsky/status` reads. AllSky's messages are not retained by the broker, so
+after a board restart the card waits for the next image (or Periodic jobs run). A message older than 15 minutes
+(`MQTT_STALE_AFTER_SECONDS`) is no longer shown. Messages larger than 64 KB, or that are not a flat
+JSON object, are ignored.
 
 When sensor data is available the Observatory tab shows:
 
 | Field | AllSky variable |
 |-------|-----------------|
-| Dome temperature | `AS_DEWCONTROLAMBIENT` (Dew Heater module, optional), else the first fan's `AS_FANS_TEMPERATURE1` (v2024: `OTH_TEMPERATURE`) |
-| Camera sensor temperature (hidden when AllSky exports its `0` placeholder) | `AS_TEMPERATURE_C` |
-| Humidity | `AS_DEWCONTROLHUMIDITY` or `AS_HUMIDITY` |
-| Dew point | `AS_DEWCONTROLDEW` |
+| Dome temperature | `AS_TEMP` (the environment sensor, AllSky v2026), else `AS_DEWCONTROLAMBIENT` (Dew Heater), else the first fan's `AS_FANS_TEMPERATURE1` (v2024: `OTH_TEMPERATURE`) |
+| Camera sensor temperature (hidden when AllSky sends its `0` placeholder) | `AS_TEMPERATURE_C` |
+| Humidity | `AS_HUMIDITY`, else `AS_DEWCONTROLHUMIDITY` |
+| Dew point | `AS_DEW`, else `AS_DEWCONTROLDEW` |
 | Dew heater | `AS_DEWCONTROLHEATER` |
 | Gain | `AS_GAIN` |
-| Exposure | `AS_sEXPOSURE`, or `AS_EXPOSURE_US` formatted as µs / ms / s (AllSky v2026 leaves `sEXPOSURE` empty) |
+| Exposure | `AS_EXPOSURE_US`, formatted as µs / ms / s |
 | Brightness | `AS_MEAN` |
 | Fan (state, PWM duty %, threshold) | `AS_FANS_FAN_STATE1` / `2`, `AS_FANS_PWM_DUTY_PERCENT1` / `2`, `AS_FANS_TEMP_LIMIT1` / `2` (v2024: `OTH_FANS`, `OTH_FANT`) |
-| Fan control temperature (Pi CPU by default, or the sensor chosen in the Fans module), only when not already the dome temperature | `AS_FANS_TEMPERATURE1` / `2` |
-| AllSky version | `ALLSKY_VERSION` |
+| Fan control temperature, only when it is not already the dome temperature (same variable or same reading) | `AS_FANS_TEMPERATURE1` / `2` |
+| AllSky version (v2024.12 only: v2026 cannot publish it) | `ALLSKY_VERSION` |
+| Updated (when the board received the readings) | the message receive time |
 
-The **Day / Night badge** on the live image card is populated from the `DAY_OR_NIGHT` field in the same JSON. It is hidden when sensor data is disabled or when the field is absent from the exported data.
+AllSky v2026 declares **one** environment sensor (*Environment* group: `AS_TEMP`, `AS_HUMIDITY`,
+`AS_DEW`, `AS_TEMPSENSOR`) that the Dew Heater and Fans modules reuse, so their readings repeat it:
+it is read first, so each quantity shows once. v2024 has a sensor per module, read as the fallback.
+
+The **Day / Night badge** on the live image card is populated from `AS_DAY_OR_NIGHT`. It is hidden
+when sensor data is disabled or when the variable is not in the list.
 
 ### Observatory display
 
@@ -257,11 +318,12 @@ All resource URLs are served through the MyAstroBoard backend at `/api/connector
 |---------|-------------|-----|
 | Images never load, proxy errors in logs | `.local` hostname used | Replace with static IP address |
 | Images load locally but not remotely | Browser trying to reach AllSky directly | Ensure proxy is not disabled; check MyAstroBoard logs |
-| Day/Night badge not shown | `sensor_data` module disabled, or Export overlay not in pipeline | Enable `sensor_data` and add Export module to AllSky pipelines |
+| Day/Night badge not shown | `sensor_data` module disabled, or `AS_DAY_OR_NIGHT` not in the Publish Data list | Enable `sensor_data`; add `AS_DAY_OR_NIGHT` to *Extra data to export* |
 | Keogram / startrails show *Not yet generated* | End-of-night processing not run yet | Normal during the night; images appear after AllSky finishes its end-of-night run |
 | Daily timelapse shows empty video player | No timelapse generated yet | Normal; the placeholder appears automatically once AllSky produces the file |
-| Sensor data unavailable | Export JSON not found or AllSky offline | Check AllSky Export module path matches `export_json_path` in advanced settings; on AllSky v2026.10+ the File Location must be under `${ALLSKY_TMP}/current_images/` |
-| Sensor data shows only the version / Day-Night badge | AllSky v2026.10+ exports only the *Extra data to export* list | Add the sensor variables to that list (see [Sensor data module](#sensor-data-module)) |
+| *No reading received from AllSky yet* | No message on the topic: Publish Data not in the Day / Night pipelines, *Publish to MQTT* off, another broker or topic, or *Use SSL* on against a `mqtt://` broker | Follow the card's steps, then *Test Module*; the health check says whether any message arrived and whether the board is connected to the broker |
+| Sensor card nearly empty | *Extra data to export* empty or short (only `utc` is sent by default) | Paste the list from the card (see [Sensor data module](#sensor-data-module)) |
+| Readings stop updating after 15 min | AllSky stopped publishing (Pi off, no image - daytime capture off -, module removed from the pipelines) | The card hides readings older than 15 minutes; check AllSky, or (v2026) also add the module to the Periodic jobs |
 | Live image stopped loading after upgrading AllSky | Live image moved from `current/tmp/` to `current/` | Detected automatically; run the health check to refresh the detection immediately |
 
 ---
