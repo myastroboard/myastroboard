@@ -12,7 +12,8 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
-- None.
+- Screen-reader labels (close buttons, menu toggle, language and theme pickers, sky widget, photo slideshow arrows,
+  location order buttons) are now translated instead of always English.
 
 ### Breaking changes
 

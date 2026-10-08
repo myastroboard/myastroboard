@@ -43,7 +43,10 @@
     "day": "Day",
     "night": "Night",
     "modal_not_initialized": "Configuration modal not properly initialized",
-    "comming_soon": "Cette fonctionnalité est en cours de développement et sera bientôt disponible !"
+    "comming_soon": "Cette fonctionnalité est en cours de développement et sera bientôt disponible !",
+    "toggle_navigation": "Toggle navigation",
+    "move_up": "Move up",
+    "move_down": "Move down"
   },
   "whats_new": {
     "footer_available": "v{version} is available",
@@ -1192,7 +1195,10 @@
     "stream_copy_url": "Copy URL",
     "stream_ha_setup_hint": "In Home Assistant: Settings -> Devices & services -> Add integration -> Generic Camera, then paste the URL above into \"Still Image URL\". No username or password needed.",
     "stream_url_copied": "URL copied to clipboard",
-    "stream_copy_failed": "Could not copy the URL - select and copy it manually"
+    "stream_copy_failed": "Could not copy the URL - select and copy it manually",
+    "previous_photo": "Previous photo",
+    "next_photo": "Next photo",
+    "photo_alt": "Photo {number}"
   },
   "skytonight": {
     "info_1": "SkyTonight calculates the best observation targets for the night based on your location, weather forecast, and internal datasets.",
@@ -2914,7 +2920,8 @@
     "score_title": "Current sky quality score (0-10): seeing, transparency, cloud cover, tracking stability",
     "other_locations": "Locations",
     "tz_badge_title": "This location's time zone is {offset} - different from yours",
-    "tz_notice": "Times shown for this location are in {tz} ({offset}). Your time zone is {your_tz} ({your_offset})."
+    "tz_notice": "Times shown for this location are in {tz} ({offset}). Your time zone is {your_tz} ({your_offset}).",
+    "score_label": "Observation score"
   },
   "wizard": {
     "title": "Getting Started",

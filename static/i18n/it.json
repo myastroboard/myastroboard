@@ -43,7 +43,10 @@
     "day": "Giorno",
     "night": "Notte",
     "modal_not_initialized": "La configurazione modale non è inizializzata correttamente",
-    "comming_soon": "Questa funzionalità è nel corso di sviluppo e sarà ben disponibile!"
+    "comming_soon": "Questa funzionalità è nel corso di sviluppo e sarà ben disponibile!",
+    "toggle_navigation": "Mostra/nascondi la navigazione",
+    "move_up": "Sposta su",
+    "move_down": "Sposta giù"
   },
   "whats_new": {
     "footer_available": "v{version} è disponibile",
@@ -1192,7 +1195,10 @@
     "stream_copy_url": "Copia URL",
     "stream_ha_setup_hint": "In Home Assistant: Impostazioni -> Dispositivi e servizi -> Aggiungi integrazione -> Generic Camera, quindi incolla l'URL sopra in \"Still Image URL\". Non servono nome utente o password.",
     "stream_url_copied": "URL copiato negli appunti",
-    "stream_copy_failed": "Impossibile copiare l'URL - selezionala e copiala manualmente"
+    "stream_copy_failed": "Impossibile copiare l'URL - selezionala e copiala manualmente",
+    "previous_photo": "Foto precedente",
+    "next_photo": "Foto successiva",
+    "photo_alt": "Foto {number}"
   },
   "skytonight": {
     "info_1": "SkyTonight calcola i migliori obiettivi di osservazione per la notte in base alla tua posizione, alle previsioni del tempo e ai set di dati interni.",
@@ -2914,7 +2920,8 @@
     "score_title": "Punteggio qualità cielo attuale (0-10): seeing, trasparenza, copertura nuvolosa, stabilità di inseguimento",
     "other_locations": "Località",
     "tz_badge_title": "Il fuso orario di questa località è {offset} - diverso dal tuo",
-    "tz_notice": "Gli orari mostrati per questa località sono in {tz} ({offset}). Il tuo fuso orario è {your_tz} ({your_offset})."
+    "tz_notice": "Gli orari mostrati per questa località sono in {tz} ({offset}). Il tuo fuso orario è {your_tz} ({your_offset}).",
+    "score_label": "Punteggio di osservazione"
   },
   "wizard": {
     "title": "Iniziare",
