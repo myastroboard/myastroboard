@@ -475,6 +475,35 @@ class TestConfigEndpoints:
         assert resp.get_json()['cache_reset'] is False
         assert reset_calls == []
 
+    def test_post_config_keeps_the_sections_it_does_not_send(self, client_admin, monkeypatch):
+        """Saving the settings page (Astrodex + constraints only) keeps connectors, MQTT
+        connections and any other stored section; connectors and connections are never
+        written through this route, even when the payload carries them."""
+        old_cfg = {
+            'locations': [],
+            'skytonight': {'constraints': {}},
+            'connectors': {'allsky': {'url': 'http://allsky.lan', 'enabled': True}},
+            'mqtt_connections': [{'id': 'c1', 'name': 'Home', 'url': 'mqtt://broker.lan'}],
+            'custom_section': {'kept': True},
+        }
+        saved = {}
+        monkeypatch.setattr(_locations_mod, 'load_config', lambda: old_cfg)
+        monkeypatch.setattr(_locations_mod, 'save_config', lambda cfg: saved.update(cfg) or True)
+
+        incoming = {
+            'astrodex': {'private': True, 'map_private': False},
+            'skytonight': {'constraints': {}},
+            'connectors': {'allsky': {'url': 'http://evil.lan'}},
+            'mqtt_connections': [],
+        }
+        resp = client_admin.post('/api/config', json=incoming)
+
+        assert resp.status_code == 200
+        assert saved['connectors'] == {'allsky': {'url': 'http://allsky.lan', 'enabled': True}}
+        assert saved['mqtt_connections'] == [{'id': 'c1', 'name': 'Home', 'url': 'mqtt://broker.lan'}]
+        assert saved['custom_section'] == {'kept': True}
+        assert saved['astrodex'] == {'private': True, 'map_private': False}
+
     def test_post_config_legacy_location_with_no_matching_preset_id(self, client_admin, monkeypatch):
         """Defensive arc: if the install default's id (from get_install_default_location)
         somehow isn't present in old_config['locations'], the compat loop runs to

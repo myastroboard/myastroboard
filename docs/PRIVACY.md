@@ -121,7 +121,7 @@ the browser IP. Mention them in your privacy notice.
 |---|---|
 | Account and all per-user files | The account is deleted (see below). |
 | Locations | An administrator deletes them. |
-| Application log | 90 days by default: older lines are removed once a day (*Parameters -> Log export*, 0 to 3650 days; 0 keeps only the size limit of 10 MB x 6 files). |
+| Application log | 90 days by default: older lines are removed once a day (*Parameters -> Logs*, 0 to 3650 days; 0 keeps only the size limit of 10 MB x 6 files). |
 | Backups downloaded from *Configuration* | Under your control, outside the application: they contain everything listed above. |
 
 ---
@@ -155,8 +155,8 @@ prefixes of the files in `astrodex/images/` and `observation_sessions/attachment
   networks ([details](AUTHENTICATION.md)).
 - Private by default towards search engines: `robots.txt` disallows crawling and the login page is
   `noindex` unless you opt in (*Parameters -> Advanced -> Privacy*).
-- Connector secrets are stored apart from the configuration, with owner-only file permissions, and
-  never appear in exports or API responses.
+- Connector secrets (MQTT connection passwords included) are stored apart from the configuration,
+  with owner-only file permissions, and never appear in exports or API responses.
 - All front-end libraries are served locally: no CDN, font or analytics request leaves the browser
   except the map tiles and geocoding listed above.
 

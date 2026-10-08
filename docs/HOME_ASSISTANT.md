@@ -36,15 +36,19 @@ integration below works the same whichever way MyAstroBoard is installed (broker
 1. **Broker.** Create a user for MyAstroBoard on the broker (Mosquitto add-on: Settings ->
    Add-ons -> Mosquitto -> Configuration, or a Home Assistant user - the add-on accepts those).
    Note the broker's IP address and port (1883, or 8883 for TLS).
-2. **MyAstroBoard.** Parameters -> Connectors -> **MQTT / Home Assistant** -> Configure:
+2. **MQTT connection.** Parameters -> Configuration -> *MQTT connections* -> **Add a connection**
+   (see [MQTT connections](#mqtt-connections)):
+   - *Display name*: any name, shown in the connector's picker.
    - *Broker URL*: `mqtt://192.168.1.10:1883` (or `mqtts://host:8883` for TLS). Use the IP
      address rather than a `.local` name - mDNS does not resolve inside the container.
    - *Username* / *Password*: the broker user. Leave both blank for an anonymous broker.
    - Press the **test** button (wifi icon): it opens one real connection to the broker with the
-     credentials as typed and reports *Reachable* or the reason it is not (refused, timeout, not
-     authorized, TLS...).
+     settings as typed and reports *Reachable* or the reason it is not (refused, timeout, not
+     authorized, TLS...). **Save**.
+3. **Connector.** Parameters -> Connectors -> **MQTT / Home Assistant** -> Configure:
+   - *MQTT connection*: pick the connection created above (the wifi button tests it).
    - Tick the modules you want (see [Modules](#modules)), switch **Enable connector** on, **Save**.
-3. **Home Assistant.** Settings -> Devices & services -> MQTT: within a minute a **MyAstroBoard**
+4. **Home Assistant.** Settings -> Devices & services -> MQTT: within a minute a **MyAstroBoard**
    device and one **MyAstroBoard - <location>** device per location preset appear. The card's
    status line shows *Connected*, the last publish time and the number of devices and entities.
 
@@ -79,14 +83,34 @@ the entities you do not need from the device page in Home Assistant.
 
 | Field | Default | Notes |
 |---|---|---|
-| Broker URL | - | `mqtt://host[:1883]` or `mqtts://host[:8883]` |
-| Username / Password | blank | The password is stored in the connector secrets store, **outside** the configuration, and is never part of a backup or config export: re-enter it after restoring a backup on another machine |
+| MQTT connection | - | One of the [MQTT connections](#mqtt-connections): the broker URL, username, password and self-signed certificate switch belong to it |
 | Home Assistant MQTT Discovery | on | Off = only the plain state topics are published (for another consumer than Home Assistant) |
 | Base topic (advanced) | `myastroboard` | Root of every topic; two boards on one broker use two base topics |
 | Discovery prefix (advanced) | `homeassistant` | Must match the MQTT integration's discovery prefix |
 | Publish interval (advanced) | 60 s | Minimum 15 s. States are only sent when they changed; everything is resent every 30 min and whenever Home Assistant restarts |
-| Client ID (advanced) | generated | `myastroboard-<8 hex>`, generated once and reused across restarts |
-| Accept self-signed certificates (advanced) | off | `mqtts://` only - skips certificate verification for a LAN broker with its own CA |
+| Client ID (advanced) | generated | `myastroboard-<8 hex>`, generated once and reused across restarts. Must differ from any other connector on the same connection |
+
+### MQTT connections
+
+A broker is declared once, in Parameters -> Configuration -> *MQTT connections*, and each MQTT
+connector picks one. Several connectors can share a connection: each one opens its own client,
+which is why two connectors on one connection cannot be saved with the same client ID (a broker
+keeps one session per client ID and would disconnect them in turn).
+
+| Field | Default | Notes |
+|---|---|---|
+| Display name | - | Unique; shown in the connectors' picker |
+| Broker URL | - | `mqtt://host[:1883]` or `mqtts://host[:8883]` |
+| Username / Password | blank | The password is stored in the connector secrets store, **outside** the configuration, and is never part of a backup or config export: re-enter it after restoring a backup on another machine. Clearing the username drops the password |
+| Accept self-signed certificates | off | `mqtts://` only - skips certificate verification for a LAN broker with its own CA |
+
+The list shows, for each connection, whether the broker answers (checked when the page opens and
+with the wifi button) and which connectors use it. A connection still picked by a connector cannot
+be deleted: pick another one in that connector first. Editing a connection makes every connector
+using it reconnect.
+
+Upgrading from 1.7.1 or earlier: a configured connector's broker becomes a connection named
+*Home Assistant*, already picked by the connector, with its password - nothing to re-enter.
 
 ### Buttons
 
@@ -319,9 +343,9 @@ action:
 
 - Outbound only. No command topic exists; nothing Home Assistant publishes is acted upon.
 - The password lives in the connector secrets store, never in the configuration, backups, the
-  config export or any API response (the card only sees a mask).
-- The card's test button never pairs the stored password with a URL that differs from the saved
-  one, and the MQTT routes are admin-only.
+  config export or any API response (the connection list only sees a mask).
+- The connection test never pairs the stored password with a URL that differs from the saved
+  one, and the MQTT and MQTT connection routes are admin-only.
 - `mqtts://` gives TLS; *Accept self-signed certificates* is meant for a LAN broker with its own
   CA, nothing else.
 - A user's data is published only while that user's own switch is on. Location devices carry the

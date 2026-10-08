@@ -28,7 +28,7 @@ async function saveAppSettingsPrivacy() {
     await _saveAppSettings({ search_engine_indexing: indexing }, 'privacy');
 }
 
-// Log levels and retention (Parameters -> Log export). A LOG_LEVEL / CONSOLE_LOG_LEVEL environment
+// Log levels and retention (Parameters -> Logs). A LOG_LEVEL / CONSOLE_LOG_LEVEL environment
 // variable overrides the saved level: its select is then disabled, with a note.
 const _LOG_LEVEL_FIELDS = [
     { key: 'log_level', envKey: 'log_level_env', envVar: 'LOG_LEVEL', id: 'app-setting-log-level' },

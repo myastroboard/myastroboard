@@ -167,6 +167,10 @@ def _validate_constraints_payload(payload):
     return cleaned, None
 
 
+# Config sections written by their own routes (blueprints/connectors.py, blueprints/mqtt_connections.py)
+_CONFIG_KEYS_MANAGED_ELSEWHERE = ('connectors', 'mqtt_connections')
+
+
 @locations_bp.route('/api/config', methods=['POST'])
 @admin_required
 def update_config_api():
@@ -278,6 +282,13 @@ def update_config_api():
     # Preserve location_configured flag if not explicitly provided
     if 'location_configured' not in config:
         config['location_configured'] = old_config.get('location_configured', False)
+
+    # The settings page sends only the sections it edits: every other part of the stored
+    # config is kept. Connectors and MQTT connections have their own validated routes
+    # (credentials go to the secrets store there), so this route never writes them.
+    for key, value in old_config.items():
+        if key in _CONFIG_KEYS_MANAGED_ELSEWHERE or key not in config:
+            config[key] = value
 
     # Save the new config
     save_config(config)

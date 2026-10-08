@@ -116,7 +116,7 @@ from utils.logging_config import refresh_log_levels, set_log_level_provider, set
 
 set_log_retention_provider(_app_settings.get_log_retention_days)
 
-# Log file / console levels (Parameters -> Log export), unless LOG_LEVEL / CONSOLE_LOG_LEVEL are set
+# Log file / console levels (Parameters -> Logs), unless LOG_LEVEL / CONSOLE_LOG_LEVEL are set
 set_log_level_provider(_app_settings.get_log_levels)
 
 # Configure reverse proxy support — configurable via Parameters → Advanced → Reverse proxy
@@ -164,6 +164,7 @@ from blueprints.connectors_myastroshine import connectors_myastroshine_bp
 from blueprints.equipment import equipment_bp
 from blueprints.locations import locations_bp
 from blueprints.misc import misc_bp
+from blueprints.mqtt_connections import mqtt_connections_bp
 from blueprints.observation_sessions import observation_sessions_bp
 from blueprints.plan_my_night import plan_my_night_bp
 from blueprints.push import push_bp
@@ -183,6 +184,7 @@ app.register_blueprint(connectors_bp)
 app.register_blueprint(connectors_allsky_bp)
 app.register_blueprint(connectors_myastroshine_bp)
 app.register_blueprint(connectors_mqtt_bp)
+app.register_blueprint(mqtt_connections_bp)
 app.register_blueprint(astrodex_stream_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(misc_bp)
@@ -446,13 +448,20 @@ if _AUTOSTART_SCHEDULERS:  # pragma: no cover - never true while imported under 
     # config file is never rewritten at import time.
     try:
         from utils.connector_secrets import migrate_all_legacy_secrets as _migrate_secrets
+        from utils.mqtt_connections import legacy_mqtt_pending as _legacy_mqtt_pending
+        from utils.mqtt_connections import migrate_legacy_mqtt as _migrate_legacy_mqtt
         from utils.repo_config import load_config as _load_config_for_secrets
+        from utils.repo_config import read_raw_config as _read_raw_config
         from utils.repo_config import save_config as _save_config_for_secrets
 
+        # The MQTT connector's broker became a shared connection (after 1.7.1): the config already
+        # reads that way (repo_config normalizes it), this persists it and moves the password.
+        _legacy_mqtt = _legacy_mqtt_pending(_read_raw_config())
         _startup_config = _load_config_for_secrets()
-        if _migrate_secrets(_startup_config):
+        _secrets_moved = _migrate_secrets(_startup_config)
+        if _migrate_legacy_mqtt(_startup_config) or _secrets_moved or _legacy_mqtt:
             _save_config_for_secrets(_startup_config)
-            logger.info('Connector credentials migrated from config.json to the secrets sidecar')
+            logger.info('Connector credentials and MQTT broker settings migrated out of the connector blocks')
     except Exception as e:
         logger.error(f'Failed to migrate connector credentials on startup: {e}', exc_info=True)
 

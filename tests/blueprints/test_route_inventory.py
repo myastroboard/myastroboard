@@ -254,6 +254,12 @@ EXPECTED_ROUTES = {
     ('/api/connectors/mqtt/publish', ('POST',)),
     ('/api/connectors/mqtt/remove', ('POST',)),
     ('/api/connectors/mqtt/status', ('GET',)),
+    # --- shared MQTT connections ---
+    ('/api/mqtt-connections', ('GET',)),
+    ('/api/mqtt-connections', ('POST',)),
+    ('/api/mqtt-connections/<connection_id>', ('DELETE',)),
+    ('/api/mqtt-connections/<connection_id>', ('PUT',)),
+    ('/api/mqtt-connections/health', ('POST',)),
     # --- skytonight (blueprint) ---
     ('/api/catalogues', ('GET',)),
     ('/api/scheduler/status', ('GET',)),

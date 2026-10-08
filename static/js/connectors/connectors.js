@@ -100,15 +100,10 @@ const _CONNECTOR_UI = {
     },
     mqtt: {
         icon: 'bi bi-broadcast me-2 text-info',
-        urlLabelKey: 'mqtt_url_field',
-        urlPlaceholder: 'mqtt://192.168.x.x:1883',
-        urlHelpKey: 'mqtt_url_help',
+        // The broker is a shared MQTT connection (Parameters -> Configuration), picked here
+        // in place of a URL - the backend's CONNECTION_FIELD.
+        connectionField: 'mqtt_connection_id',
         unreachableHintKey: 'mqtt_test_offline_hint',
-        fields: [
-            { key: 'username', labelKey: 'mqtt_username_field' },
-            { key: 'password', labelKey: 'mqtt_password_field', type: 'password', secret: true },
-        ],
-        fieldsHelpKey: 'mqtt_credentials_help',
         checkboxes: [
             { key: 'discovery_enabled', labelKey: 'mqtt_discovery_field' },
         ],
@@ -117,7 +112,6 @@ const _CONNECTOR_UI = {
             { key: 'discovery_prefix',         labelKey: 'mqtt_discovery_prefix_field', placeholder: 'homeassistant' },
             { key: 'publish_interval_seconds', labelKey: 'mqtt_interval_field',         type: 'number', min: 15, step: 5, placeholder: '60' },
             { key: 'client_id',                labelKey: 'mqtt_client_id_field',        helpKey: 'mqtt_client_id_hint' },
-            { key: 'tls_insecure',             labelKey: 'mqtt_tls_insecure_field',     checkbox: true },
         ],
         statusEndpoint: appUrl('/api/connectors/mqtt/status'),
         statusRenderer: _mqttStatusLine,
@@ -310,6 +304,76 @@ function _connectorFieldSelect(c, spec) {
     return frag;
 }
 
+/**
+ * The shared MQTT connection a connector talks through: a <select> of the saved
+ * connections (names only, from GET /api/connectors' `connection_options`), the same test
+ * button as a URL field, and a way to the page where connections are managed.
+ */
+function _connectionPicker(c, field) {
+    const cfg = c.config || {};
+    const wrap = document.createElement('div');
+    wrap.className = 'mb-3';
+    const id = _fieldInputId(c.name, field);
+
+    const lbl = document.createElement('label');
+    lbl.className = 'form-label fw-semibold small';
+    lbl.setAttribute('for', id);
+    lbl.textContent = i18n.t('connectors.mqtt_connection_field');
+    wrap.appendChild(lbl);
+
+    const group = document.createElement('div');
+    group.className = 'input-group input-group-sm';
+    const select = document.createElement('select');
+    select.className = 'form-select connector-field-input';
+    select.id = id;
+    select.dataset.connector = c.name;
+    select.dataset.field = field;
+    const none = document.createElement('option');
+    none.value = '';
+    none.textContent = i18n.t('connectors.mqtt_connection_none');
+    select.appendChild(none);
+    (c.connection_options || []).forEach(option => {
+        const opt = document.createElement('option');
+        opt.value = option.id;
+        opt.textContent = option.name;
+        if (option.id === cfg[field]) opt.selected = true;
+        select.appendChild(opt);
+    });
+    const testBtn = document.createElement('button');
+    testBtn.type = 'button';
+    testBtn.className = 'btn btn-outline-secondary connector-test-btn';
+    testBtn.dataset.connector = c.name;
+    testBtn.title = i18n.t('mqtt_connections.test');
+    testBtn.setAttribute('aria-label', i18n.t('mqtt_connections.test'));
+    testBtn.appendChild(DOMUtils.createIcon('bi bi-wifi'));
+    group.appendChild(select);
+    group.appendChild(testBtn);
+    wrap.appendChild(group);
+
+    const help = document.createElement('div');
+    help.className = 'form-text small';
+    help.textContent = i18n.t((c.connection_options || []).length
+        ? 'connectors.mqtt_connection_help'
+        : 'connectors.mqtt_connection_empty');
+    help.appendChild(document.createTextNode(' '));
+    const manage = document.createElement('a');
+    manage.href = '#';
+    manage.textContent = i18n.t('connectors.mqtt_connection_manage');
+    manage.addEventListener('click', event => {
+        event.preventDefault();
+        switchSubTab('parameters', 'configuration');
+        document.getElementById('mqtt-connections-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    help.appendChild(manage);
+    wrap.appendChild(help);
+
+    const testResult = document.createElement('div');
+    testResult.className = 'form-text connector-test-result';
+    testResult.id = `test-result-${c.name}`;
+    wrap.appendChild(testResult);
+    return wrap;
+}
+
 /** Render one labelled checkbox from a field spec. */
 function _connectorFieldCheckbox(c, spec) {
     const cfg = c.config || {};
@@ -480,28 +544,35 @@ function _connectorConfigForm(c) {
     const modules = cfg.modules || {};
     const frag    = document.createDocumentFragment();
 
-    // Label
-    const labelDiv = document.createElement('div');
-    labelDiv.className = 'mb-3';
-    const labelLbl = document.createElement('label');
-    labelLbl.className = 'form-label fw-semibold small';
-    labelLbl.setAttribute('for', `connector-label-${c.name}`);
-    labelLbl.textContent = i18n.t('connectors.label_field');
-    const labelInput = document.createElement('input');
-    labelInput.type = 'text';
-    labelInput.className = 'form-control form-control-sm connector-label-input';
-    labelInput.id = `connector-label-${c.name}`;
-    labelInput.dataset.connector = c.name;
-    labelInput.value = cfg.label || '';
-    labelInput.placeholder = c.label;
-    labelDiv.appendChild(labelLbl);
-    labelDiv.appendChild(labelInput);
-    frag.appendChild(labelDiv);
+    // Label - the title of the connector's Observatory panel, the only place it is shown, so
+    // a connector that does not feed the Observatory gets no such field (the save then leaves
+    // any stored value alone, as it does for an absent URL).
+    if ((c.target_modules || []).includes('observatory')) {
+        const labelDiv = document.createElement('div');
+        labelDiv.className = 'mb-3';
+        const labelLbl = document.createElement('label');
+        labelLbl.className = 'form-label fw-semibold small';
+        labelLbl.setAttribute('for', `connector-label-${c.name}`);
+        labelLbl.textContent = i18n.t('connectors.label_field');
+        const labelInput = document.createElement('input');
+        labelInput.type = 'text';
+        labelInput.className = 'form-control form-control-sm connector-label-input';
+        labelInput.id = `connector-label-${c.name}`;
+        labelInput.dataset.connector = c.name;
+        labelInput.value = cfg.label || '';
+        labelInput.placeholder = c.label;
+        labelDiv.appendChild(labelLbl);
+        labelDiv.appendChild(labelInput);
+        frag.appendChild(labelDiv);
+    }
 
     // URL - omitted entirely by a connector with nothing external to point at (e.g.
     // astrodex_stream, which is self-contained like MyAstroShine's SECRET_FIELDS but without
-    // even a remote host to configure).
-    if (!_connectorUI(c.name).hideUrl) {
+    // even a remote host to configure), and replaced by a connection picker for a connector
+    // whose broker is a shared MQTT connection.
+    if (_connectorUI(c.name).connectionField) {
+        frag.appendChild(_connectionPicker(c, _connectorUI(c.name).connectionField));
+    } else if (!_connectorUI(c.name).hideUrl) {
         const urlDiv = document.createElement('div');
         urlDiv.className = 'mb-3';
         const urlLbl = document.createElement('label');
@@ -941,6 +1012,11 @@ function _setResultSpinner(resultDiv, text) {
 }
 
 async function _testConnector(name) {
+    const connectionField = _connectorUI(name).connectionField;
+    if (connectionField) {
+        _testConnectorConnection(name, connectionField);
+        return;
+    }
     const urlInput  = document.getElementById(`connector-url-${name}`);
     const resultDiv = document.getElementById(`test-result-${name}`);
     if (!urlInput || !resultDiv) return;
@@ -965,6 +1041,31 @@ async function _testConnector(name) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+    }).catch(() => null);
+
+    if (!result) {
+        _setResultMessage(resultDiv, i18n.t('connectors.health_error'), 'text-danger');
+    } else if (result.reachable) {
+        _setResultMessage(resultDiv, i18n.t('connectors.reachable'), 'text-success', 'bi bi-check-circle');
+    } else {
+        _setUnreachable(name, resultDiv, result.error);
+    }
+}
+
+/** Probe the connection picked on the card, before it is saved. */
+async function _testConnectorConnection(name, field) {
+    const select    = document.getElementById(_fieldInputId(name, field));
+    const resultDiv = document.getElementById(`test-result-${name}`);
+    if (!select || !resultDiv) return;
+    if (!select.value) {
+        _setResultMessage(resultDiv, i18n.t('connectors.mqtt_connection_required'), 'text-danger');
+        return;
+    }
+    _setResultSpinner(resultDiv, i18n.t('connectors.testing'));
+    const result = await fetchJSONOnce(`/api/connectors/${name}/health`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: select.value }),
     }).catch(() => null);
 
     if (!result) {
@@ -1039,11 +1140,14 @@ async function _saveConnector(name) {
         saveBtn.appendChild(spinner);
     }
 
-    const result = await fetchJSONOnce(`/api/connectors/${name}/config`, {
+    // Plain fetch rather than fetchJSONOnce: a refused save (400) carries its reason.
+    const response = await fetch(resolveEndpoint(`/api/connectors/${name}/config`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
     }).catch(() => null);
+    const body = response ? await response.json().catch(() => null) : null;
+    const result = response && response.ok ? body : null;
 
     if (saveBtn) {
         saveBtn.disabled = false;
@@ -1053,7 +1157,11 @@ async function _saveConnector(name) {
     }
 
     if (!result) {
-        showMessage('error', i18n.t('connectors.save_error'));
+        const reasonKeys = {
+            'client id already used on this connection': 'client_id_conflict',
+            'unknown connection': 'mqtt_connection_unknown',
+        };
+        showMessage('error', i18n.t(`connectors.${reasonKeys[body && body.error] || 'save_error'}`));
         return;
     }
 

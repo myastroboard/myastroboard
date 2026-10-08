@@ -1798,6 +1798,11 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link sub-tab-btn" href="#" data-subtab="connectors">
+                            <i class="bi bi-plug text-info icon-inline" aria-hidden="true"></i> <span data-i18n="settings.connectors">Connectors</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link sub-tab-btn" href="#" data-subtab="logs">
                             <i class="bi bi-journal-text text-info icon-inline" aria-hidden="true"></i> <span data-i18n="settings.logs">Logs</span>
                         </a>
@@ -1815,16 +1820,6 @@
                     <li class="nav-item">
                         <a class="nav-link sub-tab-btn" href="#" data-subtab="backup-restore">
                             <i class="bi bi-archive text-warning icon-inline" aria-hidden="true"></i> <span data-i18n="settings.backup_restore">Backup / Restore</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link sub-tab-btn" href="#" data-subtab="log-export">
-                            <i class="bi bi-file-zip text-danger icon-inline" aria-hidden="true"></i> <span data-i18n="settings.log_export">Log Export</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link sub-tab-btn" href="#" data-subtab="connectors">
-                            <i class="bi bi-plug text-info icon-inline" aria-hidden="true"></i> <span data-i18n="settings.connectors">Connectors</span>
                         </a>
                     </li>
                 </ul>
@@ -2126,6 +2121,70 @@
                     </div>
                 </div>
 
+                <!-- MQTT connections: brokers shared by the MQTT connectors (static/js/mqtt_connections.js) -->
+                <div class="shadow p-2 mb-3 rounded bg-sub-container" id="mqtt-connections-section">
+                    <h2>
+                        <i class="bi bi-broadcast text-info icon-inline" aria-hidden="true"></i> <span data-i18n="mqtt_connections.title">MQTT connections</span>
+                    </h2>
+                    <div class="alert alert-info" role="alert" data-i18n="mqtt_connections.info">
+                        The MQTT brokers MyAstroBoard talks to. Define a broker once here, then pick it in each MQTT connector (Parameters - Connectors).
+                    </div>
+                    <div id="mqtt-connections-list" class="d-flex flex-column gap-2"></div>
+                    <div class="button-group mt-2">
+                        <button type="button" id="mqtt-connection-add" class="btn btn-primary">
+                            <i class="bi bi-plus-circle icon-inline" aria-hidden="true"></i> <span data-i18n="mqtt_connections.add">Add a connection</span>
+                        </button>
+                    </div>
+
+                    <!-- Shown / hidden on this wrapper: .bg-features forces display:block !important -->
+                    <div id="mqtt-connection-form-wrap" style="display:none;">
+                    <form id="mqtt-connection-form" class="bg-features p-3 rounded mt-3" novalidate>
+                        <h3 class="h6 mb-3" id="mqtt-connection-form-title"></h3>
+                        <input type="hidden" id="mqtt-connection-id">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label" for="mqtt-connection-name" data-i18n="mqtt_connections.name_field">Display name</label>
+                                <input type="text" class="form-control" id="mqtt-connection-name" maxlength="64" autocomplete="off">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="mqtt-connection-url" data-i18n="connectors.mqtt_url_field">Broker URL</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="mqtt-connection-url" placeholder="mqtt://192.168.x.x:1883" autocomplete="off" spellcheck="false">
+                                    <button type="button" class="btn btn-outline-secondary" id="mqtt-connection-test" data-i18n-title="mqtt_connections.test" data-i18n-aria-label="mqtt_connections.test">
+                                        <i class="bi bi-wifi" aria-hidden="true"></i>
+                                    </button>
+                                </div>
+                                <div class="form-text" data-i18n="connectors.mqtt_url_help">mqtt://host:1883 for a plain connection, mqtts://host:8883 for TLS.</div>
+                                <div class="form-text" id="mqtt-connection-test-result"></div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="mqtt-connection-username" data-i18n="connectors.mqtt_username_field">Username</label>
+                                <input type="text" class="form-control" id="mqtt-connection-username" autocomplete="off">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="mqtt-connection-password" data-i18n="connectors.mqtt_password_field">Password</label>
+                                <input type="password" class="form-control" id="mqtt-connection-password" autocomplete="new-password">
+                            </div>
+                            <div class="col-12">
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" class="form-check-input" id="mqtt-connection-tls-insecure" switch>
+                                    <label class="form-check-label" for="mqtt-connection-tls-insecure" data-i18n="connectors.mqtt_tls_insecure_field">Accept self-signed broker certificates (mqtts:// only)</label>
+                                </div>
+                                <div class="form-text" data-i18n="mqtt_connections.credentials_help">Leave the username blank for a broker that accepts anonymous connections.</div>
+                            </div>
+                        </div>
+                        <div class="button-group mt-3">
+                            <button type="submit" class="btn btn-primary" id="mqtt-connection-save">
+                                <i class="bi bi-save icon-inline" aria-hidden="true"></i> <span data-i18n="common.save">Save</span>
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="mqtt-connection-cancel">
+                                <span data-i18n="common.cancel">Cancel</span>
+                            </button>
+                        </div>
+                    </form>
+                    </div>
+                </div>
+
                 <!-- Actions -->
                 <div class="shadow p-2 mb-3 rounded bg-sub-container">
                     <h2>
@@ -2192,6 +2251,76 @@
                     </div>
                     <div id="logs-line-count" class="text-muted small mt-2" style="display:none"></div>
                     <div id="logs-display" class="logs-container mt-3 rounded"></div>
+                </div>
+
+                <!-- Log levels (app settings; LOG_LEVEL / CONSOLE_LOG_LEVEL env vars override) -->
+                <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                    <h2>
+                        <i class="bi bi-sliders text-info icon-inline" aria-hidden="true"></i>
+                        <span data-i18n="settings.log_level_title">Logging</span>
+                    </h2>
+                    <div class="alert alert-info" role="alert" data-i18n="settings.log_level_info">
+                        The log level controls how much detail is recorded. To troubleshoot an issue, set the log file level to DEBUG, reproduce the issue, then export the logs below. Changes apply right away, without a restart.
+                    </div>
+                    <div class="row g-3 mt-1 mb-2">
+                        <div class="col-md-6">
+                            <label class="form-label" for="app-setting-log-level" data-i18n="settings.log_level_file_label">Log file level</label>
+                            <select class="form-select" id="app-setting-log-level">
+                                <option value="DEBUG">DEBUG</option>
+                                <option value="INFO">INFO</option>
+                                <option value="WARNING">WARNING</option>
+                                <option value="ERROR">ERROR</option>
+                            </select>
+                            <div class="form-text" data-i18n="settings.log_level_file_help">Written to myastroboard.log, shown in the Logs tab and included in the export.</div>
+                            <div id="app-setting-log-level-env" class="form-text text-warning-emphasis fw-semibold" style="display:none;"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="app-setting-console-log-level" data-i18n="settings.log_level_console_label">Console level</label>
+                            <select class="form-select" id="app-setting-console-log-level">
+                                <option value="DEBUG">DEBUG</option>
+                                <option value="INFO">INFO</option>
+                                <option value="WARNING">WARNING</option>
+                                <option value="ERROR">ERROR</option>
+                            </select>
+                            <div class="form-text" data-i18n="settings.log_level_console_help">The container output: docker logs, or the Log tab of the Home Assistant app.</div>
+                            <div id="app-setting-console-log-level-env" class="form-text text-warning-emphasis fw-semibold" style="display:none;"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="app-setting-log-retention" data-i18n="settings.app_settings_log_retention_label">Keep application log lines for (days)</label>
+                            <input class="form-control" type="number" id="app-setting-log-retention" min="0" max="3650" step="1">
+                            <div class="form-text" data-i18n="settings.app_settings_log_retention_help">Logs contain usernames and IP addresses. Older lines are deleted once a day. 0 keeps them until the size limit rotates them out.</div>
+                        </div>
+                    </div>
+                    <div class="button-group mt-2">
+                        <button type="button" id="save-app-settings-logs" class="btn btn-primary">
+                            <i class="bi bi-save icon-inline" aria-hidden="true"></i>
+                            <span data-i18n="settings.app_settings_save_btn">Save</span>
+                        </button>
+                        <span id="app-settings-logs-feedback" class="ms-3 text-success" style="display:none;" data-i18n="settings.app_settings_saved">Settings saved.</span>
+                    </div>
+                </div>
+
+                <!-- Log export section -->
+                <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                    <h2>
+                        <i class="bi bi-file-zip text-danger icon-inline" aria-hidden="true"></i>
+                        <span data-i18n="settings.log_export_title">Export Logs</span>
+                    </h2>
+                    <div class="alert alert-info" role="alert" data-i18n="settings.log_export_info">
+                        Download a ZIP archive of all log files. Share this archive when reporting an issue to help with diagnostics.
+                    </div>
+
+                    <p class="mb-2 fw-semibold" data-i18n="settings.log_export_includes_label">Included in the archive:</p>
+                    <ul class="list-unstyled ms-2 mb-3">
+                        <li><i class="bi bi-file-earmark-text text-muted icon-inline" aria-hidden="true"></i> <code>data/myastroboard.log</code> <span class="text-muted small" data-i18n="settings.log_export_and_rotated">(+ rotated files if any)</span></li>
+                        <li><i class="bi bi-folder text-muted icon-inline" aria-hidden="true"></i> <code>data/skytonight/logs/</code></li>
+                        <li><i class="bi bi-file-earmark-text text-muted icon-inline" aria-hidden="true"></i> <code>data/skytonight/runtime/scheduler_status.json</code></li>
+                    </ul>
+
+                    <button type="button" id="log-export-btn" class="btn btn-danger">
+                        <i class="bi bi-download icon-inline" aria-hidden="true"></i>
+                        <span data-i18n="settings.log_export_download">Download Log Archive</span>
+                    </button>
                 </div>
             </div>
 
@@ -2940,80 +3069,6 @@
                 </div>
             </div>
 
-            <!-- Log Export Sub-tab -->
-            <div id="log-export-subtab" class="sub-tab-content">
-
-                <!-- Log levels (app settings; LOG_LEVEL / CONSOLE_LOG_LEVEL env vars override) -->
-                <div class="shadow p-2 mb-3 rounded bg-sub-container">
-                    <h2>
-                        <i class="bi bi-sliders text-info icon-inline" aria-hidden="true"></i>
-                        <span data-i18n="settings.log_level_title">Logging</span>
-                    </h2>
-                    <div class="alert alert-info" role="alert" data-i18n="settings.log_level_info">
-                        The log level controls how much detail is recorded. To troubleshoot an issue, set the log file level to DEBUG, reproduce the issue, then export the logs below. Changes apply right away, without a restart.
-                    </div>
-                    <div class="row g-3 mt-1 mb-2">
-                        <div class="col-md-6">
-                            <label class="form-label" for="app-setting-log-level" data-i18n="settings.log_level_file_label">Log file level</label>
-                            <select class="form-select" id="app-setting-log-level">
-                                <option value="DEBUG">DEBUG</option>
-                                <option value="INFO">INFO</option>
-                                <option value="WARNING">WARNING</option>
-                                <option value="ERROR">ERROR</option>
-                            </select>
-                            <div class="form-text" data-i18n="settings.log_level_file_help">Written to myastroboard.log, shown in the Logs tab and included in the export.</div>
-                            <div id="app-setting-log-level-env" class="form-text text-warning-emphasis fw-semibold" style="display:none;"></div>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label" for="app-setting-console-log-level" data-i18n="settings.log_level_console_label">Console level</label>
-                            <select class="form-select" id="app-setting-console-log-level">
-                                <option value="DEBUG">DEBUG</option>
-                                <option value="INFO">INFO</option>
-                                <option value="WARNING">WARNING</option>
-                                <option value="ERROR">ERROR</option>
-                            </select>
-                            <div class="form-text" data-i18n="settings.log_level_console_help">The container output: docker logs, or the Log tab of the Home Assistant app.</div>
-                            <div id="app-setting-console-log-level-env" class="form-text text-warning-emphasis fw-semibold" style="display:none;"></div>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label" for="app-setting-log-retention" data-i18n="settings.app_settings_log_retention_label">Keep application log lines for (days)</label>
-                            <input class="form-control" type="number" id="app-setting-log-retention" min="0" max="3650" step="1">
-                            <div class="form-text" data-i18n="settings.app_settings_log_retention_help">Logs contain usernames and IP addresses. Older lines are deleted once a day. 0 keeps them until the size limit rotates them out.</div>
-                        </div>
-                    </div>
-                    <div class="button-group mt-2">
-                        <button type="button" id="save-app-settings-logs" class="btn btn-primary">
-                            <i class="bi bi-save icon-inline" aria-hidden="true"></i>
-                            <span data-i18n="settings.app_settings_save_btn">Save</span>
-                        </button>
-                        <span id="app-settings-logs-feedback" class="ms-3 text-success" style="display:none;" data-i18n="settings.app_settings_saved">Settings saved.</span>
-                    </div>
-                </div>
-
-                <!-- Log export section -->
-                <div class="shadow p-2 mb-3 rounded bg-sub-container">
-                    <h2>
-                        <i class="bi bi-file-zip text-danger icon-inline" aria-hidden="true"></i>
-                        <span data-i18n="settings.log_export_title">Export Logs</span>
-                    </h2>
-                    <div class="alert alert-info" role="alert" data-i18n="settings.log_export_info">
-                        Download a ZIP archive of all log files. Share this archive when reporting an issue to help with diagnostics.
-                    </div>
-
-                    <p class="mb-2 fw-semibold" data-i18n="settings.log_export_includes_label">Included in the archive:</p>
-                    <ul class="list-unstyled ms-2 mb-3">
-                        <li><i class="bi bi-file-earmark-text text-muted icon-inline" aria-hidden="true"></i> <code>data/myastroboard.log</code> <span class="text-muted small" data-i18n="settings.log_export_and_rotated">(+ rotated files if any)</span></li>
-                        <li><i class="bi bi-folder text-muted icon-inline" aria-hidden="true"></i> <code>data/skytonight/logs/</code></li>
-                        <li><i class="bi bi-file-earmark-text text-muted icon-inline" aria-hidden="true"></i> <code>data/skytonight/runtime/scheduler_status.json</code></li>
-                    </ul>
-
-                    <button type="button" id="log-export-btn" class="btn btn-danger">
-                        <i class="bi bi-download icon-inline" aria-hidden="true"></i>
-                        <span data-i18n="settings.log_export_download">Download Log Archive</span>
-                    </button>
-                </div>
-            </div>
-
             <!-- Connectors Sub-tab -->
             <div id="connectors-subtab" class="sub-tab-content">
                 <div class="shadow p-2 mb-3 rounded bg-sub-container">
@@ -3736,6 +3791,7 @@
     <script src="{{ base }}/static/js/constraint_help.js?v={{ version }}"></script>
     <script src="{{ base }}/static/js/first_run.js?v={{ version }}"></script>
     <script src="{{ base }}/static/js/connectors/connectors.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/mqtt_connections.js?v={{ version }}"></script>
     <script src="{{ base }}/static/js/sky_status_widget.js?v={{ version }}"></script>
     <script src="{{ base }}/static/js/app.js?v={{ version }}"></script>
 </body>

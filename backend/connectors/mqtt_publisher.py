@@ -34,9 +34,9 @@ from datetime import UTC, datetime
 from typing import Any
 
 from connectors.mqtt_connector import MqttConnector
-from utils.connector_secrets import load_secrets
 from utils.constants import DATA_DIR_CACHE
 from utils.logging_config import get_logger
+from utils.mqtt_connections import connection_password, overlay_connection
 
 # Windows-compatible file locking (same split as cache_scheduler.py)
 if sys.platform == "win32":
@@ -331,7 +331,7 @@ class MqttPublisher:
         self._write_status()
 
     def _refresh_connector(self) -> bool:
-        """Reload the connector when config.json or the secrets sidecar changed. True on change."""
+        """Reload the connector when the config or the secrets store changed. True on change."""
         signature = self._current_source_signature()
         if self._connector is not None and signature == self._source_signature:
             return False
@@ -342,8 +342,10 @@ class MqttPublisher:
             logger.error(f"MQTT publisher: could not load config: {exc}")
             return False
         block = (config.get("connectors") or {}).get("mqtt") or {}
-        connector = MqttConnector(block)
-        password = load_secrets(MqttConnector.name).get("password", "")
+        # The broker comes from the shared connection the block picks (utils/mqtt_connections.py);
+        # an edit to that connection bumps the same two revisions, so it is picked up here too.
+        connector = MqttConnector(overlay_connection(block, config, MqttConnector.CONNECTION_FIELD))
+        password = connection_password(block.get(MqttConnector.CONNECTION_FIELD))
         previous, previous_password = self._connector, self._password
         self._config = config
         self._connector = connector

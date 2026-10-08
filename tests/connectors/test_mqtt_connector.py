@@ -174,8 +174,11 @@ class TestDeclaration:
 
         assert REGISTRY['mqtt'] is MqttConnector
         assert MqttConnector.target_modules == []
-        assert MqttConnector.SECRET_FIELDS == ('password',)
-        assert 'password' in MqttConnector.CONFIG_FIELDS
+        # The broker and its credentials belong to the shared MQTT connection it picks
+        assert MqttConnector.SECRET_FIELDS == ()
+        assert MqttConnector.CONNECTION_FIELD == 'mqtt_connection_id'
+        assert MqttConnector.CONNECTION_FIELD in MqttConnector.CONFIG_FIELDS
+        assert not {'url', 'username', 'password', 'tls_insecure'} & set(MqttConnector.CONFIG_FIELDS)
         assert isinstance(MqttConnector.CONFIG_FIELDS['publish_interval_seconds'], int)
         slugs = [m['slug'] for m in MqttConnector.MODULES]
         assert slugs == [

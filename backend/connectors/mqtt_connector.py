@@ -108,19 +108,21 @@ class MqttConnector(BaseConnector):
     # Standalone: the connector feeds no MyAstroBoard tab, it feeds Home Assistant.
     target_modules: list[str] = []
 
-    SECRET_FIELDS = ("password",)
+    # The broker (URL, username, password, TLS switch) is a shared MQTT connection, picked by
+    # id: see utils/mqtt_connections.py. Callers lay it over the block with overlay_connection()
+    # and pass the password explicitly, so it never sits in this connector's config.
+    CONNECTION_FIELD = "mqtt_connection_id"
 
     CONFIG_FIELDS: dict[str, Any] = {
-        "username": "",
-        "password": "",
+        "mqtt_connection_id": "",
         "base_topic": "myastroboard",
         "discovery_enabled": True,
         "discovery_prefix": "homeassistant",
         "publish_interval_seconds": 60,
         # Blank = generated once by the publisher and stored back ("myastroboard-<8 hex>").
+        # Must differ from any other connector's on the same connection (one broker session
+        # per client id) - the shared save refuses a duplicate.
         "client_id": "",
-        # Accept a self-signed broker certificate (mqtts:// on a LAN broker).
-        "tls_insecure": False,
     }
 
     # Tuning knobs stay on the class (CONNECTORS.md rule), not in utils/constants.py.

@@ -114,3 +114,9 @@
     max-height: 250px;
     object-fit: contain;
 }
+
+/* MQTT connections list (Parameters -> Configuration): let a long broker URL wrap
+   instead of pushing the action buttons off a phone screen. */
+.mqtt-connection-info {
+    min-width: 0;
+}

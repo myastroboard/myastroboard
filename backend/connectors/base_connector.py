@@ -47,6 +47,13 @@ class BaseConnector(ABC):
     # <select> from it instead of hardcoding the choices a second time.
     ENUM_FIELDS: dict[str, tuple[str, ...]] = {}
 
+    # Config key holding the id of the shared MQTT connection this connector talks through
+    # (utils/mqtt_connections.py), or "" for a connector that does not use one. The broker
+    # URL, username, password and TLS switch then come from that connection, laid over the
+    # block before the connector is built; the card shows a picker instead of a URL field,
+    # and the connection cannot be deleted while this connector points at it.
+    CONNECTION_FIELD: str = ""
+
     def __init__(self, config: dict):
         """
         Args:

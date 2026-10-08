@@ -23,6 +23,7 @@ from db.engine import transaction
 from utils import _sanitize_for_json
 from utils.config_defaults import DEFAULT_CONFIG, DEFAULT_LOCATION, LOCATION_PRESET_EXTRA_FIELDS
 from utils.logging_config import get_logger
+from utils.mqtt_connections import normalize_legacy_mqtt
 
 logger = get_logger(__name__)
 
@@ -259,6 +260,8 @@ def _read_merged_config(raw):
         not isinstance(raw_astrodex, dict) or 'map_private' not in raw_astrodex
     ):
         merged['astrodex']['map_private'] = False
+    # MQTT connector blocks from 1.7.1 or earlier carried their own broker: read them as a connection
+    normalize_legacy_mqtt(merged)
     return merged
 
 

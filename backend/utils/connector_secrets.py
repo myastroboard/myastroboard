@@ -47,6 +47,18 @@ def _read_all() -> dict[str, dict[str, str]]:
         return {}
 
 
+def mask_secret(value: str) -> str:
+    """Render a secret as '****' + its last 4 chars, or '' when unset.
+
+    A secret of 4 characters or fewer reveals no tail at all.
+    """
+    if not value:
+        return ''
+    if len(value) <= 4:
+        return '****'
+    return f'****{value[-4:]}'
+
+
 def secrets_revision() -> int:
     """Revision of the stored credentials (change detector for long-running publishers)."""
     return settings_store.setting_revision(SECRETS_KEY)
