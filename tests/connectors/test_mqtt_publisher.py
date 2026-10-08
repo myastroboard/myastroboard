@@ -121,11 +121,19 @@ def _device(kind, object_id, state, image_topic=None, image_id=None, image=None)
     )
 
 
+# The broker keys live on the shared MQTT connection the block picks
+# (utils/mqtt_connections.py); _config() routes them there so each test can still
+# override any of them in one call.
+_CONNECTION_KEYS = ("url", "username", "tls_insecure")
+CONNECTION_ID = "conn1"
+
+
 def _config(enabled=True, **overrides):
+    connection = {"id": CONNECTION_ID, "name": "Broker", "url": "mqtt://broker.lan:1883", "username": "u"}
+    connection.update({k: overrides.pop(k) for k in _CONNECTION_KEYS if k in overrides})
     block = {
-        "url": "mqtt://broker.lan:1883",
+        "mqtt_connection_id": CONNECTION_ID,
         "enabled": enabled,
-        "username": "u",
         "base_topic": "mab",
         "discovery_prefix": "ha",
         "discovery_enabled": True,
@@ -133,7 +141,7 @@ def _config(enabled=True, **overrides):
         "modules": {"sky_conditions": {"enabled": True}, "board_diagnostics": {"enabled": True}},
     }
     block.update(overrides)
-    return {"connectors": {"mqtt": block}}
+    return {"connectors": {"mqtt": block}, "mqtt_connections": [connection]}
 
 
 @pytest.fixture
@@ -147,7 +155,7 @@ def env(tmp_path, monkeypatch):
 
     from utils import connector_secrets
 
-    connector_secrets.save_secrets("mqtt", {"password": "pw"})
+    connector_secrets.save_secrets(f"mqtt_connection:{CONNECTION_ID}", {"password": "pw"})
 
     state = {"config": _config(), "signature": ("a",), "devices": [], "clients": []}
 
@@ -244,7 +252,7 @@ class TestLifecycle:
         client = env["clients"][0]
         assert client.connect_target == ("broker.lan", 1883)
         assert client.loop_started is True
-        assert client.credentials == ("u", "pw")  # password from the sidecar
+        assert client.credentials == ("u", "pw")  # password from the connection, in the secrets store
         assert client.will == ("mab/status", "offline", 1, True)
         assert client.client_id.startswith("myastroboard-")
         assert client.tls is False

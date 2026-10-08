@@ -291,3 +291,92 @@ class TestTypedFieldsAndSecrets:
         monkeypatch.setattr('blueprints.connectors.save_secrets', lambda name, values: False)
         resp, _ = self._save(client_admin, monkeypatch, {'url': 'http://x', 'password': 'hunter2'})
         assert resp.status_code == 500
+
+
+# ---------------------------------------------------------------------------
+# Connectors on a shared MQTT connection (CONNECTION_FIELD)
+# ---------------------------------------------------------------------------
+
+
+def _connection_registry():
+    from connectors.base_connector import BaseConnector
+
+    class _OnConnection(BaseConnector):
+        label = 'On connection'
+        description = ''
+        MODULES = []
+        CONNECTION_FIELD = 'mqtt_connection_id'
+        CONFIG_FIELDS = {'mqtt_connection_id': '', 'client_id': ''}
+
+        def health_check(self):
+            return {'reachable': False, 'modules': {}}
+
+    class _First(_OnConnection):
+        name = 'first'
+
+    class _Second(_OnConnection):
+        name = 'second'
+
+    return {'first': _First, 'second': _Second}
+
+
+_CONNECTIONS = [
+    {'id': 'c1', 'name': 'Home', 'url': 'mqtt://broker.lan', 'username': 'u'},
+    {'id': 'c2', 'name': 'Spare', 'url': 'mqtt://spare.lan', 'username': ''},
+]
+
+
+class TestSharedConnection:
+    def _save(self, client_admin, monkeypatch, name, payload, connectors_cfg=None):
+        saved = {}
+        config = {'connectors': dict(connectors_cfg or {}), 'mqtt_connections': list(_CONNECTIONS)}
+        monkeypatch.setattr('blueprints.connectors.load_config', lambda: config)
+        monkeypatch.setattr('blueprints.connectors.save_config', lambda cfg: saved.update(cfg) or True)
+        with patch.dict('connectors.REGISTRY', _connection_registry(), clear=True):
+            resp = client_admin.post(f'/api/connectors/{name}/config', json=payload)
+        return resp, saved
+
+    def test_listing_offers_the_connections_and_reads_the_broker_from_them(self, client_user, monkeypatch):
+        """The card gets the connection names to pick from; installed follows the picked connection."""
+        config = {'connectors': {'first': {'mqtt_connection_id': 'c1'}}, 'mqtt_connections': list(_CONNECTIONS)}
+        monkeypatch.setattr('blueprints.connectors.load_config', lambda: config)
+        with patch.dict('connectors.REGISTRY', _connection_registry(), clear=True):
+            data = {c['name']: c for c in client_user.get('/api/connectors').get_json()}
+        assert data['first']['connection_field'] == 'mqtt_connection_id'
+        assert data['first']['connection_options'] == [{'id': 'c1', 'name': 'Home'}, {'id': 'c2', 'name': 'Spare'}]
+        assert data['first']['installed'] is True
+        assert data['first']['config']['url'] == 'mqtt://broker.lan'
+        assert data['second']['installed'] is False
+
+    def test_save_keeps_the_connection_id_and_never_a_url(self, client_admin, monkeypatch):
+        """The block stores the picked connection; a submitted URL is ignored."""
+        resp, saved = self._save(client_admin, monkeypatch, 'first', {'mqtt_connection_id': 'c2', 'url': 'mqtt://x'})
+        assert resp.status_code == 200
+        assert resp.get_json()['installed'] is True
+        assert saved['connectors']['first']['mqtt_connection_id'] == 'c2'
+        assert 'url' not in saved['connectors']['first']
+
+    def test_save_rejects_an_unknown_connection(self, client_admin, monkeypatch):
+        """A connection id that does not exist is refused."""
+        resp, saved = self._save(client_admin, monkeypatch, 'first', {'mqtt_connection_id': 'gone'})
+        assert resp.status_code == 400
+        assert resp.get_json()['error'] == 'unknown connection'
+        assert saved == {}
+
+    def test_save_rejects_a_client_id_already_used_on_the_same_connection(self, client_admin, monkeypatch):
+        """Two connectors on one broker cannot share a client id - the broker would kick one off."""
+        others = {'first': {'mqtt_connection_id': 'c1', 'client_id': 'board'}}
+        resp, saved = self._save(
+            client_admin, monkeypatch, 'second', {'mqtt_connection_id': 'c1', 'client_id': 'board'}, others
+        )
+        assert resp.status_code == 400
+        assert resp.get_json() == {'error': 'client id already used on this connection', 'used_by': 'first'}
+        assert saved == {}
+
+    def test_same_client_id_on_another_connection_is_fine(self, client_admin, monkeypatch):
+        """Client ids only have to differ per broker."""
+        others = {'first': {'mqtt_connection_id': 'c1', 'client_id': 'board'}}
+        resp, _ = self._save(
+            client_admin, monkeypatch, 'second', {'mqtt_connection_id': 'c2', 'client_id': 'board'}, others
+        )
+        assert resp.status_code == 200

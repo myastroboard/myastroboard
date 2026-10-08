@@ -165,16 +165,26 @@ This page lists the HTTP routes currently declared across `backend/blueprints/*.
 
 ## Connectors
 
-- `GET /api/connectors` — List all registered connectors with installed/enabled state, module config, `target_modules` (app tabs the connector surfaces in), and a config block whose `SECRET_FIELDS` are masked (`****` + last 4, plus a `has_<field>` boolean)
-- `POST /api/connectors/<name>/config` (admin) — Save one connector's config; merged server-side, `int` / `bool` fields coerced to their declared type, and a blank or still-masked secret means "keep current". Secrets are written to the connector secrets store, never to the configuration
+- `GET /api/connectors` — List all registered connectors with installed/enabled state, module config, `target_modules` (app tabs the connector surfaces in), and a config block whose `SECRET_FIELDS` are masked (`****` + last 4, plus a `has_<field>` boolean). A connector on a shared MQTT connection also carries `connection_field` and `connection_options` (`[{id, name}]`)
+- `POST /api/connectors/<name>/config` (admin) — Save one connector's config; merged server-side, `int` / `bool` fields coerced to their declared type, and a blank or still-masked secret means "keep current". Secrets are written to the connector secrets store, never to the configuration. A connector on a shared MQTT connection: 400 for an unknown connection id, or for a `client_id` another connector already uses on the same connection
 - `GET /api/connectors/allsky/status` — Return cached AllSky sensor data (`allskydata.json`); requires `sensor_data` module enabled
 - `GET /api/connectors/allsky/health` — Run a per-module health check against the AllSky instance; accepts `?fresh=1` to bypass cache
 - `GET /api/connectors/allsky/urls` — Return proxy URLs for all enabled AllSky modules; accepts `?date=YYYYMMDD`
 - `GET /api/connectors/allsky/proxy` — Proxy an AllSky resource through the backend; params: `module=<slug>` and optional `date=YYYYMMDD`
-- `GET|POST /api/connectors/mqtt/health` (admin) - One real MQTT connect against the broker. POST `{url, username?, password?, tls_insecure?}` probes as typed (a blank password is replaced by the stored one only for the saved URL); GET probes the saved config and reports module toggles. A failed probe is a 200 with `reachable: false` and an `error` string
+- `GET|POST /api/connectors/mqtt/health` (admin) - One real MQTT connect against the broker. POST `{mqtt_connection_id}` probes the connection picked on the card (400 when missing or unknown); GET probes the saved connector's connection and reports module toggles. A failed probe is a 200 with `reachable: false` and an `error` string
 - `GET /api/connectors/mqtt/status` - What the publisher thread is doing: `enabled`, `connected`, `broker`, `last_publish_at`, `last_error`, `devices[]`, `messages_total` (read from the status file the thread writes, so any worker can answer)
 - `POST /api/connectors/mqtt/publish` (admin) - Ask the publisher for a full republish (discovery + every state) on its next tick
 - `POST /api/connectors/mqtt/remove` (admin) - Switch the connector off and purge every retained MyAstroBoard topic from the broker (Home Assistant drops the devices)
+
+## MQTT connections
+
+Brokers shared by the MQTT connectors (Parameters -> Configuration). All admin-only; the password is never returned, not even in part: a fixed `********` mask and a `has_password` flag.
+
+- `GET /api/mqtt-connections` (admin) - Every connection: `id`, `name`, `url`, `username`, `tls_insecure`, `password` (`********` when one is stored, nothing of it revealed), `has_password`, `used_by` (connector names)
+- `POST /api/mqtt-connections` (admin) - Create from `{name, url, username?, password?, tls_insecure?}`; 201, or 400 with the reason (name required or taken, invalid URL...)
+- `PUT /api/mqtt-connections/<connection_id>` (admin) - Edit; a blank or still-masked password keeps the stored one, a blank username drops it. 404 for an unknown id
+- `DELETE /api/mqtt-connections/<connection_id>` (admin) - Delete; 409 `{error, used_by}` while a connector uses it
+- `POST /api/mqtt-connections/health` (admin) - One real MQTT connect with `{url, username?, password?, tls_insecure?, id?}` as typed; a blank or masked password uses the stored one of connection `id` only when `url` is that connection's saved URL. A failed probe is a 200 with `reachable: false` and an `error` string
 
 ## Object Lookup
 

@@ -9,10 +9,9 @@ MyAstroBoard stores its runtime configuration in its database (`data/myastroboar
 | Sub-tab | Content |
 |---------|---------|
 | **Locations** | Location presets: coordinates, timezone, sky quality, horizon profile, user attribution (v1.2 — see [LOCATIONS.md](LOCATIONS.md)) |
-| **Configuration** | Global app settings (Astrodex privacy) |
-| **Advanced** | SkyTonight constraints, scheduler, app settings |
+| **Configuration** | Astrodex privacy, SkyTonight constraints, app settings, [MQTT connections](#mqtt-connections) |
 | **Connectors** | External tool connectors (AllSky, etc.) |
-| **Logs** | Live log viewer and export |
+| **Logs** | Live log viewer, log levels and retention, log export |
 | **Users** | User management (admin only) |
 | **Metrics** | Scheduler and cache performance dashboard |
 | **Backup & Restore** | Download and restore configuration archives |
@@ -135,9 +134,33 @@ Stored separately (database setting `app_settings`, see [AUTHENTICATION.md](AUTH
 | `session_cookie_secure` | `false` | Require HTTPS for session cookie |
 | `external_base_url` | `""` | `http(s)://` address other software reaches this instance at: Astrodex stream URLs and the MyAstroShine return address (whose own `callback_url_override` still wins). Empty = the address of the current request. Required under the Home Assistant sidebar panel (ingress), whose URL needs an HA login. Set in *Parameters → Advanced → Reverse proxy* |
 | `search_engine_indexing` | `false` | Allow search engines to crawl and index the login page. Off by default for privacy: `/robots.txt` returns `Disallow: /` and the login page is served with `noindex, nofollow`. When enabled, `/robots.txt` allows `/login` and the login page adds Open Graph/JSON-LD metadata pointing to myastroboard.org |
-| `log_retention_days` | `90` | Days a line stays in `myastroboard.log` and its rotated backups (0-3650). Log lines hold usernames and IP addresses, so older lines are removed once a day per process, and right away when the value is lowered. `0` disables it: only the size-based rotation (10 MB x 6 files) applies. Set in *Parameters → Log export* |
-| `log_level` | `"INFO"` | Level written to `myastroboard.log` (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`). Applies without a restart. The `LOG_LEVEL` environment variable, when set, overrides it. Set in *Parameters → Log export* |
-| `console_log_level` | `"WARNING"` | Level of the container output (`docker logs`, the Log tab of the Home Assistant app). The `CONSOLE_LOG_LEVEL` environment variable, when set, overrides it. Set in *Parameters → Log export* |
+| `log_retention_days` | `90` | Days a line stays in `myastroboard.log` and its rotated backups (0-3650). Log lines hold usernames and IP addresses, so older lines are removed once a day per process, and right away when the value is lowered. `0` disables it: only the size-based rotation (10 MB x 6 files) applies. Set in *Parameters → Logs* |
+| `log_level` | `"INFO"` | Level written to `myastroboard.log` (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`). Applies without a restart. The `LOG_LEVEL` environment variable, when set, overrides it. Set in *Parameters → Logs* |
+| `console_log_level` | `"WARNING"` | Level of the container output (`docker logs`, the Log tab of the Home Assistant app). The `CONSOLE_LOG_LEVEL` environment variable, when set, overrides it. Set in *Parameters → Logs* |
+
+---
+
+## MQTT connections
+
+**Sub-tab**: Parameters → Configuration
+
+The MQTT brokers the MQTT connectors talk to, stored under `mqtt_connections`; each connector
+picks one by id (`connectors.mqtt.mqtt_connection_id`). The password is kept in the connector
+secrets store, never in the configuration. See
+[HOME_ASSISTANT.md](HOME_ASSISTANT.md#mqtt-connections) and
+[CONNECTORS.md](CONNECTORS.md#mqtt-connections).
+
+```json
+"mqtt_connections": [
+  {
+    "id": "home-assistant",
+    "name": "Home Assistant",
+    "url": "mqtt://192.168.1.10:1883",
+    "username": "myastroboard",
+    "tls_insecure": false
+  }
+]
+```
 
 ---
 
@@ -214,7 +237,7 @@ also [docs/AUTHENTICATION.md](AUTHENTICATION.md).
 
 ### Log levels
 
-Set in *Parameters → Log export*: one level for the log file (default `INFO`) and one for the console output
+Set in *Parameters → Logs*: one level for the log file (default `INFO`) and one for the console output
 (default `WARNING`) - see `log_level` / `console_log_level` in [Application settings](#application-settings-admin).
 To troubleshoot, set the log file level to `DEBUG`, reproduce the issue, then export the logs. A change applies
 right away, without a restart (the other gunicorn worker follows within a few seconds). The `LOG_LEVEL` /

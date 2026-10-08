@@ -8,10 +8,16 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Features
 
-- None.
+- Parameters: MQTT brokers are now shared connections, managed in Configuration and picked by the MQTT / Home Assistant
+  connector; an existing broker setup is migrated automatically - see [docs/HOME_ASSISTANT.md](docs/HOME_ASSISTANT.md#mqtt-connections).
+- Parameters: sub-tabs reordered (Locations, Configuration, Connectors, Logs, Users, Metrics, Backup / Restore); Log export
+  now sits under Logs.
+- Connectors: the "Display name" field only shows on connectors with an Observatory panel (AllSky), the only place it
+  is used.
 
 ### Fixes
 
+- Saving the Parameters -> Configuration settings no longer resets the connector settings (AllSky URL, MQTT broker).
 - Observatory: AllSky sensor card shows a dome temperature (Dew Heater ambient, else the fan's control temperature) with the fan threshold on the fan row; the camera sensor `TEMPERATURE_C` `0` placeholder is hidden - see [docs/CONNECTORS.md](docs/CONNECTORS.md).
 
 ### Breaking changes

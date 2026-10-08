@@ -307,7 +307,7 @@ except Exception as e:
 #### Log Levels and Configuration
 
 - **Default File Level**: INFO; **Default Console Level**: WARNING
-- **Set in the UI**: Parameters -> Log export, stored as `log_level` / `console_log_level` in
+- **Set in the UI**: Parameters -> Logs, stored as `log_level` / `console_log_level` in
   the app settings, applied live (`utils.logging_config.refresh_log_levels`, fed by the
   `app_settings.get_log_levels` provider; other gunicorn workers follow within seconds)
 - **Available Levels**: DEBUG, INFO, WARNING, ERROR, CRITICAL

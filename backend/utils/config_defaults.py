@@ -131,4 +131,7 @@ DEFAULT_CONFIG = {
     "astrodex": DEFAULT_ASTRODEX,
     "skytonight": DEFAULT_SKYTONIGHT,
     "connectors": DEFAULT_CONNECTORS,
+    # Broker profiles picked by the MQTT connectors (utils/mqtt_connections.py); passwords
+    # live in the connector secrets store, never here.
+    "mqtt_connections": [],
 }

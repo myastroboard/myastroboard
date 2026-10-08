@@ -21,7 +21,8 @@ One module per connector on each side, named after it:
 | Tests | `tests/blueprints/test_connectors.py` | `tests/blueprints/test_connectors_allsky.py` | `tests/blueprints/test_connectors_myastroshine.py` | `tests/blueprints/test_connectors_mqtt.py`, `tests/connectors/test_mqtt_*.py` |
 
 Credentials of every connector (`SECRET_FIELDS`) live in `utils/connector_secrets.py`'s store,
-not in the configuration - see [Secrets](#secrets).
+not in the configuration - see [Secrets](#secrets). A connector that talks MQTT does not declare a
+broker of its own: it picks a shared connection - see [MQTT connections](#mqtt-connections).
 
 `blueprints/connectors.py` serves the two routes every connector shares — the listing and the
 config save; a connector's own routes go in its own blueprint module, registered in
@@ -40,6 +41,7 @@ special-casing:
 | `CONFIG_FIELDS` | Settable config keys beyond `label` / `url` / `enabled` / `modules`, as `{key: default}`. `POST /api/connectors/<name>/config` accepts these and nothing else, coercing each value to the type of its default (`str`, `bool` or `int`) |
 | `SECRET_FIELDS` | Keys holding credentials. Stored in the secrets sidecar, masked by `GET /api/connectors`; a blank or still-masked submission means "keep the stored value" |
 | `URL_FIELDS` | Keys among `CONFIG_FIELDS` holding a URL, so the save strips their trailing slash |
+| `CONNECTION_FIELD` | Config key holding the id of the shared MQTT connection the connector uses (`""` = none). See [MQTT connections](#mqtt-connections) |
 
 A connector's own tuning knobs (cache TTLs, size caps, rate limits) are class attributes too,
 not entries in `utils/constants.py` — adding a connector should not mean editing a shared file.
@@ -69,6 +71,31 @@ key and the VAPID keys already follow. Consequences:
   `observation/myastroshine_integration.get_integration_config`, `connectors/mqtt_publisher.py`);
 - an install upgraded from an earlier version is migrated at startup and on the first save:
   values still found in the configuration move to the secrets store and are stripped from it.
+
+### MQTT connections
+
+A broker is declared once, as a connection (`utils/mqtt_connections.py`, managed in
+Parameters -> Configuration through `blueprints/mqtt_connections.py`), and shared by every
+connector that talks MQTT - the Home Assistant publisher today, an AllSky reader or a Home
+Assistant sensor reader tomorrow, on the same broker or on separate ones.
+
+- A connection is `{id, name, url, username, tls_insecure}` in `config["mqtt_connections"]`; its
+  password is in the secrets store under `mqtt_connection:<id>`; API answers only carry a fixed
+  `********` mask (no tail, unlike `SECRET_FIELDS` tokens).
+- A connector declares `CONNECTION_FIELD` (`MqttConnector`: `mqtt_connection_id`). Callers build it
+  from `overlay_connection(block, config, cls.CONNECTION_FIELD)`, which lays the connection's
+  `url` / `username` / `tls_insecure` over the block; the password is fetched with
+  `connection_password(id)` and passed explicitly, never mixed into the connector's config.
+- The card shows a connection picker in place of the URL field (`connectionField` in
+  `_CONNECTOR_UI`); `GET /api/connectors` lists the connections' names as `connection_options`.
+- The shared save refuses an unknown connection id, and refuses a `client_id` already used by
+  another connector on the same connection: each connector opens its own client, and a broker
+  disconnects a client when another one connects with the same id. A blank client id is generated
+  per connector, so it never conflicts.
+- A connection picked by a connector cannot be deleted (409 with `used_by`).
+- Up to 1.7.1 the MQTT connector held its own `url` / `username` / `tls_insecure` / password.
+  `repo_config` turns such a block into the fixed-id connection `home-assistant` on every read
+  (old backups included), and `app.py` moves its password once at startup.
 
 ### Target modules
 
@@ -121,7 +148,8 @@ A module that needs setup on the remote side can declare `moduleSetup` in `_CONN
 then shows a collapsible list of steps under that module, each optionally with a value to copy.
 
 The test button also sends the connector's other fields as typed, so a connector that needs
-credentials to answer (MQTT) can probe with them before anything is saved. A connector that
+credentials to answer can probe with them before anything is saved; on a connector with a
+connection picker it probes the picked connection. A connector that
 runs something in the background can declare a `statusEndpoint` and `actions` in
 `_CONNECTOR_UI` (`static/js/connectors/connectors.js`): the card then shows a live status line
 and action buttons under the save row.
@@ -280,22 +308,21 @@ totals, latest picture). Publish-only. Full documentation, entity tables and top
 ```python
 class MqttConnector(BaseConnector):
     target_modules = []
-    SECRET_FIELDS = ("password",)
+    CONNECTION_FIELD = "mqtt_connection_id"
     CONFIG_FIELDS = {
-        "username": "",
-        "password": "",
+        "mqtt_connection_id": "",
         "base_topic": "myastroboard",
         "discovery_enabled": True,
         "discovery_prefix": "homeassistant",
         "publish_interval_seconds": 60,
         "client_id": "",
-        "tls_insecure": False,
     }
 ```
 
-The shared `url` field carries the broker as `mqtt://host:1883` or `mqtts://host:8883`;
-`is_configured()` only needs that URL (anonymous brokers exist). `health_check()` is one real
-MQTT connect.
+The broker (`mqtt://host:1883` or `mqtts://host:8883`), its credentials and the self-signed
+certificate switch come from the picked [MQTT connection](#mqtt-connections);
+`is_configured()` only needs that connection's URL (anonymous brokers exist). `health_check()` is
+one real MQTT connect.
 
 ### Modules
 
@@ -315,8 +342,7 @@ MQTT connect.
 | `base_topic` | `myastroboard` | Root of every published topic |
 | `discovery_prefix` | `homeassistant` | Home Assistant's discovery prefix |
 | `publish_interval_seconds` | `60` | Publish cycle (minimum 15 s); states go out only when changed |
-| `client_id` | generated | MQTT client id, generated once when blank |
-| `tls_insecure` | `false` | Accept a self-signed broker certificate (`mqtts://` only) |
+| `client_id` | generated | MQTT client id, generated once when blank; must differ from other connectors on the same connection |
 
 ### How it runs
 

@@ -8,8 +8,10 @@ blueprints/connectors_myastroshine.py.
 from flask import Blueprint, jsonify, request
 
 from utils.auth import admin_required, login_required
+from utils.connector_secrets import mask_secret as _mask_secret
 from utils.connector_secrets import merge_secrets, migrate_legacy_secrets, save_secrets
 from utils.logging_config import get_logger
+from utils.mqtt_connections import client_id_conflict, get_connection, list_connections, overlay_connection
 from utils.repo_config import load_config, save_config
 
 logger = get_logger(__name__)
@@ -33,18 +35,6 @@ def _public_config(cls, cfg: dict) -> dict:
     return public
 
 
-def _mask_secret(value: str) -> str:
-    """Render a secret as '****' + its last 4 chars, or '' when unset.
-
-    A secret of 4 characters or fewer reveals no tail at all.
-    """
-    if not value:
-        return ""
-    if len(value) <= 4:
-        return "****"
-    return f"****{value[-4:]}"
-
-
 @connectors_bp.route('/api/connectors', methods=['GET'])
 @login_required
 def list_connectors_api():
@@ -54,8 +44,11 @@ def list_connectors_api():
     config = load_config()
     connectors_cfg = config.get("connectors", {})
     result = []
+    connection_options = [{"id": c["id"], "name": c["name"]} for c in list_connections(config)]
     for name, cls in REGISTRY.items():
         cfg = merge_secrets(name, connectors_cfg.get(name, {}), cls.SECRET_FIELDS)
+        if cls.CONNECTION_FIELD:
+            cfg = overlay_connection(cfg, config, cls.CONNECTION_FIELD)
         connector = cls(cfg)
         result.append(
             {
@@ -68,6 +61,9 @@ def list_connectors_api():
                 "target_modules": list(cls.target_modules),
                 "secret_fields": list(cls.SECRET_FIELDS),
                 "enum_fields": {k: list(v) for k, v in cls.ENUM_FIELDS.items()},
+                # The shared MQTT connection picker (names only - never a broker credential)
+                "connection_field": cls.CONNECTION_FIELD,
+                "connection_options": connection_options if cls.CONNECTION_FIELD else [],
                 "installed": connector.is_configured(),
                 "enabled": connector.is_enabled(),
                 "config": _public_config(cls, cfg),
@@ -105,7 +101,8 @@ def save_connector_config_api(name):
 
     if "label" in payload:
         current["label"] = str(payload.get("label") or "").strip()
-    if "url" in payload:
+    # A connector on a shared MQTT connection has no URL of its own: the connection carries it.
+    if "url" in payload and not cls.CONNECTION_FIELD:
         current["url"] = str(payload.get("url") or "").strip().rstrip("/")
     if "enabled" in payload:
         current["enabled"] = bool(payload.get("enabled"))
@@ -140,6 +137,14 @@ def save_connector_config_api(name):
         else:
             current[field] = str(raw or "").strip() or default
 
+    if cls.CONNECTION_FIELD:
+        connection_id = str(current.get(cls.CONNECTION_FIELD) or "")
+        if connection_id and get_connection(config, connection_id) is None:
+            return jsonify({"error": "unknown connection"}), 400
+        other = client_id_conflict(config, name, connection_id, str(current.get("client_id") or ""))
+        if other:
+            return jsonify({"error": "client id already used on this connection", "used_by": other}), 400
+
     # Credentials never sit in config.json: whatever was submitted (or migrated above) is
     # written to the sidecar, and the block that lands in config.json carries none of them.
     for field in cls.SECRET_FIELDS:
@@ -154,6 +159,8 @@ def save_connector_config_api(name):
     effective = dict(current)
     effective.update({k: v for k, v in stored_secrets.items() if k in cls.SECRET_FIELDS})
     effective.update(new_secrets)
+    if cls.CONNECTION_FIELD:
+        effective = overlay_connection(effective, config, cls.CONNECTION_FIELD)
     connector = cls(effective)
     return jsonify({"status": "success", "enabled": connector.is_enabled(), "installed": connector.is_configured()})
 

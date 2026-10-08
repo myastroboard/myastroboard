@@ -21,13 +21,16 @@ from connectors.mqtt_connector import MqttConnector
 
 def _cfg(**overrides):
     block = {
-        'url': 'mqtt://broker.lan:1883',
+        'mqtt_connection_id': 'conn1',
         'enabled': True,
-        'username': 'saved-user',
         'modules': {'sky_conditions': {'enabled': True}},
     }
     block.update(overrides)
-    return {'connectors': {'mqtt': block}}
+    connections = [
+        {'id': 'conn1', 'name': 'Home', 'url': 'mqtt://broker.lan:1883', 'username': 'saved-user'},
+        {'id': 'conn2', 'name': 'Other', 'url': 'mqtts://other.lan', 'username': '', 'tls_insecure': True},
+    ]
+    return {'connectors': {'mqtt': block}, 'mqtt_connections': connections}
 
 
 @pytest.fixture
@@ -51,7 +54,7 @@ def saved(monkeypatch):
     state = {'config': _cfg()}
     monkeypatch.setattr('blueprints.connectors_mqtt.load_config', lambda: state['config'])
     monkeypatch.setattr('blueprints.connectors_mqtt.save_config', lambda cfg: state.update(saved_cfg=cfg) or True)
-    save_secrets('mqtt', {'password': 'saved-pw'})
+    save_secrets('mqtt_connection:conn1', {'password': 'saved-pw'})
     return state
 
 
@@ -85,7 +88,8 @@ class TestAccess:
 
 
 class TestHealth:
-    def test_get_probes_the_saved_config_with_stored_credentials(self, client_admin, saved, probe):
+    def test_get_probes_the_saved_connection_with_its_stored_credentials(self, client_admin, saved, probe):
+        """GET probes the broker of the connection the saved connector picks, with its password."""
         resp = client_admin.get('/api/connectors/mqtt/health')
         assert resp.status_code == 200
         body = resp.get_json()
@@ -96,54 +100,50 @@ class TestHealth:
         # is deliberately secret-free (see _saved_connector()'s docstring)
         assert probe['calls'] == [{'url': None, 'username': None, 'password': 'saved-pw', 'tls_insecure': None}]
 
-    def test_get_without_url_reports_url_required(self, client_admin, saved, probe):
-        saved['config'] = {'connectors': {}}
+    def test_get_without_a_connection_reports_url_required(self, client_admin, saved, probe):
+        """A connector that picks no connection has no broker to probe."""
+        saved['config'] = _cfg(mqtt_connection_id='')
         body = client_admin.get('/api/connectors/mqtt/health').get_json()
         assert body == {'reachable': False, 'modules': {}, 'error': 'url required'}
         assert probe['calls'] == []
 
-    def test_post_requires_a_url(self, client_admin, saved, probe):
-        resp = client_admin.post('/api/connectors/mqtt/health', json={'url': ''})
+    def test_post_requires_a_connection(self, client_admin, saved, probe):
+        """POST without a connection id is a 400."""
+        resp = client_admin.post('/api/connectors/mqtt/health', json={})
         assert resp.status_code == 400
-        assert resp.get_json()['error'] == 'url required'
+        assert resp.get_json()['error'] == 'connection required'
 
-    def test_post_uses_typed_credentials_as_is(self, client_admin, saved, probe):
-        resp = client_admin.post(
-            '/api/connectors/mqtt/health',
-            json={
-                'url': 'mqtt://other.lan/',
-                'username': 'typed',
-                'password': 'typed-pw',
-                'tls_insecure': True,
-            },
-        )
-        assert resp.status_code == 200 and resp.get_json()['reachable'] is True
-        assert probe['calls'] == [
-            {'url': 'mqtt://other.lan', 'username': 'typed', 'password': 'typed-pw', 'tls_insecure': True}
-        ]
+    def test_post_rejects_an_unknown_connection(self, client_admin, saved, probe):
+        """POST naming a connection that does not exist is a 400, without probing."""
+        resp = client_admin.post('/api/connectors/mqtt/health', json={'mqtt_connection_id': 'nope'})
+        assert resp.status_code == 400
+        assert resp.get_json()['error'] == 'unknown connection'
+        assert probe['calls'] == []
 
-    def test_post_blank_password_uses_stored_one_only_for_the_saved_url(self, client_admin, saved, probe):
-        client_admin.post('/api/connectors/mqtt/health', json={'url': 'mqtt://broker.lan:1883', 'password': ''})
-        client_admin.post('/api/connectors/mqtt/health', json={'url': 'mqtt://broker.lan:1883', 'password': '****d-pw'})
-        client_admin.post('/api/connectors/mqtt/health', json={'url': 'mqtt://attacker.lan:1883', 'password': ''})
-        assert [c['password'] for c in probe['calls']] == ['saved-pw', 'saved-pw', '']
-        # tls_insecure falls back to the saved value (False here) when not sent
-        assert all(c['tls_insecure'] is False for c in probe['calls'])
+    def test_post_probes_the_picked_connection_before_saving(self, client_admin, saved, probe):
+        """POST probes the connection picked in the card (not the saved one), with its own settings."""
+        resp = client_admin.post('/api/connectors/mqtt/health', json={'mqtt_connection_id': 'conn2'})
+        assert resp.status_code == 200 and resp.get_json() == {'reachable': True, 'modules': {}}
+        assert probe['calls'] == [{'url': None, 'username': None, 'password': '', 'tls_insecure': None}]
 
     def test_post_unreachable_is_a_200_with_the_error(self, client_admin, saved, probe):
+        """A failed probe is reported in the body, not as an HTTP error."""
         probe['result'].update(reachable=False, error='connection refused')
-        resp = client_admin.post('/api/connectors/mqtt/health', json={'url': 'mqtt://broker.lan:1883'})
+        resp = client_admin.post('/api/connectors/mqtt/health', json={'mqtt_connection_id': 'conn1'})
         assert resp.status_code == 200
         assert resp.get_json() == {'reachable': False, 'modules': {}, 'error': 'connection refused'}
 
-    def test_saved_connector_config_never_carries_the_password(self, saved):
-        """Regression guard for the CodeQL finding: mixing the password into the same dict
-        that url/client_id/etc. are read from taints every one of those reads as a credential
-        to static analysis. The connector built for routing must stay secret-free; the caller
-        fetches the password separately (_saved_password())."""
+    def test_saved_connector_reads_the_broker_from_the_connection(self, saved):
+        """The routing connector gets url / username / TLS from its connection, never the password.
+
+        Regression guard for the CodeQL finding: mixing the password into the same dict that
+        url/client_id/etc. are read from taints every one of those reads as a credential to
+        static analysis. The caller fetches the password separately (_saved_password())."""
         from blueprints.connectors_mqtt import _saved_connector, _saved_password
 
         connector = _saved_connector()
+        assert connector.base_url == 'mqtt://broker.lan:1883'
+        assert connector.config['username'] == 'saved-user'
         assert 'password' not in connector.config
         assert _saved_password() == 'saved-pw'
 
@@ -153,7 +153,7 @@ class TestHealth:
 
         monkeypatch.setattr(MqttConnector, 'probe', boom)
         assert client_admin.get('/api/connectors/mqtt/health').status_code == 500
-        assert client_admin.post('/api/connectors/mqtt/health', json={'url': 'mqtt://b'}).status_code == 500
+        assert client_admin.post('/api/connectors/mqtt/health', json={'mqtt_connection_id': 'conn1'}).status_code == 500
 
 
 # ---------------------------------------------------------------------------
@@ -209,7 +209,7 @@ class TestPublisherRoutes:
         assert resp.status_code == 200
         assert resp.get_json() == {'status': 'requested', 'action': 'remove', 'enabled': False}
         assert saved['saved_cfg']['connectors']['mqtt']['enabled'] is False
-        assert saved['saved_cfg']['connectors']['mqtt']['url'] == 'mqtt://broker.lan:1883'  # the rest is kept
+        assert saved['saved_cfg']['connectors']['mqtt']['mqtt_connection_id'] == 'conn1'  # the rest is kept
         assert actions == ['remove']
 
     def test_remove_on_an_already_disabled_connector_does_not_save(self, client_admin, saved, monkeypatch):

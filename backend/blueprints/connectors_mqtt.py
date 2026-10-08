@@ -12,8 +12,8 @@ from flask import Blueprint, jsonify, request
 
 from connectors.mqtt_connector import MqttConnector
 from utils.auth import admin_required, login_required
-from utils.connector_secrets import load_secrets
 from utils.logging_config import get_logger
+from utils.mqtt_connections import connection_password, get_connection, overlay_connection
 from utils.repo_config import load_config, save_config
 
 logger = get_logger(__name__)
@@ -22,7 +22,7 @@ connectors_mqtt_bp = Blueprint('connectors_mqtt', __name__)
 
 
 def _saved_connector() -> MqttConnector:
-    """The connector built from the saved config block - deliberately secret-free.
+    """The connector built from the saved config block and its connection - deliberately secret-free.
 
     The password never goes into this connector's ``config``: mixing it into the same dict
     that ``base_url``/``client_id``/etc. are read from makes every one of those routine reads
@@ -32,16 +32,13 @@ def _saved_connector() -> MqttConnector:
     """
     config = load_config()
     block = config.get('connectors', {}).get('mqtt', {}) or {}
-    return MqttConnector(block)
+    return MqttConnector(overlay_connection(block, config, MqttConnector.CONNECTION_FIELD))
 
 
 def _saved_password() -> str:
-    """The stored MQTT password, read straight from the secrets sidecar."""
-    return load_secrets(MqttConnector.name).get('password', '')
-
-
-def _is_masked_or_blank(value: str) -> bool:
-    return not value or value.startswith('****')
+    """The password of the connection the saved connector points at."""
+    block = load_config().get('connectors', {}).get('mqtt', {}) or {}
+    return connection_password(block.get(MqttConnector.CONNECTION_FIELD))
 
 
 @connectors_mqtt_bp.route('/api/connectors/mqtt/health', methods=['GET', 'POST'])
@@ -49,35 +46,30 @@ def _is_masked_or_blank(value: str) -> bool:
 def mqtt_health_api():
     """Connect to the broker once and report the outcome.
 
-    POST ``{"url", "username"?, "password"?, "tls_insecure"?}`` - probe the broker as typed in
-    the card, before saving. A blank or still-masked password is replaced by the stored one
-    **only when the URL is the saved one**: the stored credential is never sent to a host the
-    caller just typed.
+    GET - probe the saved configuration (its connection, with that connection's stored
+    credentials); also reports each module's toggle.
 
-    GET - probe the saved configuration; also reports each module's toggle.
+    POST ``{"mqtt_connection_id"}`` - probe the connection picked in the card, before saving.
+    Testing a broker as typed is the connections' own route (/api/mqtt-connections/health).
 
     A failed probe is a 200 with ``reachable: false`` and an ``error`` string the card can show;
-    400 is reserved for a missing URL.
+    400 is reserved for a missing or unknown connection.
     """
     try:
-        connector = _saved_connector()
         if request.method == 'GET':
-            return jsonify(connector.health_check(password=_saved_password()))
+            return jsonify(_saved_connector().health_check(password=_saved_password()))
 
         data = request.get_json(silent=True) or {}
-        url = str(data.get('url') or '').strip().rstrip('/')
-        if not url:
-            return jsonify({'reachable': False, 'modules': {}, 'error': 'url required'}), 400
+        connection_id = str(data.get(MqttConnector.CONNECTION_FIELD) or '').strip()
+        if not connection_id:
+            return jsonify({'reachable': False, 'modules': {}, 'error': 'connection required'}), 400
+        config = load_config()
+        if get_connection(config, connection_id) is None:
+            return jsonify({'reachable': False, 'modules': {}, 'error': 'unknown connection'}), 400
 
-        username = str(data.get('username') or '').strip()
-        password = str(data.get('password') or '').strip()
-        if _is_masked_or_blank(password):
-            password = _saved_password() if url == connector.base_url else ''
-        tls_insecure = data.get('tls_insecure')
-        if tls_insecure is None:
-            tls_insecure = connector.tls_insecure()
-
-        result = connector.probe(url=url, username=username, password=password, tls_insecure=bool(tls_insecure))
+        block = {MqttConnector.CONNECTION_FIELD: connection_id}
+        connector = MqttConnector(overlay_connection(block, config, MqttConnector.CONNECTION_FIELD))
+        result = connector.probe(password=connection_password(connection_id))
         payload = {'reachable': bool(result['reachable']), 'modules': {}}
         if result.get('error'):
             payload['error'] = result['error']
@@ -126,7 +118,7 @@ def mqtt_remove_api():
 
     Home Assistant drops the devices as the empty retained payloads arrive. The connector is
     disabled in the same call - otherwise the next publish cycle would recreate everything;
-    the rest of its configuration (broker, credentials, modules) is kept, so enabling it
+    the rest of its configuration (connection, modules) is kept, so enabling it
     again republishes everything.
     """
     try:

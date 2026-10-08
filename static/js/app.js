@@ -93,7 +93,8 @@ function applyUserStartupPreferences(force = false) {
         }
     }
 
-    const { startupMainTab, startupSubtab } = getStartupPreferenceValues();
+    const { startupMainTab } = getStartupPreferenceValues();
+    const startupSubtab = resolveSubtabAlias(getStartupPreferenceValues().startupSubtab);
     const targetMainButton = document.querySelector(`.main-tab-btn[data-tab="${startupMainTab}"]`);
     const effectiveMainTab = targetMainButton ? startupMainTab : 'forecast-astro';
 
@@ -184,7 +185,8 @@ function handleHashNavigation() {
     } else {
         // Generic resolver for all tabs (including dropdown tabs like
         // parameters, my-settings and equipment) to keep F5/hash reload stable.
-        const [candidateMain, candidateSub] = hash.split('/');
+        const [candidateMain, rawSub] = hash.split('/');
+        const candidateSub = rawSub ? resolveSubtabAlias(rawSub) : rawSub;
         const mainButton = document.querySelector(`.main-tab-btn[data-tab="${candidateMain}"]`);
         if (mainButton) {
             mainTab = candidateMain;
@@ -433,8 +435,19 @@ function setupNavbarAutoCollapse() {
     });
 }
 
+// Sub-tabs that were merged into another one: an old bookmark, PWA shortcut or saved
+// startup preference still lands on the right place.
+const _SUBTAB_ALIASES = {
+    'log-export': 'logs', // Parameters -> Log export now sits under Logs
+};
+
+function resolveSubtabAlias(subtabName) {
+    return _SUBTAB_ALIASES[subtabName] || subtabName;
+}
+
 function switchSubTab(parentTab, subtabName, options = {}) {
     const { syncHistory = true } = options;
+    subtabName = resolveSubtabAlias(subtabName);
     // Close any open modal before the sub-tab change touches history (no-op when
     // reached via switchMainTab, which already did this).
     forceCleanupModals();
@@ -457,17 +470,18 @@ function switchSubTab(parentTab, subtabName, options = {}) {
         case 'location':
             if (typeof loadMyLocationSettings === 'function') loadMyLocationSettings();
             break; // My Settings tab (v1.2)
+        case 'configuration':
+            if (typeof loadMqttConnections === 'function') loadMqttConnections();
+            break; // Parameters tab (the rest of the page is loaded at startup by loadConfiguration)
         case 'logs':
             loadLogs();
-            break; // Parameters tab
+            loadLogLevels();
+            break; // Parameters tab (log levels and the log export sit under the viewer)
         case 'users':
             loadUsers();
             break; // Parameters tab
         case 'metrics':
             startMetricsAutoRefresh();
-            break; // Parameters tab
-        case 'log-export':
-            loadLogLevels();
             break; // Parameters tab
         case 'backup-restore':
             loadMigrationBackups();
