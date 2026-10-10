@@ -8,6 +8,20 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Features
 
+- None.
+
+### Fixes
+
+- None.
+
+### Breaking changes
+
+- None.
+
+## 1.7.3 (2026-10-10)
+
+### Features
+
 - Maps: OpenStreetMap vector maps drawn in the browser, with light, dark and night vision red styles, loaded and
   cached by the server instead of Esri tiles - see [docs/CACHE_SYSTEM.md](docs/CACHE_SYSTEM.md#map-tile-cache).
 
