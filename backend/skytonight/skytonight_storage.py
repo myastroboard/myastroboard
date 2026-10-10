@@ -9,6 +9,7 @@ a location with no results yet simply gets picked up by the next scheduler run.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 from typing import Any
 
@@ -170,6 +171,23 @@ def get_alttime_dir(location_id: str | None = None) -> str:
     path = os.path.join(SKYTONIGHT_OUTPUT_DIR, resolved) if resolved else SKYTONIGHT_OUTPUT_DIR
     ensure_directory_exists(path)
     return path
+
+
+_ALTTIME_ID_SAFE = re.compile(r'[^a-z0-9_-]')
+
+
+def alttime_file_name(target_id: str) -> str:
+    """Return the file name of a target's altitude-time JSON file."""
+    return f'{_ALTTIME_ID_SAFE.sub("_", target_id.lower())}_alttime.json'
+
+
+def alttime_file_if_present(target_id: str, alttime_files: frozenset[str]) -> str:
+    """Return *target_id* when its altitude-time file is listed in *alttime_files*, else ''.
+
+    *alttime_files* comes from :func:`list_alttime_files`, called once per report rather
+    than one filesystem call per row.
+    """
+    return target_id if target_id and alttime_file_name(target_id) in alttime_files else ''
 
 
 def list_alttime_files(alttime_dir: str) -> frozenset[str]:

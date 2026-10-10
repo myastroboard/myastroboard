@@ -325,3 +325,27 @@ class TestListAlttimeFiles:
     def test_missing_directory_returns_empty_set(self, tmp_path):
         """A location whose directory is gone (or unreadable) has no altitude-time files, not an error."""
         assert skytonight_storage.list_alttime_files(str(tmp_path / 'missing')) == frozenset()
+
+
+class TestAlttimeFileIfPresent:
+    """A report row gets its target id as alttime_file only when the file is in the listing."""
+
+    def test_listed_file_returns_target_id(self):
+        listing = frozenset({'dso-ngc_1976_alttime.json'})
+        assert skytonight_storage.alttime_file_if_present('DSO-NGC 1976', listing) == 'DSO-NGC 1976'
+
+    def test_unlisted_file_returns_empty(self):
+        listing = frozenset({'dso-other_alttime.json'})
+        assert skytonight_storage.alttime_file_if_present('dso-ngc1976', listing) == ''
+
+    def test_empty_target_id_returns_empty(self):
+        """A row without a target id never matches, even if a bare '_alttime.json' exists."""
+        assert skytonight_storage.alttime_file_if_present('', frozenset({'_alttime.json'})) == ''
+
+    def test_name_matches_the_written_file(self, tmp_path):
+        """A file named by alttime_file_name is found by the listing, whatever the id's characters."""
+        (tmp_path / skytonight_storage.alttime_file_name('Comet C/2023 A3')).write_text('{}', encoding='utf-8')
+
+        listing = skytonight_storage.list_alttime_files(str(tmp_path))
+
+        assert skytonight_storage.alttime_file_if_present('Comet C/2023 A3', listing) == 'Comet C/2023 A3'

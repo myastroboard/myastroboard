@@ -1137,33 +1137,6 @@ class TestAlttimeJsonPath:
         assert 'jupiter' in path
 
 
-class TestAlttimeFileIfPresent:
-    """A report row gets its target id as alttime_file only when the file is in the listing."""
-
-    def test_listed_file_returns_target_id(self):
-        listing = frozenset({'dso-ngc_1976_alttime.json'})
-        assert _skytonight_api_mod._alttime_file_if_present('DSO-NGC 1976', listing) == 'DSO-NGC 1976'
-
-    def test_unlisted_file_returns_empty(self):
-        listing = frozenset({'dso-other_alttime.json'})
-        assert _skytonight_api_mod._alttime_file_if_present('dso-ngc1976', listing) == ''
-
-    def test_empty_target_id_returns_empty(self):
-        """A row without a target id never matches, even if a bare '_alttime.json' exists."""
-        assert _skytonight_api_mod._alttime_file_if_present('', frozenset({'_alttime.json'})) == ''
-
-    def test_name_matches_the_path_helper(self, tmp_path, monkeypatch):
-        """The listed name and _alttime_json_path agree, so a file written there is found."""
-        monkeypatch.setattr(_skytonight_api_mod, 'get_alttime_dir', lambda *_a, **_k: str(tmp_path))
-        path = _alttime_json_path('Comet C/2023 A3')
-        with open(path, 'w', encoding='utf-8') as fh:
-            fh.write('{}')
-
-        listing = _skytonight_api_mod.list_alttime_files(str(tmp_path))
-
-        assert _skytonight_api_mod._alttime_file_if_present('Comet C/2023 A3', listing) == 'Comet C/2023 A3'
-
-
 # ---------------------------------------------------------------------------
 # _build_skytonight_reports_payload — calculated path with bodies/comets/dso
 # ---------------------------------------------------------------------------

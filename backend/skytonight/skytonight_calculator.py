@@ -12,7 +12,6 @@ from __future__ import annotations
 import gc
 import math
 import os
-import re
 import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
@@ -29,6 +28,7 @@ from astropy.time import Time
 from astroweather.sun_phases import SunService
 from skytonight.skytonight_models import SkyTonightTarget
 from skytonight.skytonight_storage import (
+    alttime_file_name,
     ensure_skytonight_directories,
     get_alttime_dir,
     get_bodies_results_file,
@@ -58,9 +58,6 @@ _DSO_LOG_INTERVAL = 500
 # being excluded just because they transit before dusk or set shortly after it.
 _MIN_OBSERVABLE_HOURS_DSO = 1.0
 
-# Regex pattern for valid alttime target IDs used in file names
-_ALTTIME_ID_SAFE = re.compile(r'[^a-z0-9_-]')
-
 
 def _comet_id_without_ref(target_id: str) -> str:
     """Return a comet target_id with any trailing MPC/MPEC reference token removed."""
@@ -82,8 +79,7 @@ def _comet_id_without_ref(target_id: str) -> str:
 
 def _alttime_json_path(target_id: str, location_id: str | None = None) -> str:
     """Return the full path for a target's altitude-time JSON file (per location)."""
-    safe_id = _ALTTIME_ID_SAFE.sub('_', target_id.lower())
-    return os.path.join(get_alttime_dir(location_id), f'{safe_id}_alttime.json')
+    return os.path.join(get_alttime_dir(location_id), alttime_file_name(target_id))
 
 
 def _save_alttime_json(

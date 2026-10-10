@@ -26,6 +26,8 @@ from skytonight.skytonight_scheduler_manager import (
     get_skytonight_scheduler_for_api,
 )
 from skytonight.skytonight_storage import (
+    alttime_file_if_present,
+    alttime_file_name,
     ensure_skytonight_directories,
     get_alttime_dir,
     get_bodies_results_file,
@@ -220,26 +222,9 @@ def _annotate_skytonight_item(
     item['plan_state'] = plan_state
 
 
-_ALTTIME_ID_SAFE = re.compile(r'[^a-z0-9_-]')
-
-
-def _alttime_file_name(target_id: str) -> str:
-    """Return the file name of a target's altitude-time JSON file."""
-    return f'{_ALTTIME_ID_SAFE.sub("_", target_id.lower())}_alttime.json'
-
-
 def _alttime_json_path(target_id: str, location_id: str | None = None) -> str:
     """Return absolute path for a target's altitude-time JSON file (per location)."""
-    return os.path.normpath(os.path.join(get_alttime_dir(location_id), _alttime_file_name(target_id)))
-
-
-def _alttime_file_if_present(target_id: str, alttime_files: frozenset[str]) -> str:
-    """Return *target_id* when its altitude-time file is listed in *alttime_files*, else ''.
-
-    *alttime_files* comes from :func:`list_alttime_files`, called once per report rather
-    than one filesystem call per row.
-    """
-    return target_id if target_id and _alttime_file_name(target_id) in alttime_files else ''
+    return os.path.normpath(os.path.join(get_alttime_dir(location_id), alttime_file_name(target_id)))
 
 
 # ---------------------------------------------------------------------------
@@ -327,7 +312,7 @@ def _build_skytonight_reports_payload(catalogue: str | None, user_id: str, usern
                 'meridian transit': observation.get('meridian_transit'),
                 'antimeridian transit': observation.get('antimeridian_transit'),
                 'catalogue_names': calc_catalogue_names,
-                'alttime_file': _alttime_file_if_present(calc_item.get('target_id', ''), alttime_files),
+                'alttime_file': alttime_file_if_present(calc_item.get('target_id', ''), alttime_files),
                 'source_type': 'calculated',
                 'plan_state': plan_state,
             }
@@ -357,7 +342,7 @@ def _build_skytonight_reports_payload(catalogue: str | None, user_id: str, usern
                 'hmsdms': f"{ra_hms} / {dec_dms}" if ra_hms and dec_dms else None,
                 'observable_hours': observation.get('observable_hours'),
                 'solar elongation': calc_item.get('solar_elongation_deg'),
-                'alttime_file': _alttime_file_if_present(calc_item.get('target_id', ''), alttime_files),
+                'alttime_file': alttime_file_if_present(calc_item.get('target_id', ''), alttime_files),
                 'source_type': 'calculated',
                 'plan_state': plan_state,
             }
@@ -390,7 +375,7 @@ def _build_skytonight_reports_payload(catalogue: str | None, user_id: str, usern
                 'declination': dec_dms,
                 'hmsdms': f"{ra_hms} / {dec_dms}" if ra_hms and dec_dms else None,
                 'observable_hours': observation.get('observable_hours'),
-                'alttime_file': _alttime_file_if_present(calc_item.get('target_id', ''), alttime_files),
+                'alttime_file': alttime_file_if_present(calc_item.get('target_id', ''), alttime_files),
                 'source_type': 'calculated',
                 'plan_state': plan_state,
             }
@@ -525,7 +510,7 @@ def _build_bodies_section_payload(user_id: str, username: str) -> dict[str, Any]
                 'hmsdms': f"{ra_hms} / {dec_dms}" if ra_hms and dec_dms else None,
                 'solar elongation': calc_item.get('solar_elongation_deg'),
                 'observable_hours': observation.get('observable_hours'),
-                'alttime_file': _alttime_file_if_present(calc_item.get('target_id', ''), alttime_files),
+                'alttime_file': alttime_file_if_present(calc_item.get('target_id', ''), alttime_files),
                 'source_type': 'calculated',
                 'plan_state': plan_state,
             }
@@ -624,7 +609,7 @@ def _build_comets_section_payload(user_id: str, username: str) -> dict[str, Any]
                 'declination': dec_dms,
                 'hmsdms': f"{ra_hms} / {dec_dms}" if ra_hms and dec_dms else None,
                 'observable_hours': observation.get('observable_hours'),
-                'alttime_file': _alttime_file_if_present(calc_item.get('target_id', ''), alttime_files),
+                'alttime_file': alttime_file_if_present(calc_item.get('target_id', ''), alttime_files),
                 'source_type': 'calculated',
                 'plan_state': plan_state,
             }
@@ -976,7 +961,7 @@ def _build_dso_section_payload(
                 'meridian transit': observation.get('meridian_transit'),
                 'antimeridian transit': observation.get('antimeridian_transit'),
                 'catalogue_names': calc_catalogue_names,
-                'alttime_file': _alttime_file_if_present(calc_item.get('target_id', ''), alttime_files),
+                'alttime_file': alttime_file_if_present(calc_item.get('target_id', ''), alttime_files),
                 'source_type': 'calculated',
                 'plan_state': plan_state,
             }
