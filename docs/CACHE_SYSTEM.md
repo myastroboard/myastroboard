@@ -283,21 +283,32 @@ A "Failed" badge appears in the Duration column if the last execution threw an e
 
 ## Map tile cache
 
-The maps (locations, photo map, observation log, orbital stations) load their background from
-`GET /api/map-tiles/<z>/<x>/<y>.png` instead of a tile server: `utils/map_tiles.py` downloads each
-OpenStreetMap tile once from `tile.openstreetmap.org` and keeps it under `data/cache/map_tiles/<z>/<x>/<y>.png`.
-The browser never contacts a third-party tile server, and the tile servers only see the server's address.
+The maps (locations, photo map, observation log, orbital stations) load everything they draw from
+`/api/map-tiles/...` instead of a map server: `utils/map_tiles.py` downloads each resource once from the
+OpenStreetMap Foundation servers and keeps it under `data/cache/map_tiles/<kind>/`. The browser never contacts a
+third-party map server, and the map servers only see the server's address.
 
-- **Freshness**: a tile is downloaded again after 7 days (the minimum the
-  [OSM tile usage policy](https://operations.osmfoundation.org/policies/tiles/) asks for); browsers keep their copy
-  for 1 day (`Cache-Control: private`).
-- **Outages**: an expired tile is still served while the tile server is unreachable.
-- **Size**: once the folder passes 200 MiB, the oldest tiles are deleted down to 160 MiB (checked every 200 downloads).
-  Deleting the folder is always safe.
-- **Fair use**: at most 2 concurrent downloads per worker, an identifying `User-Agent`, and a budget of 1000 uncached
-  tiles per user per 10 minutes per worker (cache hits are free) so the proxy cannot be used for bulk downloading.
-- **Dark variant**: the same tiles recoloured in the browser by the `.map-tiles-dark` CSS class. Under the red
-  (night vision) theme, every variant is recoloured to a dim red map, markers and attribution included.
+| Kind | Route | Upstream | Kept | Browser cache |
+|---|---|---|---|---|
+| Vector tiles (Shortbread) | `/api/map-tiles/vector/<z>/<x>/<y>.mvt` | `vector.openstreetmap.org` | 7 days | 1 day |
+| Glyphs (label fonts) | `/api/map-tiles/fonts/<font>/<range>.pbf` | `vector.openstreetmap.org` | 30 days | 7 days |
+| Sprites (icons) | `/api/map-tiles/sprites/<file>` | `vector.openstreetmap.org` | 30 days | 7 days |
+| Raster tiles (PNG) | `/api/map-tiles/raster/<z>/<x>/<y>.png` | `tile.openstreetmap.org` | 7 days | 1 day |
+
+- **Rendering**: with WebGL, MapLibre GL JS draws the vector tiles inside a Leaflet layer
+  (`static/js/utils.js`), with one style per look in `static/map-styles/`: light (VersaTiles Colorful), dark
+  (VersaTiles Eclipse) and red (Eclipse recoloured to dim reds, used by the night vision theme whatever the
+  light/dark choice, and swapped live when the theme changes). Without WebGL the maps fall back to raster tiles,
+  recoloured for the dark variant and the red theme by CSS classes.
+- **Styles**: `python scripts/build_map_styles.py` downloads the VersaTiles styles (CC0) and rewrites their URLs to
+  the proxy. Run it again after a new Shortbread major version, and bump `_MAP_STYLES_VERSION` in `utils.js`.
+- **Outages**: an expired resource is still served while the map server is unreachable.
+- **Size**: once the folder passes 300 MiB, the oldest files are deleted down to 240 MiB (checked every 200
+  downloads). Deleting the folder is always safe.
+- **Fair use** ([tile](https://operations.osmfoundation.org/policies/tiles/) and
+  [vector](https://operations.osmfoundation.org/policies/vector/) usage policies): at most 2 concurrent downloads per
+  worker, an identifying `User-Agent`, resources kept at least 7 days, and a budget of 1000 uncached resources per
+  user per 10 minutes per worker (cache hits are free) so the proxy cannot be used for bulk downloading.
 
 ## Performance Impact
 

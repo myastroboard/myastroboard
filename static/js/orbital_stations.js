@@ -19,7 +19,6 @@ const ISS_FUTURE_COLOR = '#6366f1'; // indigo
 const CSS_PAST_COLOR = '#ef4444'; // red
 const CSS_FUTURE_COLOR = '#8b5cf6'; // violet
 
-const _leafletLoadState = { promise: null };
 
 function _orbitalTrackStyle(trackKind, color) {
     const onLightBasemap = _orbMapBasemapVariant === 'light';
@@ -57,13 +56,7 @@ function _refreshOrbitalStationMarkerIcons() {
 
 /** Lazily load the Leaflet library (only needed for the orbital stations map) so it isn't fetched on every page load. */
 function _ensureLeafletLoaded() {
-    return ensureVendorScriptLoaded(
-        () => typeof L !== 'undefined',
-        appUrl('/static/vendor/leaflet/dist/leaflet.min.js?v=1.9.4'),
-        appUrl('/static/vendor/leaflet/dist/leaflet.min.css?v=1.9.4'),
-        _leafletLoadState,
-        'Leaflet'
-    );
+    return ensureLeafletLoaded();
 }
 
 // ---- Active passes tab ('iss' | 'css') ----

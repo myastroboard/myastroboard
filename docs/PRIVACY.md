@@ -93,7 +93,7 @@ receives account data, but some receive coordinates or the user's IP address.
 | [Open-Meteo](https://open-meteo.com) (Switzerland/EU) | Coordinates of each location | Server | Weather forecast |
 | [7Timer!](https://www.7timer.info) (China) | Coordinates of each location | Server | Seeing / transparency forecast |
 | [Nominatim - OpenStreetMap](https://nominatim.openstreetmap.org) (EU) | Coordinates + the browser's IP | Browser | Naming a location, only when the user clicks *Use my location* |
-| [OpenStreetMap tile servers](https://operations.osmfoundation.org/policies/tiles/) (United Kingdom) | The map areas viewed, from the server's IP (never the users' IP); downloaded tiles are cached on the server | Server | Background of the maps (locations, photo map, observation log, orbital stations) |
+| [OpenStreetMap tile and vector tile servers](https://operations.osmfoundation.org/policies/) (United Kingdom) | The map areas viewed, from the server's IP (never the users' IP); downloaded tiles are cached on the server | Server | Background of the maps (locations, photo map, observation log, orbital stations) |
 | Browser push services (Google FCM, Mozilla, Apple) | An opaque notification payload | Server | Web Push, only for users who enabled notifications |
 | CelesTrak, The Space Devs, NOAA SWPC, JPL, Minor Planet Center, CDS Strasbourg, wheretheiss.at | Nothing personal | Server | Satellites, launches, space weather, ephemerides, object images |
 | GitHub | Nothing personal | Server | Check for new releases and download their changelog |

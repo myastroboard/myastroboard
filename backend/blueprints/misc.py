@@ -2,7 +2,7 @@
 
 Routes: /api/skyquality, /api/convert-coordinates, /api/timezones,
 /api/health, /health, /api/cache, /api/version, /api/version/check-updates,
-/api/map-tiles/<z>/<x>/<y>.png
+/api/map-tiles/raster|vector|fonts|sprites/...
 """
 
 import re
@@ -241,24 +241,62 @@ def check_updates_api():
         )
 
 
-@misc_bp.route('/api/map-tiles/<int:z>/<int:x>/<int:y>.png', methods=['GET'])
-@login_required
-def get_map_tile_api(z, x, y):
-    """
-    Serve one OpenStreetMap map tile through the server's tile cache.
-
-    The browser never contacts the tile servers directly (see utils/map_tiles.py).
-    """
-    if not map_tiles.is_valid_tile(z, x, y):
-        return jsonify({"error": "Invalid tile"}), 404
+def _serve_map_resource(kind, url_params, path_parts, content_type):
+    """Serve one map resource through the server's cache (see utils/map_tiles.py)."""
     try:
-        content = map_tiles.get_tile(z, x, y, user_key=session.get('username', ''))
+        content = map_tiles.get_resource(kind, url_params, path_parts, user_key=session.get('username', ''))
     except map_tiles.TileBudgetExceeded as exc:
         response = jsonify({"error": "Too many map tiles requested"})
         response.headers['Retry-After'] = str(exc.retry_after)
         return response, 429
     except map_tiles.TileUnavailable:
         return jsonify({"error": "Map tile unavailable"}), 502
-    response = Response(content, mimetype='image/png')
-    response.headers['Cache-Control'] = f'private, max-age={map_tiles.BROWSER_MAX_AGE_SECONDS}'
+    response = Response(content, mimetype=content_type)
+    if kind.gzip:
+        response.headers['Content-Encoding'] = 'gzip'
+    response.headers['Cache-Control'] = f'private, max-age={kind.browser_max_age}'
     return response
+
+
+@misc_bp.route('/api/map-tiles/raster/<int:z>/<int:x>/<int:y>.png', methods=['GET'])
+@login_required
+def get_map_raster_tile_api(z, x, y):
+    """OpenStreetMap PNG tile: the basemap of browsers without WebGL."""
+    if not map_tiles.is_valid_tile(z, x, y, map_tiles.RASTER_MAX_ZOOM):
+        return jsonify({"error": "Invalid tile"}), 404
+    return _serve_map_resource(map_tiles.RASTER, {'z': z, 'x': x, 'y': y}, (z, x, f'{y}.png'), 'image/png')
+
+
+@misc_bp.route('/api/map-tiles/vector/<int:z>/<int:x>/<int:y>.mvt', methods=['GET'])
+@login_required
+def get_map_vector_tile_api(z, x, y):
+    """OpenStreetMap Shortbread vector tile, drawn in the browser with static/map-styles/."""
+    if not map_tiles.is_valid_tile(z, x, y, map_tiles.VECTOR_MAX_ZOOM):
+        return jsonify({"error": "Invalid tile"}), 404
+    return _serve_map_resource(
+        map_tiles.VECTOR, {'z': z, 'x': x, 'y': y}, (z, x, f'{y}.mvt'), 'application/vnd.mapbox-vector-tile'
+    )
+
+
+@misc_bp.route('/api/map-tiles/fonts/<fontstack>/<glyph_range>.pbf', methods=['GET'])
+@login_required
+def get_map_glyphs_api(fontstack, glyph_range):
+    """Label glyphs of the vector map styles (one 256-character block of one font)."""
+    if fontstack not in map_tiles.FONT_STACKS or not map_tiles.is_valid_glyph_range(glyph_range):
+        return jsonify({"error": "Invalid glyph range"}), 404
+    return _serve_map_resource(
+        map_tiles.FONTS,
+        {'fontstack': fontstack, 'glyph_range': glyph_range},
+        (fontstack, f'{glyph_range}.pbf'),
+        'application/x-protobuf',
+    )
+
+
+@misc_bp.route('/api/map-tiles/sprites/<sprite_name>', methods=['GET'])
+@login_required
+def get_map_sprite_api(sprite_name):
+    """Icon sheet (PNG) or its index (JSON) of the vector map styles."""
+    content_type = map_tiles.sprite_content_type(sprite_name)
+    if content_type is None:
+        return jsonify({"error": "Invalid sprite"}), 404
+    return _serve_map_resource(map_tiles.SPRITES, {'sprite_name': sprite_name}, (sprite_name,), content_type)
