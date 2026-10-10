@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import time
 from typing import Any
 
 from skytonight.skytonight_models import SkyTonightTarget
@@ -13,6 +14,11 @@ from utils.logging_config import get_logger
 logger = get_logger(__name__)
 
 _dataset_cache: dict[str, Any] = {}
+
+# How long a cached dataset is trusted before its file's mtime is checked again. One request
+# can resolve tens of thousands of names (Astrodex matching over a DSO report), and a stat()
+# per lookup costs seconds on slow filesystems (Docker Desktop bind mounts).
+_DATASET_MTIME_CHECK_INTERVAL_S = 2.0
 
 
 def invalidate_targets_dataset_cache() -> None:
@@ -134,6 +140,13 @@ def load_targets_dataset(force_reload: bool = False, dataset_file: str | None = 
     global _dataset_cache
 
     target_dataset_file = dataset_file or SKYTONIGHT_DATASET_FILE
+    cache_matches = (
+        not force_reload and _dataset_cache.get('dataset_file') == target_dataset_file and _dataset_cache.get('loaded')
+    )
+    now = time.monotonic()
+    if cache_matches and now - _dataset_cache.get('checked_at', 0.0) < _DATASET_MTIME_CHECK_INTERVAL_S:
+        return _dataset_cache
+
     # The scheduler rebuilds the file in its own worker and only clears its own
     # cache, so every other gunicorn worker notices the rebuild by the file's mtime.
     try:
@@ -141,12 +154,8 @@ def load_targets_dataset(force_reload: bool = False, dataset_file: str | None = 
     except OSError:
         file_mtime_ns = None
 
-    if (
-        not force_reload
-        and _dataset_cache.get('dataset_file') == target_dataset_file
-        and _dataset_cache.get('loaded')
-        and _dataset_cache.get('file_mtime_ns') == file_mtime_ns
-    ):
+    if cache_matches and _dataset_cache.get('file_mtime_ns') == file_mtime_ns:
+        _dataset_cache['checked_at'] = now
         return _dataset_cache
 
     payload = load_json_file(target_dataset_file, default={})
@@ -157,6 +166,7 @@ def load_targets_dataset(force_reload: bool = False, dataset_file: str | None = 
         'loaded': True,
         'dataset_file': target_dataset_file,
         'file_mtime_ns': file_mtime_ns,
+        'checked_at': now,
         'metadata': payload.get('metadata', {}) if isinstance(payload.get('metadata', {}), dict) else {},
         'targets': targets,
         'lookup': lookup,

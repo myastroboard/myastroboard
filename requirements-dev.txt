@@ -9,10 +9,10 @@ pytest-cov===7.1.0
 # installing. Excluded from the default `pytest` run (see pytest.ini); run with
 # `pytest -m e2e` or `pytest tests/e2e/ -m e2e`.
 playwright===1.63.0
-pytest-playwright===0.9.0
+pytest-playwright===0.10.0
 
 # Development tools (optional)
-ruff===0.16.10
+ruff===0.17.0
 djlint===1.46.4
 pyright===1.1.414
 

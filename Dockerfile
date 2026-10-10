@@ -2,7 +2,7 @@
 # =================================
 # Builder stage
 # =================================
-FROM python:3.14.6-slim AS builder
+FROM python:3.14.8-slim AS builder
 
 # Build environment
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -67,7 +67,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # =================================
 # Production stage
 # =================================
-FROM python:3.14.6-slim AS production
+FROM python:3.14.8-slim AS production
 
 # Labels
 LABEL maintainer="Gloup"
