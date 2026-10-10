@@ -57,6 +57,7 @@ myastroboard/
 │   │   ├── i18n_utils.py                # Translation backend helpers
 │   │   ├── image_privacy.py             # Lossless EXIF/GPS metadata stripping for uploaded pictures
 │   │   ├── logging_config.py            # Centralized logger setup
+│   │   ├── map_tiles.py                 # OpenStreetMap tile proxy + on-disk cache (/api/map-tiles, the browser never contacts tile servers)
 │   │   ├── mqtt_connections.py          # Shared MQTT broker connections (Parameters -> Configuration), picked by the MQTT connectors
 │   │   ├── metrics_collector.py         # Metrics collection service
 │   │   ├── on_demand_translate.py       # On-demand DeepL/LibreTranslate integration

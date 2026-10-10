@@ -86,6 +86,7 @@ EXPECTED_ROUTES = {
     ('/api/logs/clear', ('POST',)),
     ('/api/logs/export', ('GET',)),
     ('/api/logs/level', ('GET',)),
+    ('/api/map-tiles/<int:z>/<int:x>/<int:y>.png', ('GET',)),
     ('/api/metrics', ('GET',)),
     ('/api/timezones', ('GET',)),
     ('/api/version', ('GET',)),

@@ -281,6 +281,24 @@ The **Metrics** tab in the UI (admin only) includes a **Cache Jobs** table popul
 
 A "Failed" badge appears in the Duration column if the last execution threw an exception.
 
+## Map tile cache
+
+The maps (locations, photo map, observation log, orbital stations) load their background from
+`GET /api/map-tiles/<z>/<x>/<y>.png` instead of a tile server: `utils/map_tiles.py` downloads each
+OpenStreetMap tile once from `tile.openstreetmap.org` and keeps it under `data/cache/map_tiles/<z>/<x>/<y>.png`.
+The browser never contacts a third-party tile server, and the tile servers only see the server's address.
+
+- **Freshness**: a tile is downloaded again after 7 days (the minimum the
+  [OSM tile usage policy](https://operations.osmfoundation.org/policies/tiles/) asks for); browsers keep their copy
+  for 1 day (`Cache-Control: private`).
+- **Outages**: an expired tile is still served while the tile server is unreachable.
+- **Size**: once the folder passes 200 MiB, the oldest tiles are deleted down to 160 MiB (checked every 200 downloads).
+  Deleting the folder is always safe.
+- **Fair use**: at most 2 concurrent downloads per worker, an identifying `User-Agent`, and a budget of 1000 uncached
+  tiles per user per 10 minutes per worker (cache hits are free) so the proxy cannot be used for bulk downloading.
+- **Dark variant**: the same tiles recoloured in the browser by the `.map-tiles-dark` CSS class. Under the red
+  (night vision) theme, every variant is recoloured to a dim red map, markers and attribution included.
+
 ## Performance Impact
 
 ### Benefits

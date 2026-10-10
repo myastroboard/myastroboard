@@ -1,16 +1,18 @@
 """Miscellaneous utility routes Blueprint.
 
 Routes: /api/skyquality, /api/convert-coordinates, /api/timezones,
-/api/health, /health, /api/cache, /api/version, /api/version/check-updates
+/api/health, /health, /api/cache, /api/version, /api/version/check-updates,
+/api/map-tiles/<z>/<x>/<y>.png
 """
 
 import re
 from datetime import UTC, datetime
 from zoneinfo import ZoneInfo, available_timezones
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, Response, jsonify, request, session
 
 from cache import cache_store
+from utils import map_tiles
 from utils.auth import login_required
 from utils.logging_config import get_logger
 from utils.repo_config import get_install_default_location, get_scheduler_locations, load_config
@@ -237,3 +239,26 @@ def check_updates_api():
             ),
             500,
         )
+
+
+@misc_bp.route('/api/map-tiles/<int:z>/<int:x>/<int:y>.png', methods=['GET'])
+@login_required
+def get_map_tile_api(z, x, y):
+    """
+    Serve one OpenStreetMap map tile through the server's tile cache.
+
+    The browser never contacts the tile servers directly (see utils/map_tiles.py).
+    """
+    if not map_tiles.is_valid_tile(z, x, y):
+        return jsonify({"error": "Invalid tile"}), 404
+    try:
+        content = map_tiles.get_tile(z, x, y, user_key=session.get('username', ''))
+    except map_tiles.TileBudgetExceeded as exc:
+        response = jsonify({"error": "Too many map tiles requested"})
+        response.headers['Retry-After'] = str(exc.retry_after)
+        return response, 429
+    except map_tiles.TileUnavailable:
+        return jsonify({"error": "Map tile unavailable"}), 502
+    response = Response(content, mimetype='image/png')
+    response.headers['Cache-Control'] = f'private, max-age={map_tiles.BROWSER_MAX_AGE_SECONDS}'
+    return response

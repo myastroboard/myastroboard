@@ -8,10 +8,12 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Features
 
-- None.
+- Maps: OpenStreetMap tiles loaded and cached by the server replace Esri tiles fetched by the browser (no third-party
+  request, survives short outages), dimmed red under the red theme - see [docs/CACHE_SYSTEM.md](docs/CACHE_SYSTEM.md#map-tile-cache).
 
 ### Fixes
 
+- Astrodex photo map: the mouse wheel scrolls the page again; it zooms the map only after a click on it.
 - *What's new* window: the release just published is listed again instead of "could not be loaded" (its changelog
   entries are read from the release tag's Unreleased section, archived only after tagging).
 - Screen-reader labels (close buttons, menu toggle, language and theme pickers, sky widget, photo slideshow arrows,

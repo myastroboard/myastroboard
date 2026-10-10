@@ -1313,10 +1313,10 @@ async function _obsUpdateLocationMap() {
     if (typeof L === 'undefined') return;
 
     _obsDestroyLocationMap();
-    _observationLocationMap = L.map(container, { scrollWheelZoom: false, zoomControl: false })
+    _observationLocationMap = L.map(container, { ...STATIC_LEAFLET_MAP_OPTIONS })
         .setView([coords.lat, coords.lng], 9);
     addLeafletBasemap(_observationLocationMap, 'light', { maxZoom: 18 });
-    L.marker([coords.lat, coords.lng]).addTo(_observationLocationMap);
+    L.marker([coords.lat, coords.lng], { ...STATIC_LEAFLET_MARKER_OPTIONS }).addTo(_observationLocationMap);
 }
 
 function _obsDestroyLocationMap() {

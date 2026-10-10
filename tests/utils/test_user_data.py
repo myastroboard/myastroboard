@@ -188,6 +188,7 @@ _SHARED_DIRS = {
     ('utils/constants.py', 'SKYTONIGHT_LOGS_DIR'): 'shared SkyTonight engine data',
     ('utils/constants.py', 'SKYTONIGHT_RUNTIME_DIR'): 'shared SkyTonight engine data',
     ('observation/object_info.py', 'OBJECT_IMAGE_CACHE_DIR'): 'catalogue object images',
+    ('utils/map_tiles.py', 'MAP_TILES_CACHE_DIR'): 'OpenStreetMap tile cache',
     ('space/css_passes.py', 'SKYFIELD_CACHE_DIR'): 'ephemeris cache',
     ('space/iss_passes.py', 'SKYFIELD_CACHE_DIR'): 'ephemeris cache',
     ('space/spaceflight_tracker.py', '_SPACEFLIGHT_IMAGES_DIR'): 'launch images cache',
