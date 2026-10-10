@@ -20,6 +20,8 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   location order buttons) are now translated instead of always English.
 - SkyTonight deep-sky and comet lists load in well under a second again instead of timing out with "Failed to
   load SkyTonight results" on slow disks (Docker Desktop on Windows).
+- SkyTonight sky map: opens about three times faster, and its filters respond at once, with a thousand or more
+  targets plotted.
 
 ### Breaking changes
 
