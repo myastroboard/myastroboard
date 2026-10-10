@@ -651,61 +651,77 @@ async function _renderSkyMap(reports, container) {
     const gridClr = isDark ? 'rgba(180,210,255,0.12)' : 'rgba(40,60,120,0.15)';
     const tickClr = isDark ? '#9ab0cc' : '#334466';
 
-    // ── build traces, keeping an index map per target ────────────────────────
-    const traces = [];
-    const traceMap = []; // [{arcIdx, dotIdx, target}] in same order as targets[]
-
-    targets.forEach((tgt, i) => {
-        const color = PALETTE[i % PALETTE.length];
-        const alt = tgt.alt;
-        const az = tgt.az;
+    // ── per-target plot data, computed once ──────────────────────────────────
+    // A night can plot well over a thousand targets. One Plotly trace per arc and per dot
+    // made rendering and every filter change take seconds, so targets are drawn through a
+    // handful of shared traces instead (see _buildTargetTraces), rebuilt from the visible set.
+    const plotEntries = targets.map((tgt, i) => {
         const label = String(tgt.n);
         const scoreStr = tgt.score != null ? (tgt.score * 100).toFixed(0) + '%' : '-';
         const constLabel = tgt.constellation ? _translatedConstellation(tgt.constellation) : '';
-        const tooltip = `<b>${label}: ${escapeHtml(tgt.name)}</b><br>` +
-            `${escapeHtml(tSkyTonightType(tgt.type || tgt.category))}<br>` +
-            `AstroScore: ${scoreStr}<br>` +
-            (constLabel ? `${escapeHtml(constLabel)}<br>` : '');
+        return {
+            target: tgt,
+            colorIdx: i % PALETTE.length,
+            label,
+            r: tgt.alt.map(a => Math.max(0, 90 - a)),
+            theta: tgt.az,
+            symbol: CAT_SYMBOL[tgt.type] || (tgt.category === 'bodies' ? 'star' : 'x'),
+            tooltip: `<b>${label}: ${escapeHtml(tgt.name)}</b><br>` +
+                `${escapeHtml(tSkyTonightType(tgt.type || tgt.category))}<br>` +
+                `AstroScore: ${scoreStr}<br>` +
+                (constLabel ? `${escapeHtml(constLabel)}<br>` : ''),
+        };
+    });
 
-        const r = alt.map(a => Math.max(0, 90 - a));
-        const theta = az;
-
-        const arcIdx = traces.length;
-        traces.push({
+    /** Arcs grouped by palette color (null breaks the line between targets), then one dot trace on top. */
+    function _buildTargetTraces(entries) {
+        const arcs = PALETTE.map(color => ({
             type: 'scatterpolar', mode: 'lines',
-            name: `${label}: ${tgt.name}`,
-            r, theta,
+            r: [], theta: [],
             line: { color, width: 1.8 },
             hoverinfo: 'skip',
             showlegend: false,
-        });
-
-        const dotSymbol = CAT_SYMBOL[tgt.type] || (tgt.category === 'bodies' ? 'star' : 'x');
-        const dotIdx = traces.length;
-        traces.push({
+        }));
+        const dots = {
             type: 'scatterpolar', mode: 'markers+text',
-            name: `${label}: ${tgt.name}`,
-            r: [r[0]], theta: [theta[0]],
-            text: [label],
+            r: [], theta: [], text: [], hovertext: [],
             textposition: 'top center',
-            textfont: { color, size: 9 },
-            hovertext: [tooltip],
+            textfont: { color: [], size: 9 },
             hoverinfo: 'text',
             marker: {
-                symbol: dotSymbol, color, size: 8, opacity: 0.95,
+                symbol: [], color: [], size: 8, opacity: 0.95,
                 line: { color: isDark ? '#111' : '#fff', width: 1 },
             },
             showlegend: false,
-        });
+        };
+        entries.forEach(entry => {
+            const arc = arcs[entry.colorIdx];
+            if (arc.r.length) {
+                arc.r.push(null);
+                arc.theta.push(null);
+            }
+            arc.r.push(...entry.r);
+            arc.theta.push(...entry.theta);
 
-        traceMap.push({ arcIdx, dotIdx, target: tgt });
-    });
+            const color = PALETTE[entry.colorIdx];
+            dots.r.push(entry.r[0]);
+            dots.theta.push(entry.theta[0]);
+            dots.text.push(entry.label);
+            dots.hovertext.push(entry.tooltip);
+            dots.textfont.color.push(color);
+            dots.marker.symbol.push(entry.symbol);
+            dots.marker.color.push(color);
+        });
+        return [...arcs.filter(arc => arc.r.length), dots];
+    }
 
     // ── Plotly layout ─────────────────────────────────────────────────────────
     const plotLayout = {
         paper_bgcolor: 'rgba(0,0,0,0)',
         plot_bgcolor: 'rgba(0,0,0,0)',
         autosize: true,
+        // Keeps the user's zoom when a filter change redraws the map with Plotly.react.
+        uirevision: 'sky-map',
         polar: {
             bgcolor: skyBg,
             radialaxis: {
@@ -787,7 +803,8 @@ async function _renderSkyMap(reports, container) {
     // Flat alt_min circle: r = 90 - alt_min at every azimuth
     const circleTheta = Array.from({ length: 361 }, (_, i) => i);
     const circleR = circleTheta.map(() => 90 - altMin);
-    traces.push({
+    const horizonTraces = [];
+    horizonTraces.push({
         type: 'scatterpolar', mode: 'lines',
         name: `${altMin}° min`,
         r: circleR, theta: circleTheta,
@@ -803,7 +820,7 @@ async function _renderSkyMap(reports, container) {
             const alt = _horizonAltAtAz(az, horizonProfile);
             return alt !== null ? 90 - alt : 90 - altMin;
         });
-        traces.push({
+        horizonTraces.push({
             type: 'scatterpolar', mode: 'lines',
             name: tSkyTonightCompat('horizon_custom_line') || 'Custom Horizon',
             r: customR, theta: customTheta,
@@ -812,17 +829,13 @@ async function _renderSkyMap(reports, container) {
         });
     }
 
-    Plotly.newPlot(mapDiv, traces, plotLayout, plotConfig);
-
+    // The map is first drawn by applyFilters(), at the end of this function.
     resetBtn.addEventListener('click', () => {
         Plotly.relayout(mapDiv, {
             'polar.radialaxis.range': [0, 90],
             'polar.radialaxis.autorange': false,
         });
     });
-
-    const ro = new ResizeObserver(() => Plotly.Plots.resize(mapDiv));
-    ro.observe(mapDiv);
 
     // ── Sky map card footer: horizon line legend ──────────────────────────────
     const skyMapFooter = document.createElement('div');
@@ -1129,33 +1142,32 @@ async function _renderSkyMap(reports, container) {
     });
 
     // ── Filter logic ──────────────────────────────────────────────────────────
+    function isTargetShown(tgt) {
+        return activeCategories.has(tgt.category) &&
+            (tgt.score == null || tgt.score >= minScore) &&
+            (!messierOnly || (tgt.category === 'deep_sky' && tgt.messier)) &&
+            (allConstellations.length === 0 || !tgt.constellation || activeConstellations.has(tgt.constellation));
+    }
+
     function applyFilters() {
-        const visArr = new Array(traces.length).fill(true);
-        traceMap.forEach(({ arcIdx, dotIdx, target }) => {
-            const show = activeCategories.has(target.category) &&
-                (target.score == null || target.score >= minScore) &&
-                (!messierOnly || (target.category === 'deep_sky' && target.messier)) &&
-                (allConstellations.length === 0 || !target.constellation || activeConstellations.has(target.constellation));
-            visArr[arcIdx] = show;
-            visArr[dotIdx] = show;
-        });
-        Plotly.restyle(mapDiv, { visible: visArr });
+        const shown = targets.map(isTargetShown);
+        const traces = [..._buildTargetTraces(plotEntries.filter((_, i) => shown[i])), ...horizonTraces];
+        // react() redraws in place; on the first call it creates the plot.
+        Plotly.react(mapDiv, traces, plotLayout, plotConfig);
 
         let visible = 0;
         legendRows.forEach((tableRow, i) => {
-            const tgt = targets[i];
-            const show = activeCategories.has(tgt.category) &&
-                (tgt.score == null || tgt.score >= minScore) &&
-                (!messierOnly || (tgt.category === 'deep_sky' && tgt.messier)) &&
-                (allConstellations.length === 0 || !tgt.constellation || activeConstellations.has(tgt.constellation));
-            tableRow.style.display = show ? '' : 'none';
-            if (show) visible++;
+            tableRow.style.display = shown[i] ? '' : 'none';
+            if (shown[i]) visible++;
         });
         statsLine.textContent = tSkyTonightCompat('sky_map_count', { count: visible });
     }
 
-    // Apply initial filter (default slider is 65 %)
+    // First draw, with the initial filter (default slider is 65 %)
     applyFilters();
+
+    const ro = new ResizeObserver(() => Plotly.Plots.resize(mapDiv));
+    ro.observe(mapDiv);
 }
 
 
