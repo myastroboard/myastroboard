@@ -107,10 +107,14 @@ async function _renderAstrodexPhotoMap(data) {
 
     if (!document.body.contains(container)) return; // sub-tab switched away while loading
 
+    // Wheel zoom only after a click on the map, so scrolling the page past it is never
+    // captured; it switches off again as soon as the pointer leaves the map.
     const map = L.map(container, {
         zoomControl: true,
-        scrollWheelZoom: true,
+        scrollWheelZoom: false,
     });
+    map.on('click', () => map.scrollWheelZoom.enable());
+    map.on('mouseout', () => map.scrollWheelZoom.disable());
 
     // Default to light, while letting users switch dark/light and persist choice.
     attachLeafletBasemapStyleControl(map, {

@@ -42,24 +42,32 @@ function formatDuration(seconds) {
 }
 
 // =======================
-// Leaflet basemaps (no API key)
+// Leaflet basemaps (OpenStreetMap, proxied and cached by the server)
 // =======================
+
+// The browser only talks to our own server: /api/map-tiles fetches each tile from the
+// OpenStreetMap tile servers once and caches it (backend/utils/map_tiles.py).
+// The dark variant is the same tiles recoloured by the .map-tiles-dark CSS class.
+const _MAP_TILES_URL = appUrl('/api/map-tiles/{z}/{x}/{y}.png'); // appUrl: Home Assistant ingress prefix
+const _OSM_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors';
 
 const _LEAFLET_BASEMAPS = {
     light: {
-        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
-        maxZoom: 18,
-        attribution: 'Tiles &copy; Esri',
+        url: _MAP_TILES_URL,
+        maxZoom: 19,
+        attribution: _OSM_ATTRIBUTION,
+        className: '',
     },
     dark: {
-        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
-        maxZoom: 16,
-        attribution: 'Tiles &copy; Esri',
+        url: _MAP_TILES_URL,
+        maxZoom: 19,
+        attribution: _OSM_ATTRIBUTION,
+        className: 'map-tiles-dark',
     },
 };
 
 /**
- * Add a no-key Leaflet basemap to a map instance.
+ * Add a Leaflet basemap to a map instance.
  * @param {object} map - Leaflet map instance
  * @param {'light'|'dark'} variant - Basemap variant
  * @param {object} tileOptions - Optional Leaflet tile options overrides
@@ -72,9 +80,27 @@ function addLeafletBasemap(map, variant = 'light', tileOptions = {}) {
     return L.tileLayer(profile.url, {
         maxZoom: profile.maxZoom,
         attribution: profile.attribution,
+        className: profile.className,
         ...tileOptions,
     }).addTo(map);
 }
+
+/**
+ * Leaflet options for a static preview map (location cards, picture and session
+ * locations): no pan, zoom or keyboard focus of any kind, so it never traps a scroll,
+ * a drag or a pinch meant for the page. Use STATIC_LEAFLET_MARKER_OPTIONS for its marker.
+ */
+const STATIC_LEAFLET_MAP_OPTIONS = Object.freeze({
+    zoomControl: false,
+    scrollWheelZoom: false,
+    dragging: false,
+    touchZoom: false,
+    doubleClickZoom: false,
+    boxZoom: false,
+    keyboard: false,
+});
+
+const STATIC_LEAFLET_MARKER_OPTIONS = Object.freeze({ interactive: false, keyboard: false });
 
 function _normalizeLeafletBasemapVariant(variant, fallback = 'light') {
     if (!variant || !_LEAFLET_BASEMAPS[variant]) return fallback;

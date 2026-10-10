@@ -1791,11 +1791,11 @@ async function _updatePictureLocationMap(prefix) {
         try { _pictureLocationMap.remove(); } catch (_) { /* already gone */ }
         _pictureLocationMap = null;
     }
-    _pictureLocationMap = L.map(container, { scrollWheelZoom: false, zoomControl: false })
+    _pictureLocationMap = L.map(container, { ...STATIC_LEAFLET_MAP_OPTIONS })
         .setView([coords.lat, coords.lng], 9);
     // Light basemap stays legible for remote sites with little infrastructure.
     addLeafletBasemap(_pictureLocationMap, 'light', { maxZoom: 18 });
-    L.marker([coords.lat, coords.lng]).addTo(_pictureLocationMap);
+    L.marker([coords.lat, coords.lng], { ...STATIC_LEAFLET_MARKER_OPTIONS }).addTo(_pictureLocationMap);
 }
 
 // Reads the location picker's current state into the fields the backend

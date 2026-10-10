@@ -124,17 +124,12 @@ async function _initLocationCardMaps() {
 
         const lat = Number(loc.latitude);
         const lon = Number(loc.longitude);
-        const map = L.map(container, {
-            scrollWheelZoom: false, // a card grid must not trap page scroll
-            zoomControl: false,
-            keyboard: false, // container is aria-hidden (decorative); Leaflet's
-            // keyboard handler would otherwise add tabindex="0" and make a
-            // hidden element focusable
-        }).setView([lat, lon], 9);
+        // Static preview (the container is aria-hidden, so it must not take keyboard focus either)
+        const map = L.map(container, { ...STATIC_LEAFLET_MAP_OPTIONS }).setView([lat, lon], 9);
 
         // Light basemap keeps remote areas readable on small minimaps.
         addLeafletBasemap(map, 'light', { maxZoom: 18 });
-        L.marker([lat, lon]).addTo(map);
+        L.marker([lat, lon], { ...STATIC_LEAFLET_MARKER_OPTIONS }).addTo(map);
 
         _locationCardMaps[loc.id] = map;
     });

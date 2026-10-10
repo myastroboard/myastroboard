@@ -681,6 +681,64 @@ class TestVersionEndpoints:
 
 
 # ---------------------------------------------------------------------------
+# Map tile proxy endpoint
+# ---------------------------------------------------------------------------
+
+
+class TestMapTileEndpoint:
+    def test_tile_is_served_as_png_with_private_cache(self, client_admin, monkeypatch):
+        """A valid tile is returned as a PNG the browser may cache privately, never shared caches."""
+        seen = {}
+
+        def fake_get_tile(z, x, y, user_key):
+            seen.update(z=z, x=x, y=y, user_key=user_key)
+            return b'png-bytes'
+
+        monkeypatch.setattr(_misc_mod.map_tiles, 'get_tile', fake_get_tile)
+        resp = client_admin.get('/api/map-tiles/3/4/5.png')
+        assert resp.status_code == 200
+        assert resp.mimetype == 'image/png'
+        assert resp.data == b'png-bytes'
+        assert resp.headers['Cache-Control'].startswith('private, max-age=')
+        assert seen == {'z': 3, 'x': 4, 'y': 5, 'user_key': 'admin'}
+
+    def test_tile_outside_the_pyramid_returns_404(self, client_admin, monkeypatch):
+        """Coordinates past the edge of their zoom level never reach the tile server."""
+        monkeypatch.setattr(_misc_mod.map_tiles, 'get_tile', lambda *a, **k: pytest.fail('upstream called'))
+        assert client_admin.get('/api/map-tiles/2/4/0.png').status_code == 404
+        assert client_admin.get('/api/map-tiles/25/0/0.png').status_code == 404
+
+    def test_non_numeric_tile_path_returns_404(self, client_admin):
+        """Only integer coordinates match the route."""
+        assert client_admin.get('/api/map-tiles/a/0/0.png').status_code == 404
+        assert client_admin.get('/api/map-tiles/1/-1/0.png').status_code == 404
+
+    def test_unavailable_tile_returns_502(self, client_admin, monkeypatch):
+        """An uncached tile the tile server cannot provide is a bad-gateway error."""
+
+        def fail(*_args, **_kwargs):
+            raise _misc_mod.map_tiles.TileUnavailable('offline')
+
+        monkeypatch.setattr(_misc_mod.map_tiles, 'get_tile', fail)
+        assert client_admin.get('/api/map-tiles/1/0/0.png').status_code == 502
+
+    def test_spent_budget_returns_429_with_retry_after(self, client_admin, monkeypatch):
+        """A user past the upstream fetch budget is told when to retry."""
+
+        def over_budget(*_args, **_kwargs):
+            raise _misc_mod.map_tiles.TileBudgetExceeded(42)
+
+        monkeypatch.setattr(_misc_mod.map_tiles, 'get_tile', over_budget)
+        resp = client_admin.get('/api/map-tiles/1/0/0.png')
+        assert resp.status_code == 429
+        assert resp.headers['Retry-After'] == '42'
+
+    def test_unauthenticated_returns_401(self, client):
+        """Tiles are only served to signed-in users."""
+        assert client.get('/api/map-tiles/0/0/0.png').status_code == 401
+
+
+# ---------------------------------------------------------------------------
 # Cache status endpoint
 # ---------------------------------------------------------------------------
 

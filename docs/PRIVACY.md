@@ -93,7 +93,7 @@ receives account data, but some receive coordinates or the user's IP address.
 | [Open-Meteo](https://open-meteo.com) (Switzerland/EU) | Coordinates of each location | Server | Weather forecast |
 | [7Timer!](https://www.7timer.info) (China) | Coordinates of each location | Server | Seeing / transparency forecast |
 | [Nominatim - OpenStreetMap](https://nominatim.openstreetmap.org) (EU) | Coordinates + the browser's IP | Browser | Naming a location, only when the user clicks *Use my location* |
-| Esri ArcGIS map tiles (USA) | The browser's IP + the map area viewed | Browser | Background of the maps (locations, photo map) |
+| [OpenStreetMap tile servers](https://operations.osmfoundation.org/policies/tiles/) (United Kingdom) | The map areas viewed, from the server's IP (never the users' IP); downloaded tiles are cached on the server | Server | Background of the maps (locations, photo map, observation log, orbital stations) |
 | Browser push services (Google FCM, Mozilla, Apple) | An opaque notification payload | Server | Web Push, only for users who enabled notifications |
 | CelesTrak, The Space Devs, NOAA SWPC, JPL, Minor Planet Center, CDS Strasbourg, wheretheiss.at | Nothing personal | Server | Satellites, launches, space weather, ephemerides, object images |
 | GitHub | Nothing personal | Server | Check for new releases and download their changelog |
@@ -110,8 +110,8 @@ Optional integrations send data only when an administrator enables them:
   ([details](ASTRODEX_STREAM.md)).
 - **AllSky** and other connectors - the application reads from them; it does not send user data.
 
-Transfers outside the EU: 7Timer (China) receives location coordinates and Esri (USA) receives
-the browser IP. Mention them in your privacy notice.
+Transfers outside the EU: 7Timer (China) receives location coordinates, and the OpenStreetMap Foundation
+(United Kingdom) receives the map areas viewed, from the server's IP. Mention them in your privacy notice.
 
 ---
 
@@ -158,7 +158,7 @@ prefixes of the files in `astrodex/images/` and `observation_sessions/attachment
 - Connector secrets (MQTT connection passwords included) are stored apart from the configuration,
   with owner-only file permissions, and never appear in exports or API responses.
 - All front-end libraries are served locally: no CDN, font or analytics request leaves the browser
-  except the map tiles and geocoding listed above.
+  except the geocoding listed above (map tiles go through the server).
 
 Protect the `data/` volume and your backups: they hold everything on this page.
 
@@ -186,8 +186,8 @@ Who can see it: administrators of this instance; other members only for what you
 (shared Astrodex, photo map). Pictures are stripped of their GPS metadata on upload.
 
 Third parties: weather providers (Open-Meteo, 7Timer! - China) receive the coordinates
-of the observing locations; map tiles (Esri - USA) and place names (OpenStreetMap) are
-loaded by your browser. [Add enabled integrations: MQTT, MyAstroShine...]
+of the observing locations; map tiles (OpenStreetMap - United Kingdom) are loaded by our server, and
+place names (OpenStreetMap) by your browser. [Add enabled integrations: MQTT, MyAstroShine...]
 
 Retention: your data is kept while your account exists and deleted with it. Server logs
 are kept for [90] days.
