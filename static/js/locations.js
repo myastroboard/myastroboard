@@ -12,16 +12,9 @@ let _myLocationsCache = null; // /api/locations/mine payload (switcher + my-sett
 // re-render can tear the old map instances down before the DOM nodes go away.
 let _locationCardMaps = {};
 let _locationCardMapsGeneration = 0;
-const _locationsLeafletLoadState = { promise: null };
 
 function _ensureLocationsLeafletLoaded() {
-    return ensureVendorScriptLoaded(
-        () => typeof L !== 'undefined',
-        appUrl('/static/vendor/leaflet/dist/leaflet.min.js?v=1.9.4'),
-        appUrl('/static/vendor/leaflet/dist/leaflet.min.css?v=1.9.4'),
-        _locationsLeafletLoadState,
-        'Leaflet'
-    );
+    return ensureLeafletLoaded();
 }
 
 // ======================

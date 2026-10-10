@@ -57,7 +57,7 @@ myastroboard/
 │   │   ├── i18n_utils.py                # Translation backend helpers
 │   │   ├── image_privacy.py             # Lossless EXIF/GPS metadata stripping for uploaded pictures
 │   │   ├── logging_config.py            # Centralized logger setup
-│   │   ├── map_tiles.py                 # OpenStreetMap tile proxy + on-disk cache (/api/map-tiles, the browser never contacts tile servers)
+│   │   ├── map_tiles.py                 # OpenStreetMap map resources proxy + on-disk cache (/api/map-tiles: vector/raster tiles, glyphs, sprites)
 │   │   ├── mqtt_connections.py          # Shared MQTT broker connections (Parameters -> Configuration), picked by the MQTT connectors
 │   │   ├── metrics_collector.py         # Metrics collection service
 │   │   ├── on_demand_translate.py       # On-demand DeepL/LibreTranslate integration
@@ -166,6 +166,7 @@ myastroboard/
 │   ├── SKYTONIGHT.md                # SkyTonight architecture + AstroScore documentation
 │   └── VISUAL_TOUR.md               # Visual tour of the application
 ├── scripts/
+│   ├── build_map_styles.py          # Builds static/map-styles/*.json (vector basemap styles, URLs pointed at /api/map-tiles)
 │   ├── build_skytonight_catalogue.py # Offline dataset builder (generates data/skytonight/catalogues/targets.json)
 │   ├── minify_static.py             # Static file minifier
 │   ├── translate_checker.py         # Translation consistency checker

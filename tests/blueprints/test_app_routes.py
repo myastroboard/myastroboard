@@ -685,42 +685,81 @@ class TestVersionEndpoints:
 # ---------------------------------------------------------------------------
 
 
-class TestMapTileEndpoint:
-    def test_tile_is_served_as_png_with_private_cache(self, client_admin, monkeypatch):
-        """A valid tile is returned as a PNG the browser may cache privately, never shared caches."""
-        seen = {}
+class TestMapTileEndpoints:
+    @pytest.fixture
+    def resource_calls(self, monkeypatch):
+        """Replace the proxy with a recorder that returns fixed bytes."""
+        calls = []
 
-        def fake_get_tile(z, x, y, user_key):
-            seen.update(z=z, x=x, y=y, user_key=user_key)
-            return b'png-bytes'
+        def fake_get_resource(kind, url_params, path_parts, user_key):
+            calls.append({'kind': kind, 'url_params': url_params, 'path_parts': path_parts, 'user_key': user_key})
+            return b'resource-bytes'
 
-        monkeypatch.setattr(_misc_mod.map_tiles, 'get_tile', fake_get_tile)
-        resp = client_admin.get('/api/map-tiles/3/4/5.png')
+        monkeypatch.setattr(_misc_mod.map_tiles, 'get_resource', fake_get_resource)
+        return calls
+
+    def test_raster_tile_is_served_as_png_with_private_cache(self, client_admin, resource_calls):
+        """A raster tile is a plain PNG the browser may cache privately, never in shared caches."""
+        resp = client_admin.get('/api/map-tiles/raster/3/4/5.png')
         assert resp.status_code == 200
         assert resp.mimetype == 'image/png'
-        assert resp.data == b'png-bytes'
+        assert resp.data == b'resource-bytes'
+        assert 'Content-Encoding' not in resp.headers
         assert resp.headers['Cache-Control'].startswith('private, max-age=')
-        assert seen == {'z': 3, 'x': 4, 'y': 5, 'user_key': 'admin'}
+        assert resource_calls == [
+            {
+                'kind': _misc_mod.map_tiles.RASTER,
+                'url_params': {'z': 3, 'x': 4, 'y': 5},
+                'path_parts': (3, 4, '5.png'),
+                'user_key': 'admin',
+            }
+        ]
 
-    def test_tile_outside_the_pyramid_returns_404(self, client_admin, monkeypatch):
-        """Coordinates past the edge of their zoom level never reach the tile server."""
-        monkeypatch.setattr(_misc_mod.map_tiles, 'get_tile', lambda *a, **k: pytest.fail('upstream called'))
-        assert client_admin.get('/api/map-tiles/2/4/0.png').status_code == 404
-        assert client_admin.get('/api/map-tiles/25/0/0.png').status_code == 404
+    def test_vector_tile_is_served_gzip_encoded(self, client_admin, resource_calls):
+        """Vector tiles are stored gzipped and announced as such to the browser."""
+        resp = client_admin.get('/api/map-tiles/vector/3/4/5.mvt')
+        assert resp.status_code == 200
+        assert resp.mimetype == 'application/vnd.mapbox-vector-tile'
+        assert resp.headers['Content-Encoding'] == 'gzip'
+        assert resource_calls[0]['kind'] is _misc_mod.map_tiles.VECTOR
 
-    def test_non_numeric_tile_path_returns_404(self, client_admin):
-        """Only integer coordinates match the route."""
-        assert client_admin.get('/api/map-tiles/a/0/0.png').status_code == 404
-        assert client_admin.get('/api/map-tiles/1/-1/0.png').status_code == 404
+    def test_glyphs_and_sprites_are_served(self, client_admin, resource_calls):
+        """The fonts and sprite files the styles reference are proxied with their own content types."""
+        glyphs = client_admin.get('/api/map-tiles/fonts/noto_sans_regular/256-511.pbf')
+        sprite_png = client_admin.get('/api/map-tiles/sprites/sprites@2x.png')
+        sprite_json = client_admin.get('/api/map-tiles/sprites/sprites.json')
 
-    def test_unavailable_tile_returns_502(self, client_admin, monkeypatch):
-        """An uncached tile the tile server cannot provide is a bad-gateway error."""
+        assert glyphs.status_code == 200 and glyphs.headers['Content-Encoding'] == 'gzip'
+        assert sprite_png.mimetype == 'image/png' and 'Content-Encoding' not in sprite_png.headers
+        assert sprite_json.mimetype == 'application/json'
+        assert resource_calls[0]['url_params'] == {'fontstack': 'noto_sans_regular', 'glyph_range': '256-511'}
+
+    @pytest.mark.parametrize(
+        'path',
+        [
+            '/api/map-tiles/raster/2/4/0.png',
+            '/api/map-tiles/raster/25/0/0.png',
+            '/api/map-tiles/vector/15/0/0.mvt',
+            '/api/map-tiles/fonts/arial/0-255.pbf',
+            '/api/map-tiles/fonts/noto_sans_bold/0-511.pbf',
+            '/api/map-tiles/sprites/other.png',
+            '/api/map-tiles/raster/a/0/0.png',
+            '/api/map-tiles/raster/1/-1/0.png',
+        ],
+    )
+    def test_invalid_resource_returns_404_without_upstream_call(self, client_admin, resource_calls, path):
+        """Out-of-pyramid tiles, unknown fonts, misaligned glyph blocks and unknown sprites never reach upstream."""
+        assert client_admin.get(path).status_code == 404
+        assert resource_calls == []
+
+    def test_unavailable_resource_returns_502(self, client_admin, monkeypatch):
+        """An uncached resource the map server cannot provide is a bad-gateway error."""
 
         def fail(*_args, **_kwargs):
             raise _misc_mod.map_tiles.TileUnavailable('offline')
 
-        monkeypatch.setattr(_misc_mod.map_tiles, 'get_tile', fail)
-        assert client_admin.get('/api/map-tiles/1/0/0.png').status_code == 502
+        monkeypatch.setattr(_misc_mod.map_tiles, 'get_resource', fail)
+        assert client_admin.get('/api/map-tiles/vector/1/0/0.mvt').status_code == 502
 
     def test_spent_budget_returns_429_with_retry_after(self, client_admin, monkeypatch):
         """A user past the upstream fetch budget is told when to retry."""
@@ -728,14 +767,23 @@ class TestMapTileEndpoint:
         def over_budget(*_args, **_kwargs):
             raise _misc_mod.map_tiles.TileBudgetExceeded(42)
 
-        monkeypatch.setattr(_misc_mod.map_tiles, 'get_tile', over_budget)
-        resp = client_admin.get('/api/map-tiles/1/0/0.png')
+        monkeypatch.setattr(_misc_mod.map_tiles, 'get_resource', over_budget)
+        resp = client_admin.get('/api/map-tiles/raster/1/0/0.png')
         assert resp.status_code == 429
         assert resp.headers['Retry-After'] == '42'
 
-    def test_unauthenticated_returns_401(self, client):
-        """Tiles are only served to signed-in users."""
-        assert client.get('/api/map-tiles/0/0/0.png').status_code == 401
+    @pytest.mark.parametrize(
+        'path',
+        [
+            '/api/map-tiles/raster/0/0/0.png',
+            '/api/map-tiles/vector/0/0/0.mvt',
+            '/api/map-tiles/fonts/noto_sans_regular/0-255.pbf',
+            '/api/map-tiles/sprites/sprites.json',
+        ],
+    )
+    def test_unauthenticated_returns_401(self, client, path):
+        """Map resources are only served to signed-in users."""
+        assert client.get(path).status_code == 401
 
 
 # ---------------------------------------------------------------------------

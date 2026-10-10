@@ -865,13 +865,13 @@ body.density-compact .alert {
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-1) 22%, transparent);
 }
 
-/* Dark basemap: the OpenStreetMap tiles recoloured (utils.js, _LEAFLET_BASEMAPS.dark) */
-.leaflet-layer.map-tiles-dark {
+/* Raster fallback basemap (browsers without WebGL, utils.js): the OSM tiles recoloured for the
+   dark variant and the red theme. The vector basemap has its own styles (static/map-styles/). */
+.leaflet-layer.map-tiles-raster.map-tiles-dark {
     filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9) saturate(0.6);
 }
 
-/* Red (night vision) theme: both basemap variants become a dim, red-only map */
-html[data-theme="red"] .leaflet-tile-pane .leaflet-layer {
+html[data-theme="red"] .leaflet-layer.map-tiles-raster {
     filter: grayscale(1) invert(1) brightness(0.55) sepia(1) saturate(5) hue-rotate(-40deg);
 }
 

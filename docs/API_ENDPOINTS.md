@@ -99,9 +99,11 @@ This page lists the HTTP routes currently declared across `backend/blueprints/*.
   CHANGELOG.md sections between the installed and the latest version (`version`, `date`, `features`, `fixes`, `breaking`;
   newest first), or is `null` when the changelog could not be fetched.
 - `GET /api/catalogues`
-- `GET /api/map-tiles/<z>/<x>/<y>.png` - OpenStreetMap map tile served through the server's tile cache, so the browser
-  never contacts the tile servers (`404` outside the tile pyramid or past zoom 19, `429` with `Retry-After` past the
-  per-user download budget, `502` when the tile is neither cached nor downloadable); see
+- `GET /api/map-tiles/vector/<z>/<x>/<y>.mvt`, `GET /api/map-tiles/fonts/<font>/<range>.pbf`,
+  `GET /api/map-tiles/sprites/<file>`, `GET /api/map-tiles/raster/<z>/<x>/<y>.png` - OpenStreetMap map resources
+  served through the server's cache, so the browser never contacts the map servers (vector tiles and glyphs are
+  gzip-encoded; `404` for an invalid tile, font, glyph block or sprite file, `429` with `Retry-After` past the
+  per-user download budget, `502` when the resource is neither cached nor downloadable); see
   [CACHE_SYSTEM.md](CACHE_SYSTEM.md#map-tile-cache)
 
 ## Scheduler

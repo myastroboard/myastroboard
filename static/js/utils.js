@@ -42,45 +42,146 @@ function formatDuration(seconds) {
 }
 
 // =======================
-// Leaflet basemaps (OpenStreetMap, proxied and cached by the server)
+// Leaflet maps: loading and basemaps (OpenStreetMap, proxied and cached by the server)
 // =======================
 
-// The browser only talks to our own server: /api/map-tiles fetches each tile from the
-// OpenStreetMap tile servers once and caches it (backend/utils/map_tiles.py).
-// The dark variant is the same tiles recoloured by the .map-tiles-dark CSS class.
-const _MAP_TILES_URL = appUrl('/api/map-tiles/{z}/{x}/{y}.png'); // appUrl: Home Assistant ingress prefix
+// The browser only talks to our own server: /api/map-tiles fetches every map resource from the
+// OpenStreetMap servers once and caches it (backend/utils/map_tiles.py).
+//
+// With WebGL, the basemap is OpenStreetMap vector tiles drawn by MapLibre GL JS inside a Leaflet
+// layer (maplibre-gl-leaflet), with one style per look in static/map-styles/ (built by
+// scripts/build_map_styles.py): light, dark, and red for the night vision theme, which overrides
+// the light/dark choice. Without WebGL, it falls back to raster tiles recoloured by CSS classes.
+const _LEAFLET_VERSION = '1.9.4';
+const _MAPLIBRE_VERSION = '6.11.2';
+const _MAPLIBRE_LEAFLET_VERSION = '0.1.4';
+const _leafletLibLoadState = { promise: null };
+const _maplibreLoadState = { promise: null };
+const _maplibreLeafletLoadState = { promise: null };
+let _vectorBasemapAvailable = false;
+
 const _OSM_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors';
+const _RASTER_TILES_URL = appUrl('/api/map-tiles/raster/{z}/{x}/{y}.png'); // appUrl: Home Assistant ingress prefix
+// Placeholder origin of every URL inside static/map-styles/*.json (see scripts/build_map_styles.py)
+const _MAP_STYLE_ORIGIN = 'https://myastroboard.invalid';
+// Bump after running scripts/build_map_styles.py so browsers fetch the new styles
+const _MAP_STYLES_VERSION = '2';
 
 const _LEAFLET_BASEMAPS = {
-    light: {
-        url: _MAP_TILES_URL,
-        maxZoom: 19,
-        attribution: _OSM_ATTRIBUTION,
-        className: '',
-    },
-    dark: {
-        url: _MAP_TILES_URL,
-        maxZoom: 19,
-        attribution: _OSM_ATTRIBUTION,
-        className: 'map-tiles-dark',
-    },
+    light: { maxZoom: 19, rasterClassName: 'map-tiles-raster' },
+    dark: { maxZoom: 19, rasterClassName: 'map-tiles-raster map-tiles-dark' },
 };
 
+// Vector basemap layers on screen, restyled when the theme switches to or from red
+const _vectorBasemapLayers = new Map();
+
+function _supportsWebGL() {
+    try {
+        const canvas = document.createElement('canvas');
+        return Boolean(canvas.getContext('webgl2') || canvas.getContext('webgl'));
+    } catch (_) {
+        return false;
+    }
+}
+
+function _ensureVectorBasemapLoaded() {
+    if (!_supportsWebGL()) return Promise.resolve(false);
+    return ensureVendorScriptLoaded(
+        () => typeof maplibregl !== 'undefined',
+        appUrl(`/static/js/maplibre_loader.mjs?v=${_MAPLIBRE_VERSION}`),
+        appUrl(`/static/vendor/maplibre-gl/dist/maplibre-gl.css?v=${_MAPLIBRE_VERSION}`),
+        _maplibreLoadState,
+        'MapLibre GL JS',
+        'module'
+    ).then(() => ensureVendorScriptLoaded(
+        () => typeof L.maplibreGL === 'function',
+        appUrl(`/static/vendor/maplibre-gl-leaflet/leaflet-maplibre-gl.js?v=${_MAPLIBRE_LEAFLET_VERSION}`),
+        null,
+        _maplibreLeafletLoadState,
+        'maplibre-gl-leaflet'
+    )).then(() => true);
+}
+
 /**
- * Add a Leaflet basemap to a map instance.
+ * Load Leaflet, plus the vector basemap libraries when the browser supports WebGL.
+ * Rejects only when Leaflet itself fails; a vector basemap failure falls back to raster tiles.
+ * @returns {Promise<void>}
+ */
+async function ensureLeafletLoaded() {
+    await ensureVendorScriptLoaded(
+        () => typeof L !== 'undefined',
+        appUrl(`/static/vendor/leaflet/dist/leaflet.min.js?v=${_LEAFLET_VERSION}`),
+        appUrl(`/static/vendor/leaflet/dist/leaflet.min.css?v=${_LEAFLET_VERSION}`),
+        _leafletLibLoadState,
+        'Leaflet'
+    );
+    try {
+        _vectorBasemapAvailable = await _ensureVectorBasemapLoaded();
+    } catch (error) {
+        console.warn('Vector basemap unavailable, using raster tiles', error);
+        _vectorBasemapAvailable = false;
+    }
+}
+
+function _isRedTheme() {
+    return document.documentElement.getAttribute('data-theme') === 'red';
+}
+
+function _mapStyleUrl(variant) {
+    const style = _isRedTheme() ? 'red' : variant;
+    return window.location.origin + appUrl(`/static/map-styles/${style}.json?v=${_MAP_STYLES_VERSION}`);
+}
+
+// Swap the styles' placeholder origin for this server (with its ingress prefix, if any)
+function _mapStyleTransformRequest(url) {
+    if (url.startsWith(_MAP_STYLE_ORIGIN)) {
+        return { url: window.location.origin + appUrl(url.slice(_MAP_STYLE_ORIGIN.length)) };
+    }
+    return { url };
+}
+
+function _addVectorBasemap(map, variant, layerOptions) {
+    // Leaflet only reads maxZoom from tile layers, so the limit goes on the map itself; MapLibre
+    // keeps its own (higher) limit and simply follows Leaflet's view.
+    const { maxZoom, ...glOptions } = layerOptions;
+    if (Number.isFinite(maxZoom)) map.setMaxZoom(maxZoom);
+    const layer = L.maplibreGL({
+        style: _mapStyleUrl(variant),
+        transformRequest: _mapStyleTransformRequest,
+        ...glOptions,
+    }).addTo(map);
+    _vectorBasemapLayers.set(layer, variant);
+    layer.on('remove', () => _vectorBasemapLayers.delete(layer));
+    return layer;
+}
+
+// Follow the theme live: entering or leaving the red theme swaps the style of every vector basemap.
+new MutationObserver(() => {
+    _vectorBasemapLayers.forEach((variant, layer) => {
+        const glMap = layer.getMaplibreMap();
+        if (glMap) glMap.setStyle(_mapStyleUrl(variant));
+    });
+}).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+/**
+ * Add the OpenStreetMap basemap to a Leaflet map (call ensureLeafletLoaded() first).
  * @param {object} map - Leaflet map instance
- * @param {'light'|'dark'} variant - Basemap variant
- * @param {object} tileOptions - Optional Leaflet tile options overrides
- * @returns {object|null} Leaflet tile layer instance or null
+ * @param {'light'|'dark'} variant - Basemap variant (the red theme overrides it)
+ * @param {object} tileOptions - Optional layer option overrides
+ * @returns {object|null} Leaflet layer instance or null
  */
 function addLeafletBasemap(map, variant = 'light', tileOptions = {}) {
     if (!map || typeof L === 'undefined') return null;
 
-    const profile = _LEAFLET_BASEMAPS[variant] || _LEAFLET_BASEMAPS.light;
-    return L.tileLayer(profile.url, {
+    const knownVariant = _LEAFLET_BASEMAPS[variant] ? variant : 'light';
+    const profile = _LEAFLET_BASEMAPS[knownVariant];
+    if (_vectorBasemapAvailable && typeof L.maplibreGL === 'function') {
+        return _addVectorBasemap(map, knownVariant, { maxZoom: profile.maxZoom, ...tileOptions });
+    }
+    return L.tileLayer(_RASTER_TILES_URL, {
         maxZoom: profile.maxZoom,
-        attribution: profile.attribution,
-        className: profile.className,
+        attribution: _OSM_ATTRIBUTION,
+        className: profile.rasterClassName,
         ...tileOptions,
     }).addTo(map);
 }
@@ -663,8 +764,9 @@ function tSkyTonightType(value) {
  * @param {{promise: Promise|null}} state - Caller-owned box holding the memoized promise
  *   (a plain object so each caller keeps its own independent cache slot).
  * @param {string} libraryName - Used only in the rejection error message.
+ * @param {'classic'|'module'} [scriptType] - 'module' for an ES module script.
  */
-function ensureVendorScriptLoaded(isLoaded, scriptUrl, cssUrl, state, libraryName) {
+function ensureVendorScriptLoaded(isLoaded, scriptUrl, cssUrl, state, libraryName, scriptType = 'classic') {
     if (isLoaded()) return Promise.resolve();
     if (state.promise) return state.promise;
     state.promise = new Promise((resolve, reject) => {
@@ -678,6 +780,7 @@ function ensureVendorScriptLoaded(isLoaded, scriptUrl, cssUrl, state, libraryNam
             });
         }
         const script = document.createElement('script');
+        if (scriptType === 'module') script.type = 'module';
         script.src = appUrl(scriptUrl);
         script.onload = resolve;
         script.onerror = () => {

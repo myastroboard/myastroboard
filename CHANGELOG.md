@@ -8,8 +8,8 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Features
 
-- Maps: OpenStreetMap tiles loaded and cached by the server replace Esri tiles fetched by the browser (no third-party
-  request, survives short outages), dimmed red under the red theme - see [docs/CACHE_SYSTEM.md](docs/CACHE_SYSTEM.md#map-tile-cache).
+- Maps: OpenStreetMap vector maps drawn in the browser, with light, dark and night vision red styles, loaded and
+  cached by the server instead of Esri tiles - see [docs/CACHE_SYSTEM.md](docs/CACHE_SYSTEM.md#map-tile-cache).
 
 ### Fixes
 
