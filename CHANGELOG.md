@@ -18,6 +18,8 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   entries are read from the release tag's Unreleased section, archived only after tagging).
 - Screen-reader labels (close buttons, menu toggle, language and theme pickers, sky widget, photo slideshow arrows,
   location order buttons) are now translated instead of always English.
+- SkyTonight deep-sky and comet lists load in well under a second again instead of timing out with "Failed to
+  load SkyTonight results" on slow disks (Docker Desktop on Windows).
 
 ### Breaking changes
 

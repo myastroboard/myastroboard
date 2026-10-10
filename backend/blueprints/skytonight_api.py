@@ -36,6 +36,7 @@ from skytonight.skytonight_storage import (
     has_calculation_results,
     has_comets_results,
     has_dso_results,
+    list_alttime_files,
 )
 from skytonight.skytonight_storage import (
     get_scheduler_trigger_file as get_skytonight_scheduler_trigger_file,
@@ -222,16 +223,23 @@ def _annotate_skytonight_item(
 _ALTTIME_ID_SAFE = re.compile(r'[^a-z0-9_-]')
 
 
-def _alttime_json_path(target_id: str, location_id: str | None = None, alttime_dir: str | None = None) -> str:
-    """Return absolute path for a target's altitude-time JSON file (per location).
+def _alttime_file_name(target_id: str) -> str:
+    """Return the file name of a target's altitude-time JSON file."""
+    return f'{_ALTTIME_ID_SAFE.sub("_", target_id.lower())}_alttime.json'
 
-    Pass a pre-resolved *alttime_dir* (from :func:`get_alttime_dir`, called once)
-    when checking many rows in a loop - it avoids re-resolving/creating the
-    directory (a filesystem call) on every single row.
+
+def _alttime_json_path(target_id: str, location_id: str | None = None) -> str:
+    """Return absolute path for a target's altitude-time JSON file (per location)."""
+    return os.path.normpath(os.path.join(get_alttime_dir(location_id), _alttime_file_name(target_id)))
+
+
+def _alttime_file_if_present(target_id: str, alttime_files: frozenset[str]) -> str:
+    """Return *target_id* when its altitude-time file is listed in *alttime_files*, else ''.
+
+    *alttime_files* comes from :func:`list_alttime_files`, called once per report rather
+    than one filesystem call per row.
     """
-    safe_id = _ALTTIME_ID_SAFE.sub('_', target_id.lower())
-    resolved_dir = alttime_dir if alttime_dir is not None else get_alttime_dir(location_id)
-    return os.path.normpath(os.path.join(resolved_dir, f'{safe_id}_alttime.json'))
+    return target_id if target_id and _alttime_file_name(target_id) in alttime_files else ''
 
 
 # ---------------------------------------------------------------------------
@@ -266,7 +274,7 @@ def _build_skytonight_reports_payload(catalogue: str | None, user_id: str, usern
     if has_calculation_results(location_id):
         calc = load_calculation_results(location_id)
         night_meta = calc.get('metadata', {})
-        alttime_dir = get_alttime_dir(location_id)
+        alttime_files = list_alttime_files(get_alttime_dir(location_id))
 
         base_result['night_metadata'] = night_meta
 
@@ -319,11 +327,7 @@ def _build_skytonight_reports_payload(catalogue: str | None, user_id: str, usern
                 'meridian transit': observation.get('meridian_transit'),
                 'antimeridian transit': observation.get('antimeridian_transit'),
                 'catalogue_names': calc_catalogue_names,
-                'alttime_file': (
-                    calc_item.get('target_id', '')
-                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', ''), alttime_dir=alttime_dir))
-                    else ''
-                ),
+                'alttime_file': _alttime_file_if_present(calc_item.get('target_id', ''), alttime_files),
                 'source_type': 'calculated',
                 'plan_state': plan_state,
             }
@@ -353,11 +357,7 @@ def _build_skytonight_reports_payload(catalogue: str | None, user_id: str, usern
                 'hmsdms': f"{ra_hms} / {dec_dms}" if ra_hms and dec_dms else None,
                 'observable_hours': observation.get('observable_hours'),
                 'solar elongation': calc_item.get('solar_elongation_deg'),
-                'alttime_file': (
-                    calc_item.get('target_id', '')
-                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', ''), alttime_dir=alttime_dir))
-                    else ''
-                ),
+                'alttime_file': _alttime_file_if_present(calc_item.get('target_id', ''), alttime_files),
                 'source_type': 'calculated',
                 'plan_state': plan_state,
             }
@@ -390,11 +390,7 @@ def _build_skytonight_reports_payload(catalogue: str | None, user_id: str, usern
                 'declination': dec_dms,
                 'hmsdms': f"{ra_hms} / {dec_dms}" if ra_hms and dec_dms else None,
                 'observable_hours': observation.get('observable_hours'),
-                'alttime_file': (
-                    calc_item.get('target_id', '')
-                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', ''), alttime_dir=alttime_dir))
-                    else ''
-                ),
+                'alttime_file': _alttime_file_if_present(calc_item.get('target_id', ''), alttime_files),
                 'source_type': 'calculated',
                 'plan_state': plan_state,
             }
@@ -508,7 +504,7 @@ def _build_bodies_section_payload(user_id: str, username: str) -> dict[str, Any]
 
     if has_bodies_results(location_id):
         data = load_json_file(get_bodies_results_file(location_id), default={})
-        alttime_dir = get_alttime_dir(location_id)
+        alttime_files = list_alttime_files(get_alttime_dir(location_id))
         rows = []
         for calc_item in data.get('bodies', []):
             observation = calc_item.get('observation', {})
@@ -529,11 +525,7 @@ def _build_bodies_section_payload(user_id: str, username: str) -> dict[str, Any]
                 'hmsdms': f"{ra_hms} / {dec_dms}" if ra_hms and dec_dms else None,
                 'solar elongation': calc_item.get('solar_elongation_deg'),
                 'observable_hours': observation.get('observable_hours'),
-                'alttime_file': (
-                    calc_item.get('target_id', '')
-                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', ''), alttime_dir=alttime_dir))
-                    else ''
-                ),
+                'alttime_file': _alttime_file_if_present(calc_item.get('target_id', ''), alttime_files),
                 'source_type': 'calculated',
                 'plan_state': plan_state,
             }
@@ -604,7 +596,7 @@ def _build_comets_section_payload(user_id: str, username: str) -> dict[str, Any]
 
     if has_comets_results(location_id):
         data = load_json_file(get_comets_results_file(location_id), default={})
-        alttime_dir = get_alttime_dir(location_id)
+        alttime_files = list_alttime_files(get_alttime_dir(location_id))
         rows = []
         for calc_item in data.get('comets', []):
             observation = calc_item.get('observation', {})
@@ -632,11 +624,7 @@ def _build_comets_section_payload(user_id: str, username: str) -> dict[str, Any]
                 'declination': dec_dms,
                 'hmsdms': f"{ra_hms} / {dec_dms}" if ra_hms and dec_dms else None,
                 'observable_hours': observation.get('observable_hours'),
-                'alttime_file': (
-                    calc_item.get('target_id', '')
-                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', ''), alttime_dir=alttime_dir))
-                    else ''
-                ),
+                'alttime_file': _alttime_file_if_present(calc_item.get('target_id', ''), alttime_files),
                 'source_type': 'calculated',
                 'plan_state': plan_state,
             }
@@ -942,7 +930,7 @@ def _build_dso_section_payload(
 
     if has_dso_results(location_id):
         data = load_json_file(get_dso_results_file(location_id), default={})
-        alttime_dir = get_alttime_dir(location_id)
+        alttime_files = list_alttime_files(get_alttime_dir(location_id))
         rows = []
         rows_added = 0
         for calc_item in data.get('deep_sky', []):
@@ -988,11 +976,7 @@ def _build_dso_section_payload(
                 'meridian transit': observation.get('meridian_transit'),
                 'antimeridian transit': observation.get('antimeridian_transit'),
                 'catalogue_names': calc_catalogue_names,
-                'alttime_file': (
-                    calc_item.get('target_id', '')
-                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', ''), alttime_dir=alttime_dir))
-                    else ''
-                ),
+                'alttime_file': _alttime_file_if_present(calc_item.get('target_id', ''), alttime_files),
                 'source_type': 'calculated',
                 'plan_state': plan_state,
             }

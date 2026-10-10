@@ -304,3 +304,24 @@ class TestGetResultsFile:
         result = get_results_file()
         assert isinstance(result, str)
         assert len(result) > 0
+
+
+class TestListAlttimeFiles:
+    """list_alttime_files lists a location's altitude-time files in one directory read."""
+
+    def test_returns_only_alttime_file_names(self, tmp_path):
+        (tmp_path / 'dso-1_alttime.json').write_text('{}', encoding='utf-8')
+        (tmp_path / 'body-mars_alttime.json').write_text('{}', encoding='utf-8')
+        (tmp_path / 'notes.txt').write_text('x', encoding='utf-8')
+        (tmp_path / 'dso_results.json').write_text('{}', encoding='utf-8')
+
+        result = skytonight_storage.list_alttime_files(str(tmp_path))
+
+        assert result == frozenset({'dso-1_alttime.json', 'body-mars_alttime.json'})
+
+    def test_empty_directory_returns_empty_set(self, tmp_path):
+        assert skytonight_storage.list_alttime_files(str(tmp_path)) == frozenset()
+
+    def test_missing_directory_returns_empty_set(self, tmp_path):
+        """A location whose directory is gone (or unreadable) has no altitude-time files, not an error."""
+        assert skytonight_storage.list_alttime_files(str(tmp_path / 'missing')) == frozenset()

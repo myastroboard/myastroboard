@@ -27,7 +27,7 @@ const _plotlyLoadState = { promise: null };
 function _ensurePlotlyLoaded() {
     return ensureVendorScriptLoaded(
         () => typeof Plotly !== 'undefined',
-        appUrl('/static/vendor/plotly/plotly-3.7.0.min.js?v=3.7.0'),
+        appUrl('/static/vendor/plotly/plotly-4.1.2.min.js?v=4.1.2'),
         null,
         _plotlyLoadState,
         'Plotly'
@@ -732,6 +732,8 @@ async function _renderSkyMap(reports, container) {
         responsive: true,
         displaylogo: false,
         modeBarButtonsToRemove: ['toImage'],
+        // Plotly 4 shows an "Upload to Cloud" button by default (cloud.plotly.com): no third parties.
+        showSendToCloud: false,
     };
 
     // ── DOM: outer row ────────────────────────────────────────────────────────

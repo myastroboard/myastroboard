@@ -172,6 +172,19 @@ def get_alttime_dir(location_id: str | None = None) -> str:
     return path
 
 
+def list_alttime_files(alttime_dir: str) -> frozenset[str]:
+    """Return the names of the *_alttime.json files in *alttime_dir*, from one directory listing.
+
+    A report marks which of its (up to thousands of) rows have an altitude-time file; testing
+    names against this set avoids one stat() per row, slow on Docker Desktop bind mounts.
+    """
+    try:
+        with os.scandir(alttime_dir) as entries:
+            return frozenset(entry.name for entry in entries if entry.name.endswith('_alttime.json'))
+    except OSError:
+        return frozenset()
+
+
 def _safe_location_dir(base_dir: str, location_id: str) -> str:
     """Resolve *location_id* under *base_dir* and verify it doesn't escape it.
 

@@ -53,7 +53,7 @@ function formatDuration(seconds) {
 // scripts/build_map_styles.py): light, dark, and red for the night vision theme, which overrides
 // the light/dark choice. Without WebGL, it falls back to raster tiles recoloured by CSS classes.
 const _LEAFLET_VERSION = '1.9.4';
-const _MAPLIBRE_VERSION = '6.11.2';
+const _MAPLIBRE_VERSION = '6.13.0';
 const _MAPLIBRE_LEAFLET_VERSION = '0.1.4';
 const _leafletLibLoadState = { promise: null };
 const _maplibreLoadState = { promise: null };

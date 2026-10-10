@@ -310,7 +310,47 @@ def test_dataset_rebuilt_by_another_worker_is_reloaded(tmp_path):
     )
     future = time.time() + 5  # guarantee an mtime change even on coarse-grained filesystems
     os.utime(dataset_file, (future, future))
+    # The mtime is only re-checked once the check interval has elapsed.
+    cached_dataset['checked_at'] -= skytonight_targets._DATASET_MTIME_CHECK_INTERVAL_S
 
     reloaded = skytonight_targets.load_targets_dataset(dataset_file=str(dataset_file))
     assert reloaded['metadata']['version'] == 'new'
     assert reloaded['targets'] == []
+
+
+def test_recently_checked_dataset_skips_the_mtime_stat(tmp_path, monkeypatch):
+    """Within the check interval, repeated lookups reuse the cache without touching the disk:
+    one request resolves thousands of names, and a stat() each is slow on bind mounts."""
+    dataset_file = tmp_path / 'targets.json'
+    skytonight_targets.save_targets_dataset(_sample_targets(), dataset_file=str(dataset_file))
+    first = skytonight_targets.load_targets_dataset(force_reload=True, dataset_file=str(dataset_file))
+
+    stat_calls = []
+    real_stat = os.stat
+
+    def counting_stat(path, *args, **kwargs):
+        if str(path) == str(dataset_file):
+            stat_calls.append(path)
+        return real_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(skytonight_targets.os, 'stat', counting_stat)
+
+    for _ in range(100):
+        assert skytonight_targets.get_lookup_entry('Messier', 'M 31', dataset_file=str(dataset_file))
+    assert skytonight_targets.load_targets_dataset(dataset_file=str(dataset_file)) is first
+    assert stat_calls == []
+
+
+def test_unchanged_dataset_is_kept_after_the_check_interval(tmp_path):
+    """Once the interval has elapsed the mtime is checked again; an unchanged file keeps the
+    same cached object and restarts the interval."""
+    dataset_file = tmp_path / 'targets.json'
+    skytonight_targets.save_targets_dataset(_sample_targets(), dataset_file=str(dataset_file))
+    first = skytonight_targets.load_targets_dataset(force_reload=True, dataset_file=str(dataset_file))
+    first['checked_at'] -= skytonight_targets._DATASET_MTIME_CHECK_INTERVAL_S
+    aged_check = first['checked_at']
+
+    second = skytonight_targets.load_targets_dataset(dataset_file=str(dataset_file))
+
+    assert second is first
+    assert second['checked_at'] > aged_check
