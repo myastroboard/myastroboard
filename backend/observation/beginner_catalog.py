@@ -7,11 +7,10 @@ with the current user's SkyTonight/Astrodex/Plan My Night state.
 
 import json
 import os
-import re
 from typing import Any
 
 from observation import object_info
-from skytonight.skytonight_storage import get_alttime_dir
+from skytonight.skytonight_storage import alttime_file_if_present, get_alttime_dir, list_alttime_files
 from utils import normalize_catalogue_key as _normalize_key
 from utils.constellation_names import full_constellation_name
 from utils.i18n_utils import I18nManager
@@ -21,22 +20,6 @@ logger = get_logger(__name__)
 
 _CATALOGUES_DIR = os.path.join(os.path.dirname(__file__), '..', 'catalogues')
 _BEGINNER_CATALOG_FILE = os.path.join(_CATALOGUES_DIR, 'beginner_catalog.json')
-
-# Same "safe id" sanitization used to name *_alttime.json files, duplicated here rather
-# than imported to avoid a circular import (skytonight_api/skytonight_calculator don't
-# import this module, but keeping the convention local avoids adding a new cross-module
-# dependency just for one regex).
-_ALTTIME_ID_SAFE = re.compile(r'[^a-z0-9_-]')
-
-
-def _alttime_file_for_target(target_id: str, location_id: Any) -> str:
-    """Return ``target_id`` if its per-location altitude-time JSON file exists on disk, else ''."""
-    if not target_id:
-        return ''
-    safe_id = _ALTTIME_ID_SAFE.sub('_', target_id.lower())
-    path = os.path.join(get_alttime_dir(location_id), f'{safe_id}_alttime.json')
-    return target_id if os.path.isfile(path) else ''
-
 
 _catalog_cache: dict[str, Any] = {'data': None, 'key': None}
 
@@ -146,6 +129,8 @@ def enrich_with_skytonight(
     dso_lookup = _build_dso_lookup(dso_results)
     astrodex_keys = _build_name_key_set(user_astrodex_items, ['name', 'catalogue'])
     plan_keys = _build_name_key_set(user_plan_entries, ['name', 'catalogue', 'target_name'])
+    # One directory listing for every entry, and none when nothing is visible tonight.
+    alttime_files = list_alttime_files(get_alttime_dir(location_id)) if dso_lookup else frozenset()
 
     enriched = []
     for entry in catalog:
@@ -157,7 +142,7 @@ def enrich_with_skytonight(
         new_entry['visible_tonight'] = dso_match is not None
         new_entry['astro_score'] = dso_match.get('astro_score') if dso_match else None
         new_entry['alttime_file'] = (
-            _alttime_file_for_target(dso_match.get('target_id', ''), location_id) if dso_match else ''
+            alttime_file_if_present(dso_match.get('target_id', ''), alttime_files) if dso_match else ''
         )
 
         # Every catalog entry has its own fixed coordinates, so the thumbnail can be

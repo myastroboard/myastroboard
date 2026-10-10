@@ -254,14 +254,58 @@ class TestBeginnerCatalogEndpoint:
         assert response.status_code == 200
 
 
-def test_alttime_file_for_target_returns_id_when_file_exists(tmp_path, monkeypatch):
+def _dso_results_with_targets(*target_ids):
+    """DSO results matching M42 (first id) and M99 (second id, if given)."""
+    names = [{'Messier': 'M 42'}, {'Messier': 'M 99'}]
+    return {
+        'deep_sky': [
+            {'catalogue_names': names[i], 'astro_score': 0.5, 'target_id': target_id}
+            for i, target_id in enumerate(target_ids)
+        ]
+    }
+
+
+def test_enrich_sets_alttime_file_only_when_its_file_exists(tmp_path, monkeypatch):
+    """A visible entry gets its target id as alttime_file when the altitude-time file is on disk."""
     monkeypatch.setattr(beginner_catalog, 'get_alttime_dir', lambda location_id: str(tmp_path))
-    (tmp_path / 'target1_alttime.json').write_text('{}', encoding='utf-8')
+    (tmp_path / 'dso-m42_alttime.json').write_text('{}', encoding='utf-8')
 
-    assert beginner_catalog._alttime_file_for_target('target1', None) == 'target1'
+    enriched = beginner_catalog.enrich_with_skytonight(
+        _fake_catalog(), _dso_results_with_targets('dso-m42', 'dso-m99'), [], []
+    )
+
+    by_id = {e['id']: e for e in enriched}
+    assert by_id['M42']['alttime_file'] == 'dso-m42'
+    assert by_id['M99']['alttime_file'] == ''
 
 
-def test_alttime_file_for_target_returns_empty_when_file_missing(tmp_path, monkeypatch):
+def test_enrich_lists_the_alttime_directory_once(tmp_path, monkeypatch):
+    """Every entry is checked against one directory listing, not one filesystem call each."""
     monkeypatch.setattr(beginner_catalog, 'get_alttime_dir', lambda location_id: str(tmp_path))
+    listings = []
 
-    assert beginner_catalog._alttime_file_for_target('missing-target', None) == ''
+    def counting_listing(alttime_dir):
+        listings.append(alttime_dir)
+        return frozenset({'dso-m42_alttime.json', 'dso-m99_alttime.json'})
+
+    monkeypatch.setattr(beginner_catalog, 'list_alttime_files', counting_listing)
+
+    enriched = beginner_catalog.enrich_with_skytonight(
+        _fake_catalog(), _dso_results_with_targets('dso-m42', 'dso-m99'), [], []
+    )
+
+    assert listings == [str(tmp_path)]
+    assert {e['id']: e['alttime_file'] for e in enriched} == {'M42': 'dso-m42', 'M99': 'dso-m99'}
+
+
+def test_enrich_skips_the_listing_when_nothing_is_visible(monkeypatch):
+    """Without SkyTonight results no entry can have an altitude-time file, so the disk is not read."""
+
+    def fail_listing(alttime_dir):
+        raise AssertionError('the alttime directory must not be listed')
+
+    monkeypatch.setattr(beginner_catalog, 'list_alttime_files', fail_listing)
+
+    enriched = beginner_catalog.enrich_with_skytonight(_fake_catalog(), {}, [], [])
+
+    assert all(e['alttime_file'] == '' for e in enriched)

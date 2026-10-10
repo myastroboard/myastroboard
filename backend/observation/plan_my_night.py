@@ -86,7 +86,6 @@ def _parse_datetime(value: Any) -> datetime | None:
 # timeline warning badges, and the schedule optimizer below)
 # ---------------------------------------------------------------------------
 
-_ALTTIME_FILENAME_RE = re.compile(r'[^a-z0-9_-]')
 _VISIBILITY_OK_THRESHOLD = 0.95
 
 
@@ -94,10 +93,9 @@ def _load_alttime(alttime_file: str, location_id: str | None) -> dict[str, Any] 
     """Load a target's cached altitude-time series JSON for the given location preset."""
     if not alttime_file:
         return None
-    from skytonight.skytonight_storage import get_alttime_dir
+    from skytonight.skytonight_storage import alttime_file_name, get_alttime_dir
 
-    safe = _ALTTIME_FILENAME_RE.sub('_', str(alttime_file).lower())
-    path = os.path.normpath(os.path.join(get_alttime_dir(location_id), f'{safe}_alttime.json'))
+    path = os.path.normpath(os.path.join(get_alttime_dir(location_id), alttime_file_name(str(alttime_file))))
     if not os.path.isfile(path):
         return None
     try:
