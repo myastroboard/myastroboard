@@ -31,8 +31,11 @@ The non-negotiables in section 1 are never relaxed.
 
 ## 1. Non-negotiables
 
-- **AI assistants never run `git commit`**, and never offer or ask to commit. The maintainer does
-  every commit. Proposing a commit message, staging, or showing a diff on request is fine.
+- **AI assistants commit only when the maintainer explicitly asks**, and never offer or ask to
+  commit. When asked, they commit only on a dedicated branch they created
+  (`<type>/<short-description>`, see section 11), never on `main` or on a branch they did not
+  create. They never merge, approve, or close a pull request: the maintainer reviews and
+  squash-merges. Proposing a commit message, staging, or showing a diff on request is fine.
 
   **Exception: declared scheduled tasks.** An assistant running unattended may commit and push
   only when all of these hold:
@@ -49,8 +52,9 @@ The non-negotiables in section 1 are never relaxed.
     pull request says it was opened by a scheduled task and names the task file.
   - It ends at the pull request: it never approves, merges, or closes it. The maintainer reviews
     and squash-merges, as for any other change.
-- **Never push, force-push, rebase shared branches, or rewrite published history** without an
-  explicit request. A declared scheduled task (above) may push its own branch, nothing else.
+- **Never force-push, rebase shared branches, or rewrite published history.** An assistant pushes
+  only the dedicated branch it committed to at the maintainer's request (above), or its own branch
+  for a declared scheduled task. Nothing is ever pushed to `main`.
 - **Disclose AI assistance.** When an AI tool wrote a meaningful part of a change, its commit
   carries a `Co-Authored-By:` trailer naming the tool (for example
   `Co-Authored-By: Claude <noreply@anthropic.com>`), and the pull request description says so.
