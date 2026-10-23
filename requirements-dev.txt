@@ -8,12 +8,12 @@ pytest-cov===7.1.0
 # Browser e2e tests (tests/e2e/) - run `playwright install chromium` once after
 # installing. Excluded from the default `pytest` run (see pytest.ini); run with
 # `pytest -m e2e` or `pytest tests/e2e/ -m e2e`.
-playwright===1.64.0
+playwright===1.64.1
 pytest-playwright===0.10.0
 
 # Development tools (optional)
-ruff===0.17.1
-djlint===1.46.6
+ruff===0.17.2
+djlint===1.47.0
 pyright===1.1.414
 
 # Used by scripts/translate_i18n_values.py

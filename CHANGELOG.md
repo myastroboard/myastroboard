@@ -12,7 +12,8 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
-- None.
+- Security: Pillow updated to 13.0.0, which fixes several image-decoding vulnerabilities (JPEG, TIFF, PDF, GIF, BMP);
+  astropy, pandas, SQLAlchemy and alembic also updated to their latest releases.
 
 ### Breaking changes
 
