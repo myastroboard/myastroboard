@@ -47,4 +47,4 @@ pywebpush===2.5.0
 paho-mqtt===2.1.0
 
 # Image processing (Astrodex Stream connector: crop + banner rendering)
-Pillow===12.3.0
+Pillow===13.0.0
