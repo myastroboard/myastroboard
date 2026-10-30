@@ -12,7 +12,8 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
-- None.
+- Map tiles: a failure while reading a tile from OpenStreetMap no longer returns a server error; the
+  cached tile is served instead, as for any other upstream failure.
 
 ### Breaking changes
 

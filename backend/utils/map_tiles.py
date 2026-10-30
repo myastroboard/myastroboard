@@ -209,8 +209,12 @@ def _fetch_upstream(kind: MapResourceKind, url: str) -> bytes:
             content = resp.raw.read(kind.max_bytes + 1, decode_content=True)
         finally:
             resp.close()
-    except requests.RequestException as exc:
-        raise TileUnavailable(f'Upstream request failed: {exc}') from exc
+    except TileUnavailable:
+        raise
+    except Exception as exc:
+        # Not only RequestException: niquests installs urllib3-future in place of urllib3, and its
+        # streaming read raises errors requests does not wrap (UnavailableTraffic, a queue.Empty)
+        raise TileUnavailable(f'Upstream request failed: {exc!r}') from exc
     finally:
         _UPSTREAM_SLOTS.release()
 

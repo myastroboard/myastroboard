@@ -2,6 +2,7 @@
 
 import gzip
 import os
+import queue
 import time
 
 import pytest
@@ -20,6 +21,8 @@ class _FakeRaw:
         self._content = content
 
     def read(self, amount, decode_content=False):
+        if isinstance(self._content, Exception):
+            raise self._content
         return self._content[:amount]
 
 
@@ -184,6 +187,24 @@ class TestGetResource:
         with pytest.raises(map_tiles.TileUnavailable):
             _raster(2, 1, 1)
         assert not os.path.exists(map_tiles.cache_path(map_tiles.RASTER, 2, 1, '1.png'))
+
+    def test_stream_read_error_outside_requests_becomes_tile_unavailable(self, tile_env):
+        """An error raised while reading the body that requests does not wrap (urllib3-future's
+        UnavailableTraffic is a queue.Empty) is reported as an unavailable tile, not a server error."""
+        response = _FakeResponse(content=queue.Empty('No connection matches the traffic indicator'))
+        tile_env['state']['response'] = response
+        with pytest.raises(map_tiles.TileUnavailable):
+            _vector(3, 1, 1)
+        assert response.closed
+        assert not os.path.exists(map_tiles.cache_path(map_tiles.VECTOR, 3, 1, '1.mvt'))
+
+    def test_stream_read_error_serves_stale_tile(self, tile_env):
+        """A body read failure falls back to the expired cached tile like any other upstream failure."""
+        _raster(1, 0, 1)
+        _age(map_tiles.cache_path(map_tiles.RASTER, 1, 0, '1.png'), map_tiles.RASTER.fresh_seconds + 60)
+        tile_env['state']['response'] = _FakeResponse(content=queue.Empty('No connection matches'))
+
+        assert _raster(1, 0, 1) == PNG
 
     @pytest.mark.parametrize('body', [b'<html>error</html>', b'{"error": "rate limited"}'])
     def test_error_page_is_not_taken_for_a_vector_tile(self, tile_env, body):
