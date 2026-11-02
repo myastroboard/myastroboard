@@ -13,7 +13,7 @@ pytest-playwright===0.10.0
 
 # Development tools (optional)
 ruff===0.17.2
-djlint===1.47.0
+djlint===1.47.1
 pyright===1.1.414
 
 # Used by scripts/translate_i18n_values.py
