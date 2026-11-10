@@ -749,6 +749,18 @@ function renderObservationSessionDetail(sessionId) {
     });
     toolbar.appendChild(exportPdfButton);
 
+    if (typeof shareObservationSession === 'function' && typeof createShareButton === 'function') {
+        // Recap card: targets, integration and conditions - never the session's location.
+        toolbar.appendChild(createShareButton(() => shareObservationSession(session, {
+            date: _obsSessionDateRange(session)
+                .filter((value, index, range) => value && range.indexOf(value) === index)
+                .map(value => formatStringToDate(value))
+                .join(' - '),
+            equipment: _obsCombinationLabel(session),
+            imageUrl: sessionPictures.length ? appUrl(`/api/astrodex/images/${sessionPictures[0].filename}`) : '',
+        })));
+    }
+
     if (observationLogData.canEdit) {
         const editButton = document.createElement('button');
         editButton.type = 'button';

@@ -25,6 +25,7 @@ Welcome to the comprehensive documentation for MyAstroBoard, the integrated astr
 - [Astrophotography Tab](ASTROPHOTOGRAPHY.md) - Best imaging window, Moon, Sun, Aurora, celestial events — formulas and calculations
 - [SkyTonight](SKYTONIGHT.md) - SkyTonight calculation engine, AstroScore formula, catalogues, and scheduler
 - [Plan My Night](PLAN_MY_NIGHT.md) - Night planning workflow, permissions, and exports
+- [Share Cards](SHARE_CARDS.md) - Ready-to-post images of a picture, a session, tonight's sky or an event
 - [Exposure Calculator](EXPOSURE_CALC.md) - Sub-exposure formula, sky background rate, Bortle→SQM table
 
 #### Weather & Conditions
@@ -91,6 +92,7 @@ Welcome to the comprehensive documentation for MyAstroBoard, the integrated astr
 | Target catalogue & AstroScore | SkyTonight | [SKYTONIGHT.md](SKYTONIGHT.md) |
 | Target visibility calendar | SkyTonight -> DSO / Astrodex item | [SKYTONIGHT.md](SKYTONIGHT.md) |
 | Framing simulator | SkyTonight -> DSO / Wishlist / Plan My Night / Astrodex item | [SKYTONIGHT.md](SKYTONIGHT.md#framing-simulator) |
+| Share cards | Astrodex picture / Observation Log session / Tonight for you / Calendar event | [SHARE_CARDS.md](SHARE_CARDS.md) |
 | Guided setup wizard (first run) | Startup modal | [BEGINNER_EXPERIENCE.md](BEGINNER_EXPERIENCE.md) |
 | Difficulty ratings & "Tonight for you" | SkyTonight → DSO | [BEGINNER_EXPERIENCE.md](BEGINNER_EXPERIENCE.md) |
 | Beginner Catalog | SkyTonight → Beginner | [BEGINNER_EXPERIENCE.md](BEGINNER_EXPERIENCE.md) |

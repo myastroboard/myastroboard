@@ -1608,6 +1608,7 @@ function renderPicturesGrid(item) {
                         ${picture.observation_session ? `<button class="btn btn-outline-secondary" data-action="view-observation-session" data-session-id="${escapeForJs(picture.observation_session.session_id)}" title="${i18n.t('astrodex.observation_log_picture_tooltip', { date: escapeHtml(picture.observation_session.session_date || '') })}"><i class="bi bi-journal-text" aria-hidden="true"></i></button>` : ''}
                         ${!picture.is_main ? `<button class="btn btn-outline-secondary" data-action="set-main-picture" data-item-id="${escapeForJs(item.id)}" data-picture-id="${escapeForJs(picture.id)}" title="${i18n.t('astrodex.set_as_main')}"><i class="bi bi-star text-warning" aria-hidden="true"></i></button>` : ''}
                         ${_myAstroShineEnabled ? `<button class="btn btn-outline-secondary" data-action="send-to-myastroshine" data-item-id="${escapeForJs(item.id)}" data-picture-id="${escapeForJs(picture.id)}" title="${i18n.t('astrodex.send_to_myastroshine')}"><i class="bi bi-stars text-info" aria-hidden="true"></i></button>` : ''}
+                        <button class="btn btn-outline-secondary" data-action="share-picture" data-item-id="${escapeForJs(item.id)}" data-picture-id="${escapeForJs(picture.id)}" title="${i18n.t('share.open')}" aria-label="${i18n.t('share.open')}"><i class="bi bi-share" aria-hidden="true"></i></button>
                         <button class="btn btn-outline-secondary" data-action="edit-picture" data-item-id="${escapeForJs(item.id)}" data-picture-id="${escapeForJs(picture.id)}" title="${i18n.t('astrodex.edit')}"><i class="bi bi-pencil-square" aria-hidden="true"></i></button>
                         <button class="btn btn-danger" data-action="delete-picture" data-item-id="${escapeForJs(item.id)}" data-picture-id="${escapeForJs(picture.id)}" title="${i18n.t('astrodex.delete')}"><i class="bi bi-trash" aria-hidden="true"></i></button>
                     </div>
@@ -2223,6 +2224,29 @@ async function updateItemField(itemId, field, value) {
         console.error('Error updating item:', error);
         showMessage('error', i18n.t('astrodex.failed_to_update_item'));
     }
+}
+
+/**
+ * Open the share card of one picture: the photo with its acquisition details.
+ * The picture's location is deliberately left out of the card.
+ * @param {string} itemId
+ * @param {string} pictureId
+ */
+function shareAstrodexPictureById(itemId, pictureId) {
+    if (typeof shareAstrodexPicture !== 'function') return;
+    const item = astrodexData.items.find(i => i.id === itemId);
+    const picture = item ? item.pictures.find(p => p.id === pictureId) : null;
+    if (!item || !picture) return;
+
+    const typeKey = `skytonight.type_${strToTranslateKey(item.type || '')}`;
+    shareAstrodexPicture(item, picture, {
+        type: item.type ? (i18n.has(typeKey) ? i18n.t(typeKey) : item.type) : '',
+        constellation: item.constellation ? getConstellationDisplayName(item.constellation) : '',
+        // A combination the viewer cannot see (another user's, not shared) has no name here:
+        // fall back to the picture's free-text device, else leave the line out.
+        equipment: _findAstrodexEquipmentName('combinations', picture.combination_id) || picture.device || '',
+        date: picture.date ? formatStringToDate(picture.date) : '',
+    });
 }
 
 async function showEditPictureModal(itemId, pictureId) {
@@ -2935,6 +2959,10 @@ async function initializeAstrodexEventListeners() {
                     if (isAllowedAstrodex) {
                         sendPictureToMyAstroShine(itemId, pictureId);
                     }
+                    break;
+                case 'share-picture':
+                    e.preventDefault();
+                    shareAstrodexPictureById(itemId, pictureId);
                     break;
                 case 'open-astrodex-stream':
                     e.preventDefault();

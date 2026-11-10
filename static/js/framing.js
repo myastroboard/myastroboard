@@ -752,7 +752,7 @@ function _frDownload(canvas, data, selected, colorOf) {
     ctx.textAlign = 'right';
     ctx.fillStyle = '#8b96a8';
     ctx.font = `16px ${fontFamily}`;
-    ctx.fillText(`${data.image.credit} - MyAstroBoard`, size - 24, size + 32);
+    ctx.fillText(`${data.image.credit} - myastroboard.org`, size - 24, size + 32);
 
     output.toBlob((blob) => {
         if (!blob) return;
