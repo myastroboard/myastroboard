@@ -11,10 +11,10 @@ This document describes features that could potentially be integrated into MyAst
 MyAstroBoard is an **opinionated core, not a plugin platform.** Extensibility is delivered through narrow, documented extension points where a contributor can add value as one reviewable unit - not through a feature-level plugin system that a stranger cannot safely write anyway:
 
 - **Catalogues** - JSON cross-ref / standalone files (already the mechanism for Pensack 500, LBN, GaryImm, Arp, Sharpless, Barnard, vdB, Abell). Adding one is a JSON file plus a short registration block.
-- **Export formatters** - a small registry shipped with v2.1 (Stellarium, SkySafari, NINA, CSV).
+- **Export formatters** - a small registry shipped with v1.10 (Stellarium, SkySafari, NINA, AstroBin, CSV).
 - **Connectors** - the `BaseConnector` contract (talk to an external system, return data), hardened in-tree one connector at a time - see [below](#on-the-former-connector-sdk-and-mab-plugins-was-v16).
 
-The recipe per extension type lives in [docs/EXTENDING.md](docs/EXTENDING.md); the connector recipe is already filled in, the export-formatter section is filled in as v2.1 lands.
+The recipe per extension type lives in [docs/EXTENDING.md](docs/EXTENDING.md); the connector recipe is already filled in, the export-formatter section is filled in as v1.10 lands.
 
 ### On the former "Connector SDK and mab-plugins" (was v1.6)
 
@@ -334,11 +334,212 @@ Full reference: [docs/DATABASE.md](docs/DATABASE.md).
 
 ---
 
+## Direction after v1.7
+
+Up to v1.7 the roadmap built the full loop **Plan -> Observe -> Log -> Astrodex -> Review**. What
+the application still lacks is not depth but **visibility**: nothing it produces is an image
+someone wants to share, it cannot be tried without installing it, and the most expected planning
+visual (what the sensor sees on a target) is missing. The remaining 1.x releases therefore make the
+application **visible**, then **effortless**; none of them needs any hardware connection.
+
+Each release is planned around one thing worth showing, so that a release is also something to
+publish.
+
+What changed from the previous 2.x plan:
+
+- **Pulled forward into 1.x**: the field-of-view overlay (as a framing simulator on a still
+  image), exports to external tools, and public profiles.
+- **Pulled forward inside 2.x**: plate solving, now paired with image annotation, and the Night
+  Copilot.
+- **Merged and deferred**: the former v2.4-v2.7 (Observatory Dashboard, NINA Companion, Smart
+  Automation, Observatory Orchestrator) become one demand-driven line, v2.4+. They are the most
+  expensive items, serve the narrowest audience, overlap with mature capture software, and carry a
+  hardware-safety risk no other feature has.
+- **New**: share cards, year in review, achievements, automatic log import from FITS headers,
+  multi-night imaging projects, moon-aware filter advice, 7-night outlook, transient alerts,
+  planetary and lunar section, club mode.
+
+---
+
+### v1.8 - See and Show
+
+| | |
+|---|---|
+| **Why** | The application has no shareable output and no visual answer to the first question every imager asks: "what will this target look like in my instrument?" Dedicated tools (Telescopius, the NINA framing assistant) answer it, so users leave MyAstroBoard at the exact moment they prepare a night. |
+| **Effort** | Medium |
+| **Status** | 🗓️ Planned - next in line |
+
+#### Framing simulator
+
+- A **Framing** action on SkyTonight target cards, Plan My Night, the Wishlist and Astrodex items
+- Real sky imagery (DSS2 colour) centred on the target, with the sensor rectangle of the selected
+  equipment combination drawn to scale
+- Sensor rotation, centre offset by dragging, overlay of two or three combinations for comparison
+- A plain-language verdict: fills 40% of the frame, too large (mosaic suggested), very small
+- Eyepiece field circle for visual observers
+- The framing (centre and rotation) can be saved on a Plan My Night entry
+- Built on the existing FOV formulas and the existing server-side cache of CDS imagery: the browser
+  never calls a third party
+
+#### Share cards
+
+A **Share** action that renders a ready-to-post image, in square and portrait formats, from data
+the application already holds:
+
+- **Astrodex photo** - the picture with its acquisition details (equipment, frames, sub-exposure,
+  total integration, date)
+- **Session recap** - targets, total integration and conditions of a logged night
+- **Framing** - the framing simulator view
+- **My sky tonight** - night score, dark window, Moon phase, top targets
+- **Event** - an upcoming event (eclipse, meteor shower, ISS transit, comet) with its time and
+  altitude for the user's own location
+
+Rendered in the browser, nothing is sent anywhere. No coordinates and no location name by default;
+each field can be removed before export. A small "MyAstroBoard" footer is on by default and can be
+turned off.
+
+#### Try before installing
+
+- A guided tour on the project website: one short looping clip per key moment, then the one-line
+  install
+- A **static demo** is under evaluation: the real interface served as plain files from recorded API
+  responses, at no hosting cost. Server-side filters, searches and calculations would only work for
+  the recorded cases, and the sky shown is the one recorded, not tonight's
+- A hosted, live read-only demo instance is **not planned**: it needs paid infrastructure
+
+**i18n in 6 languages.**
+
+---
+
+### v1.9 - My Progress
+
+| | |
+|---|---|
+| **Why** | Your Sky already computes how an observer is doing, as a dashboard to consult. The same figures told as a dated story, and as milestones to reach, give a reason to go back out and something to show. Mostly a new presentation of existing aggregations. |
+| **Effort** | Medium |
+| **Status** | 💡 Idea - subject to change |
+
+#### Year in review
+
+- A short sequence of screens for a given year: total integration and nights, objects captured and
+  new this year, target of the year, best night, hardest-working equipment, catalogue progress, a
+  mosaic of the year's best pictures
+- Each screen exports as a share card
+- Available all year for any past year; highlighted on the dashboard around the end of the year
+- Strictly private, like the Observation Log; a screen with no data is hidden, never shown empty
+- Date-sensitive: it is only worth publishing in December, so it may ship ahead of v1.8
+
+#### Achievements and challenges
+
+- Badges computed from what was actually logged: first galaxy / nebula / comet, Messier and other
+  catalogue milestones, integration hours, seasons and constellations covered
+- Seasonal challenges generated from real visibility at the user's location, never from a dated
+  hardcoded list; a **Messier marathon** planner at the right time of year, with the achievable
+  count for the latitude
+- A "next within reach" view linking to the missing targets visible tonight
+- Sober by design and can be turned off; no ranking between users
+
+**i18n in 6 languages.**
+
+---
+
+### v1.10 - Effortless Log
+
+| | |
+|---|---|
+| **Why** | Manual entry is what makes experienced imagers drop a logbook after three nights: their capture software has already written everything into each file. This release makes the log fill itself, tracks multi-night work per filter, and lets a plan leave for the tools that run the hardware. |
+| **Effort** | High |
+| **Status** | 💡 Idea - subject to change |
+
+#### Automatic import from FITS headers
+
+- Drop the folder of a night into the browser: only the **header** of each file is read, in the
+  browser; the images are never uploaded
+- Frames are grouped by night, target and filter; calibration frames are set aside
+- A review screen (target matched to the catalogue, proposed equipment combination, duplicates)
+  before anything is saved
+- Covers the common capture sources (NINA, ASIAIR, SharpCap, smart telescopes)
+
+#### Multi-night imaging projects
+
+- A project is a target, an equipment combination and an integration goal, optionally per filter
+  ("8 h H-alpha, 6 h OIII, 6 h SII")
+- Progress bars fed by the Observation Log; remaining time, next visibility window and end of
+  season for the target
+- Projects in progress and visible tonight are proposed first in Plan My Night
+- Requires a per-filter breakdown on log entries, which v1.3 left out of scope
+
+#### Exports to external tools
+
+- Target lists from Plan My Night, the Wishlist and SkyTonight: NINA, Stellarium, SkySafari,
+  extended CSV
+- Acquisition details from the log: AstroBin acquisition CSV, and a one-line technical caption
+- Ships the small **export formatter registry** announced under
+  [Architecture direction](#architecture-direction)
+
+#### Moon-aware filter advice
+
+- Each target is tagged broadband or narrowband-friendly from its object type and catalogue
+- A plain advice line for tonight's Moon, and a "suits tonight's Moon" quick filter
+- Takes the filters of the active equipment combination into account
+- Advice only in this release; AstroScore is not changed
+
+**i18n in 6 languages.**
+
+---
+
+### v1.11 - Open to the Outside
+
+| | |
+|---|---|
+| **Why** | The application answers "tonight?" well but not "which night this week?", knows nothing about new objects appearing in the sky, has little for lunar and planetary observers, and gives a user nowhere to point people to. |
+| **Effort** | High |
+| **Status** | 💡 Idea - subject to change |
+
+#### 7-night outlook
+
+- Seven tiles on the dashboard, one per night: overall score, clouds, wind, dew risk, moonless dark
+  hours, seeing when available, and a one-line verdict
+- A night opens its hourly detail and its best targets
+- Nights beyond three days are marked as uncertain
+- Optional notification for the best night of the week; published through the MQTT connector
+
+#### Public observatory page (opt-in)
+
+- A public address without login, per user, off by default; the administrator can disable the
+  feature for the whole instance
+- The user chooses block by block what is shown: pictures individually marked public, headline
+  figures, equipment, badges, tonight's conditions without position
+- No coordinates, no location name, no map; the Observation Log stays private
+- Link preview tags, and a small embeddable "sky tonight" widget for a club website
+
+#### Transient alerts
+
+- A **Transients** list next to comets: bright supernovae and novae, with tonight's visibility from
+  the user's location
+- Magnitude limit adjustable to the equipment; same actions as any target (altitude chart, framing,
+  Plan My Night, Astrodex)
+- A notification trigger for a new bright transient observable from the location
+- Live source only: no dated hardcoded list; depends on a data source whose access terms allow it
+
+#### Planetary and lunar
+
+- Planets tonight: best time, altitude, apparent diameter, and a planetary score driven by seeing
+  and altitude rather than Moon and sky darkness
+- Jupiter's Galilean moons and their events, Saturn's ring tilt, phases of the inner planets
+- Moon tonight: features near the terminator, known lighting effects (Lunar X and V) with their
+  time, libration
+- Planet size in pixels for the selected equipment combination
+
+**i18n in 6 languages.**
+
+---
+
 ### v2.0 - Interactive Sky Chart
 
 | | |
 |---|---|
-| **Why** | The one missing visualization that every astronomer expects. Positioned at v2.0 because it has the highest integration surface - it becomes most useful once planning tools (v1.4), observation log (v1.3), and Astrodex are mature. |
+| **Why** | The one missing visualization that every astronomer expects. Positioned at v2.0 because it has the highest integration surface - it becomes most useful once planning tools (v1.4), observation log (v1.3), Astrodex and the framing simulator (v1.8) are mature. |
 | **Effort** | High |
 | **Status** | 💡 Idea - subject to change |
 
@@ -352,15 +553,14 @@ Scope: a planning-grade sky chart integrated with existing data - not a full Ste
 - Time slider: scrub through the night to preview altitude evolution
 - Moon and planets overlaid
 
-#### FOV overlay
+#### Interactive framing
 
-- Toggle: render the active equipment combination's FOV rectangle on any selected target
-- Instantly visualizes framing without leaving the app
-- Pulls directly from the existing FOV calculator
+- The v1.8 framing simulator becomes a layer of the chart: the sensor rectangle is moved and
+  rotated over zoomable imagery, with other surveys (H-alpha) as backdrop
 
 #### Mosaic planner
 
-Multi-panel planning for targets that exceed the sensor FOV - the multi-panel extension of the FOV overlay above. Originally scoped for v1.4 and moved here: the panel grid only becomes genuinely useful when it can be drawn over real sky imagery, and building it before the chart means building the preview twice.
+Multi-panel planning for targets that exceed the sensor FOV - the multi-panel extension of the framing simulator.
 
 - Configure panel grid (2x1, 2x2, 3x2...), overlap percentage, rotation angle
 - Live grid preview on the chart, over the DSS/HiPS backdrop, per equipment combination
@@ -379,61 +579,80 @@ Multi-panel planning for targets that exceed the sensor FOV - the multi-panel ex
 - Objects already captured (in Astrodex) shown as filled dots vs. outlines
 - Provides a visual "coverage" layer on top of the planning layer
 
-**Technology:** [Aladin Lite](https://aladin.cds.unistra.fr/AladinLite/) (MIT-licensed, maintained by CDS Strasbourg) embedded via its JavaScript API - avoids building a sky renderer from scratch and provides professional-grade DSS/HiPS imagery as backdrop.
+**Technology:** [Aladin Lite](https://aladin.cds.unistra.fr/AladinLite/) (maintained by CDS Strasbourg) embedded via its JavaScript API - avoids building a sky renderer from scratch and provides professional-grade DSS/HiPS imagery as backdrop. Its license must be confirmed as AGPL-3.0 compatible before adoption; the library is vendored and its imagery goes through a server-side cached proxy, like the map tiles.
 
 **i18n in 6 languages.**
 
 ---
 
-### v2.1 - Community & Sharing
+### v2.1 - Astro Intelligence
 
 | | |
 |---|---|
-| **Why** | Single-user self-hosted installs benefit from sharing; club and family installs benefit even more. Built last in the 2.x cycle because it needs a stable feature set and a user base large enough to make sharing meaningful. v1.1 (beginner onboarding) is the prerequisite for that user base. |
-| **Effort** | Medium |
-| **Status** | 💡 Idea - subject to change |
-
-#### Public Astrodex profiles (opt-in)
-
-- User can set their Astrodex to public -> accessible at `/u/<username>` without login
-- Shareable link; optionally password-protected
-- Profile shows: captured objects, equipment used, observation stats (from v1.5)
-
-#### Export to external tools
-
-Export Plan My Night or SkyTonight results as:
-
-- Stellarium bookmarks (`.stel`)
-- SkySafari observing list (`.skylist`)
-- CSV with RA/Dec (extend existing export)
-- NINA-ready target list (XML with coordinates and filter settings)
-
-#### Community object of the month (admin-curated)
-
-- Admin pins a seasonal target list -> appears as a special SkyTonight category for all users
-- Drives shared focus for club and family multi-user installs
-- No external server required - purely local admin action
-
-**i18n in 6 languages.**
-
----
-
-### v2.2 - Integrations
-
-| | |
-|---|---|
-| **Why** | Bridges MAB with the capture and guiding software that advanced imagers already run. Most niche audience - placed last. |
+| **Why** | Two features that make the application say something the user did not know: what is really in a picture, and what to shoot tonight. Both are pure software, so they come before any hardware integration. |
 | **Effort** | High |
 | **Status** | 💡 Idea - subject to change |
 
-Everything here that talks to an external system is built as a `BaseConnector` in `backend/connectors/`, same as AllSky, MyAstroShine and the v1.6 MQTT publisher, not as bespoke in-core code. This release is the first real test of whether that contract is expressive enough for connectors that write back into MAB data rather than only reading.
+#### Plate solve and annotated image
 
-#### Plate solve (upload -> coordinates)
+- Analyse an Astrodex picture: centre, field scale and rotation are computed and stored on it
+- **Annotation**: every catalogue object inside the field is labelled on the picture; the annotated
+  image exports as a share card
+- "Also in this image": each object found can be added to Astrodex in one click
+- Measured field compared with the theoretical field of the equipment combination
+- Built as an opt-in connector (the Astrometry.net public API first; a local solver as an option),
+  because the picture leaves the instance
 
-- User uploads a FITS or JPEG -> MAB calls the Astrometry.net public API -> returns RA/Dec center, field scale, rotation angle
-- Result: auto-populates Astrodex item coordinates and cross-links to the matching SkyTonight target
-- Use case: "I just captured something - what exactly is it?"
-- No local solver required; the public API handles it
+#### Night Copilot
+
+Every planning tool up to this point still requires the user to decide what to shoot. The Copilot proposes it, with reasons. A rule engine over signals already collected, not a generative model:
+
+- **Proposed night** - one click builds a complete, editable plan opened in Plan My Night
+- **Reasons in plain language** for each choice (high from 22:00 to 02:00, on the wishlist, 3 h
+  missing on a project, Moon set at 23:00)
+- **Integration time estimate** per target - a range, from surface brightness, sky quality,
+  aperture and sampling; always labelled as an estimate, and omitted when the data is missing
+- **Duplicate warning** before re-planning a target already well captured
+- **Equipment recommendation** from the user's own combinations
+
+**Prerequisites** - benefits from v1.10 (projects, moon-aware advice) and v1.11 (7-night outlook).
+
+**i18n in 6 languages.**
+
+---
+
+### v2.2 - Club
+
+| | |
+|---|---|
+| **Why** | A club or family install reaches many people at once, but today a shared instance only shares equipment and merges Astrodex views. Nothing makes the group live. To be built with one or two pilot clubs rather than from this list alone. |
+| **Effort** | Medium |
+| **Status** | 💡 Idea - subject to change |
+
+- **Object of the month** (admin-curated) - a pinned target or short list shown to all users, with
+  the pictures members already uploaded; expires by itself
+- **Outings** - a small calendar of observing nights at a registered location, with the forecast
+  for that place and night, and sign-ups
+- **Club board** (individual opt-in) - catalogue progress and club-wide totals, without a podium
+- **Club page** - the aggregated version of the v1.11 public page
+- No external server required - purely local
+
+**i18n in 6 languages.**
+
+---
+
+### v2.3 - Capture Bridges (file-based)
+
+| | |
+|---|---|
+| **Why** | Bridges MAB with the capture and guiding software that advanced imagers already run, by exchanging files only: no device connection, no hardware risk, no network constraint. Narrow audience - to be built if the v1.10 exports are actually used. |
+| **Effort** | Medium |
+| **Status** | 💡 Idea - subject to change |
+
+#### NINA sequence export
+
+- From Plan My Night: generate a NINA-compatible sequence (target name, RA/Dec, rotation, filter, frame count, exposure)
+- One-click download; ready to import into NINA without manual re-entry
 
 #### PHD2 guiding log import
 
@@ -441,144 +660,33 @@ Everything here that talks to an external system is built as a `BaseConnector` i
 - Result attached to an Observation Log session (v1.3)
 - Session Analytics dashboard (v1.5) shows guiding quality trend per equipment combination over time
 
-#### NINA sequence export
+#### Capture folder recognition
 
-- From Plan My Night: generate a NINA-compatible sequence XML (target name, RA/Dec, filter, frame count, exposure)
-- One-click download; ready to import into NINA without manual re-entry
-
-#### INDI/ASCOM GoTo *(stretch goal)*
-
-- Connect MAB to a running INDI server on the local network -> send GoTo commands directly from Plan My Night
-- High complexity; included as a stretch goal only - pursue based on user demand after the rest of v2.2 ships
+- The v1.10 FITS import recognises ASIAIR and smart-telescope folder layouts for a no-setup import
+- End-of-night report: planned versus captured
 
 **i18n in 6 languages.**
 
 ---
 
-### v2.3 - Astro Intelligence (Night Copilot)
+### v2.4+ - Live Observatory (demand-driven)
 
 | | |
 |---|---|
-| **Why** | Every planning tool up to this point (Plan My Night, SkyTonight filters, Wishlist, Session Analytics) still requires the user to decide what to shoot. This version closes the loop by suggesting it. It's a pure software/data feature with no hardware connector required, so it can ship ahead of the live-integration cluster (v2.4+). |
-| **Effort** | High |
-| **Status** | 💡 Idea - subject to change |
+| **Why** | Turns MyAstroBoard into the real-time dashboard of the observatory, then lets it act on the equipment. Groups the former v2.4 (Observatory Dashboard), v2.5 (NINA Companion), v2.6 (Smart Automation) and v2.7 (Observatory Orchestrator). Not scheduled: it starts only when users actually ask for it. |
+| **Effort** | Very high |
+| **Status** | 💡 Idea - not scheduled |
 
-#### Night Copilot
+Why it is last: it needs equipment driven by a computer on the same network as MyAstroBoard (the narrowest audience of this roadmap), NINA / ASIAIR / Voyager already do it on the machine wired to the hardware, and a command error has physical consequences (a roof left open, a cable wrap) that a display error never has.
 
-Suggests the best target for tonight using signals already collected elsewhere in the app:
+If it starts, it proceeds in this order, each step usable on its own:
 
-- Weather forecast (existing #forecast-weather)
-- Moon phase and position
-- Seeing & transparency (existing #forecast-astro)
-- User observation history (v1.3 Observation Log)
-- Wishlist (v1.5)
-- Available time window (Plan My Night)
+1. **Read-only status** - live equipment state (connected / parked / slewing / imaging), last captured frame, running sequence progress, guiding statistics, disk space; one `BaseConnector` per software (NINA Advanced API, ASCOM Alpaca, INDI)
+2. **Alerts** on that state (guiding degrading, sequence stopped, clouds rolling in) through the existing notifications - still no command sent
+3. **Actions**, one at a time, each off by default and confirmed: push a sequence, GoTo, pause and resume on weather; never a roof or enclosure without an independent hardware safety
+4. **One-click night** - check weather, connect, start, monitor, park, report - only if the three previous steps are in use
 
-Additional features:
-
-- **Progress tracker** - visual "how close am I to done" per wishlist/catalog
-- **Duplicate detection** - warn before re-planning a target already well-captured (reuses Astrodex + Observation Log)
-- **Equipment recommendations** - suggest the best telescope/camera combo from the user's equipment list for a given target
-- **Exposure recommendations** - suggest sub-exposure length and total integration time based on target surface brightness, moon phase, and historical results for similar targets
-
-**Prerequisites** - meaningful recommendations need v1.3 (Observation Log) and v1.5 (Session Analytics/Wishlist) as data sources, and benefit from v2.0 (Sky Chart) for target context.
-
-**i18n in 6 languages.**
-
----
-
-### v2.4 - Observatory Dashboard
-
-| | |
-|---|---|
-| **Why** | Turns MyAstroBoard into the real-time dashboard of the observatory, not just a planning tool. First of the "live" versions - it requires a persistent device-connector layer (ASCOM Alpaca / INDI) that today only exists as the v2.2 GoTo stretch goal. |
-| **Effort** | High |
-| **Status** | 💡 Idea - subject to change |
-
-What needs to be built:
-
-- **Live equipment status** - real-time state (connected / parked / slewing / imaging) pulled via ASCOM Alpaca or INDI
-- **Multi-rig support** - dashboard scales to more than one telescope/camera setup running concurrently
-- **Live image preview** - last captured frame, pulled from the imaging software's output folder or API
-- **Night timeline** - chronological visual log of tonight's sequence events (slew, filter change, meridian flip, errors)
-- **Power & weather monitoring** - local sensors or Home Assistant entities (mains power, dew point, cloud cover) surfaced on the dashboard
-
-**Prerequisites** - promotes v2.2's INDI/ASCOM GoTo stretch goal from a one-off command into a persistent connector; requires the app to reach devices on the local network, which is a deployment consideration for cloud/remote installs.
-
-**i18n in 6 languages.**
-
----
-
-### v2.5 - NINA Companion
-
-| | |
-|---|---|
-| **Why** | Not a replacement for NINA - a live companion view for users who already run NINA as their capture software. Upgrades v2.2's file-based NINA sequence export / PHD2 log import into a live, bidirectional connection. |
-| **Effort** | High |
-| **Status** | 💡 Idea - subject to change |
-
-Features:
-
-- **Live NINA connector** - via NINA's Advanced API plugin, replacing manual XML export with direct sequence push and live read-back
-- **Sequence monitoring** - real-time progress of the running NINA sequence inside MAB
-- **End-of-session report** - auto-generated summary (frames captured, time per filter, errors) at sequence completion
-- **Guiding statistics** - live RMS/drift trend, superseding v2.2's static PHD2 log import
-- **Storage monitoring** - free disk space on the capture PC, warns before a session fills the drive
-
-**Prerequisites** - builds directly on the live-connector layer from v2.4; requires the NINA Advanced API plugin on the user's rig.
-
-**i18n in 6 languages.**
-
----
-
-### v2.6 - Smart Automation
-
-| | |
-|---|---|
-| **Why** | With live equipment status (v2.4) and NINA telemetry (v2.5) available, MAB can start acting on conditions instead of only displaying them. |
-| **Effort** | High |
-| **Status** | 💡 Idea - subject to change |
-
-Features:
-
-- **Weather-aware planning** - Plan My Night re-evaluates automatically as forecast conditions change through the night
-- **Dynamic target switching** - suggest (or, opt-in, auto-apply) a swap to a better-positioned/clearer target when conditions shift
-- **Smart notifications** - push alerts tied to live equipment/weather state (e.g. "clouds rolling in", "guiding RMS degrading"), extending the existing notification system with the location-awareness added in v1.2
-- **Automatic pause/resume** - pause the running sequence on cloud cover / high wind / meridian-flip risk, resume when clear
-
-**Prerequisites** - v2.4 (live status), v2.5 (NINA telemetry), and the existing push notification infrastructure.
-
-**i18n in 6 languages.**
-
----
-
-### v2.7 - Observatory Orchestrator
-
-| | |
-|---|---|
-| **Why** | Coordinates every connector built through v2.4-v2.6 into a single one-click flow - the payoff of the live-integration cluster. |
-| **Effort** | High |
-| **Status** | 💡 Idea - subject to change |
-
-Coordinates:
-
-- NINA
-- PHD2
-- ASCOM Alpaca
-- Home Assistant *(extends the v1.6 MQTT Publisher connector with inbound control, rather than a net-new connector)*
-- Weather
-- Notifications
-
-One-click night:
-
-1. Check weather
-2. Connect devices
-3. Start sequence
-4. Monitor
-5. Park mount
-6. Generate report
-
-**Prerequisites** - v2.4, v2.5, v2.6; upgrades the v1.6 Home Assistant connector from publish-only to power/roof/dome control.
+Already covered without any live connection: observatory state through the v1.6 MQTT connector and Home Assistant, the AllSky camera in the Observatory tab, and the after-the-fact picture of a night through the v1.10 FITS import and v2.3 file bridges.
 
 **i18n in 6 languages.**
 
@@ -613,7 +721,7 @@ Natural-language queries over the history accumulated in Observation Log (v1.3) 
 
 Also:
 
-- Best equipment by target (long-term aggregation, feeds back into the v2.3 recommendation engine)
+- Best equipment by target (long-term aggregation, feeds back into the v2.1 recommendation engine)
 - Best conditions by target/season
 - Integration history across all connectors
 - Personal, evolving recommendations
@@ -633,12 +741,13 @@ Also:
 | v1.5 | Session Analytics | All | Medium | ✅ Implemented |
 | v1.6 | MQTT Publisher & Home Assistant Integration + Astrodex Stream | All | Medium | ✅ Implemented |
 | v1.7 | Database storage (SQLite, relational, Alembic migrations, verified 1.6 import) | All | High | ✅ Implemented |
+| v1.8 | See and Show (framing simulator, share cards, guided tour) | All | Medium | 🗓️ Planned |
+| v1.9 | My Progress (year in review, achievements and challenges) | All | Medium | 💡 Idea |
+| v1.10 | Effortless Log (FITS import, imaging projects, exports, moon-aware advice) | Advanced | High | 💡 Idea |
+| v1.11 | Open to the Outside (7-night outlook, public page, transients, planetary and lunar) | All | High | 💡 Idea |
 | v2.0 | Interactive Sky Chart + mosaic planner | All | High | 💡 Idea |
-| v2.1 | Community & Sharing | All | Medium | 💡 Idea |
-| v2.2 | Integrations (plate solve, PHD2, NINA) | Advanced | High | 💡 Idea |
-| v2.3 | Astro Intelligence (Night Copilot) | All | High | 💡 Idea |
-| v2.4 | Observatory Dashboard | Advanced | High | 💡 Idea |
-| v2.5 | NINA Companion | Advanced | High | 💡 Idea |
-| v2.6 | Smart Automation | Advanced | High | 💡 Idea |
-| v2.7 | Observatory Orchestrator | Advanced | High | 💡 Idea |
+| v2.1 | Astro Intelligence (plate solve and annotation, Night Copilot) | All | High | 💡 Idea |
+| v2.2 | Club (object of the month, outings, club board) | Clubs | Medium | 💡 Idea |
+| v2.3 | Capture Bridges, file-based (NINA sequence, PHD2 log) | Advanced | Medium | 💡 Idea |
+| v2.4+ | Live Observatory (former v2.4-v2.7), demand-driven | Advanced | Very High | 💡 Idea - not scheduled |
 | v3.0 | Personal Observatory OS | All | Very High | 💡 Idea |
