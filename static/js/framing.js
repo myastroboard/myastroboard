@@ -141,17 +141,16 @@ function _frPickBackgroundFov(ladder, selectedFrames, sizeArcmin) {
 }
 
 /**
- * Choose the frame selected when the simulator opens: the best fit, else the widest.
- * @param {Object[]} frames - widest first
+ * Choose the frame selected when the simulator opens: the caller's own combination when
+ * it can be framed (Plan My Night passes the plan's), else the best fit the server picked.
+ * @param {Object} data - GET /api/skytonight/framing payload
+ * @param {string|null} preferredId - combination id asked for by the caller
  * @returns {Object|null}
  */
-function _frDefaultFrame(frames) {
-    return (
-        frames.find((frame) => frame.verdict === 'good') ||
-        frames.find((frame) => frame.verdict === 'tight') ||
-        frames[0] ||
-        null
-    );
+function _frDefaultFrame(data, preferredId) {
+    const frames = data.frames || [];
+    const byId = (id) => (id ? frames.find((frame) => frame.combination_id === id) : undefined);
+    return byId(preferredId) || byId(data.default_combination_id) || frames[0] || null;
 }
 
 /**
@@ -193,9 +192,11 @@ function _frVerdictText(frame) {
  * Fetch the framing data of a target and render the simulator into a container.
  * @param {string} identifier - catalogue id or name
  * @param {HTMLElement} containerEl
+ * @param {Object} [options]
+ * @param {string} [options.combinationId] - combination to select on opening, when it can be framed
  * @returns {Promise<Function>} a teardown function releasing the simulator's listeners
  */
-async function renderFramingInto(identifier, containerEl) {
+async function renderFramingInto(identifier, containerEl, options = {}) {
     const id = (identifier || '').trim();
     if (!id || !containerEl) return () => {};
 
@@ -224,14 +225,16 @@ async function renderFramingInto(identifier, containerEl) {
         containerEl.appendChild(_frAlert('info', _frT(key, fallback)));
         return () => {};
     }
-    return _frBuildSimulator(data, containerEl);
+    return _frBuildSimulator(data, containerEl, options.combinationId || null);
 }
 
 /**
  * Open the framing simulator in the shared modal_xl_close shell.
  * @param {string} identifier - catalogue id or name
+ * @param {Object} [options]
+ * @param {string} [options.combinationId] - combination to select on opening, when it can be framed
  */
-async function openFraming(identifier) {
+async function openFraming(identifier, options = {}) {
     const id = (identifier || '').trim();
     if (!id) return;
 
@@ -252,7 +255,7 @@ async function openFraming(identifier) {
         },
     });
 
-    teardown = await renderFramingInto(id, bodyEl);
+    teardown = await renderFramingInto(id, bodyEl, options);
     if (closed) teardown();
 }
 
@@ -267,9 +270,10 @@ function _frAlert(level, text) {
  * Build the simulator (canvas + controls) from an API payload.
  * @param {Object} data - GET /api/skytonight/framing payload (supported)
  * @param {HTMLElement} containerEl
+ * @param {string|null} preferredId - combination to select on opening, when it can be framed
  * @returns {Function} teardown
  */
-function _frBuildSimulator(data, containerEl) {
+function _frBuildSimulator(data, containerEl, preferredId) {
     const size = data.image.size_px;
     const frames = data.frames || [];
     const state = {
@@ -283,7 +287,7 @@ function _frBuildSimulator(data, containerEl) {
         imageFailed: false,
         colors: FRAMING_FALLBACK_COLORS.slice(),
     };
-    const defaultFrame = _frDefaultFrame(frames);
+    const defaultFrame = _frDefaultFrame(data, preferredId);
     if (defaultFrame) state.selectedIds.push(defaultFrame.combination_id);
 
     const selectedFrames = () => frames.filter((frame) => state.selectedIds.includes(frame.combination_id));

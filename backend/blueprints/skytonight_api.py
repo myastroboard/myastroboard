@@ -1612,8 +1612,9 @@ def get_skytonight_framing_api():
       - ``target``: catalogue id or name (required).
 
     The payload carries the resolved target (coordinates, apparent size), the allowed
-    background image fields of view, and one frame per enabled and valid equipment
-    combination (own or shared) that has a camera sensor and a focal length.
+    background image fields of view, one frame per enabled and valid equipment
+    combination (own or shared) that has a camera sensor and a focal length, and the
+    combination to select by default (the best fit).
     """
     target = (request.args.get('target') or '').strip()
     if not target or not re.match(r'^[A-Za-z0-9 _.+\-]{1,64}$', target):
@@ -1653,6 +1654,7 @@ def get_skytonight_framing_api():
                 },
                 'has_combinations': bool(combinations),
                 'frames': frames,
+                'default_combination_id': equipment_framing.pick_default_frame(frames),
             }
         )
     except Exception:

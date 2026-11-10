@@ -168,3 +168,48 @@ def test_build_frames_survives_one_malformed_combination(monkeypatch):
     frames = framing.build_frames(combinations, {'tel-1': _TELESCOPE}, {'cam-1': _CAMERA}, size_arcmin=None)
 
     assert [frame['combination_id'] for frame in frames] == ['combo-1']
+
+
+def _rated(combination_id, verdict, fill_ratio):
+    return {'combination_id': combination_id, 'verdict': verdict, 'fill_ratio': fill_ratio}
+
+
+def test_pick_default_frame_prefers_good_fit_closest_to_ideal():
+    """Among good fits, the one whose fill is closest to the ideal wins, not the widest."""
+    frames = [
+        _rated('wide', framing.VERDICT_GOOD, 0.10),
+        _rated('ideal', framing.VERDICT_GOOD, 0.40),
+        _rated('tight', framing.VERDICT_TIGHT, 0.65),
+    ]
+
+    assert framing.pick_default_frame(frames) == 'ideal'
+
+
+def test_pick_default_frame_measures_closeness_on_a_log_scale():
+    """Half and double the ideal are equally far; a fill slightly closer in ratio wins."""
+    frames = [_rated('low', framing.VERDICT_GOOD, 0.17), _rated('high', framing.VERDICT_GOOD, 0.60)]
+
+    # 0.35 / 0.17 = 2.06, 0.60 / 0.35 = 1.71: the higher fill is the closer one.
+    assert framing.pick_default_frame(frames) == 'high'
+
+
+def test_pick_default_frame_falls_back_to_tight_then_any_rated():
+    """Without a good fit a tight one is used; without either, the closest to the ideal."""
+    tight = [_rated('small', framing.VERDICT_SMALL, 0.05), _rated('tight', framing.VERDICT_TIGHT, 0.9)]
+    neither = [_rated('small', framing.VERDICT_SMALL, 0.02), _rated('large', framing.VERDICT_TOO_LARGE, 1.2)]
+
+    assert framing.pick_default_frame(tight) == 'tight'
+    # 1.2 / 0.35 = 3.4, 0.35 / 0.02 = 17.5.
+    assert framing.pick_default_frame(neither) == 'large'
+
+
+def test_pick_default_frame_without_fill_ratio_uses_first_frame():
+    """A target of unknown size has no best fit: the first (widest) frame is selected."""
+    frames = [_rated('widest', framing.VERDICT_UNKNOWN, None), _rated('narrow', framing.VERDICT_UNKNOWN, None)]
+
+    assert framing.pick_default_frame(frames) == 'widest'
+
+
+def test_pick_default_frame_without_frames_is_none():
+    """No frame, no default."""
+    assert framing.pick_default_frame([]) is None

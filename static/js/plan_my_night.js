@@ -1897,7 +1897,8 @@ function renderPlanMyNight(payload) {
             framingButton.type = 'button';
             framingButton.className = 'btn btn-outline-primary btn-sm mt-1 ms-1';
             DOMUtils.append(framingButton, DOMUtils.createIcon('bi bi-aspect-ratio icon-inline'), i18n.t('framing.title'));
-            framingButton.addEventListener('click', () => openFraming(framingName));
+            // Open on the plan's own combination: it is the one the night will be shot with.
+            framingButton.addEventListener('click', () => openFraming(framingName, { combinationId: currentPlanCombinationId }));
             item.appendChild(framingButton);
         }
 

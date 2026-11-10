@@ -3333,6 +3333,7 @@ def test_framing_returns_target_image_ladder_and_frames(client_admin, monkeypatc
     assert payload['has_combinations'] is True
     assert [frame['combination_id'] for frame in payload['frames']] == ['combo-1']
     assert payload['frames'][0]['verdict'] == 'too_large'
+    assert payload['default_combination_id'] == 'combo-1'
 
 
 def test_framing_without_combinations_still_returns_the_target(client_admin, monkeypatch):
@@ -3344,6 +3345,7 @@ def test_framing_without_combinations_still_returns_the_target(client_admin, mon
     assert payload['supported'] is True
     assert payload['has_combinations'] is False
     assert payload['frames'] == []
+    assert payload['default_combination_id'] is None
 
 
 def test_framing_reports_unsupported_target_with_reason(client_admin, monkeypatch):

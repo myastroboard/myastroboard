@@ -328,7 +328,9 @@ around a deep-sky object with the sensor rectangle of an equipment combination d
 opens from the frame icon next to a target in the Deep Sky Objects table, from a Wishlist item, from
 a Plan My Night entry, and as a **Framing** section in an Astrodex item detail.
 
-- Select up to three combinations to compare them on the same image.
+- Select up to three combinations to compare them on the same image. One is selected on opening:
+  from Plan My Night, the plan's own combination; otherwise the best fit - a *good fit* before a
+  *tight* one, and among equals the one whose target fill is closest to 35% of the short side.
 - Rotate the sensor (position angle, from north through east) and drag the frame - or use the
   arrow keys - to move it off the target. The coordinates of the frame centre are shown.
 - A dashed circle marks the target's apparent size, when the catalogue gives one.
@@ -363,7 +365,7 @@ scale on a dark background, and CDS is not retried for a few minutes.
 - `GET /api/skytonight/framing?target=<id_or_name>` - the resolved target (coordinates, apparent
   size), the image key and allowed fields of view, and one frame per usable combination: field of
   view, image scale, half extent in tangent-plane units, verdict, fill ratio, target size in pixels
-  and the mosaic estimate.
+  and the mosaic estimate. `default_combination_id` names the best fit.
 - `GET /api/skytonight/framing/image/<ra>_<dec>_<fov>.jpg` - the cached background image.
 
 Implementation: `backend/observation/sky_framing.py` (target resolution, image cache),

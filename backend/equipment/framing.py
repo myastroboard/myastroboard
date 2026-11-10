@@ -22,6 +22,10 @@ _FILL_SMALL_BELOW = 0.10
 _FILL_GOOD_UP_TO = 0.60
 _FILL_TIGHT_UP_TO = 1.00
 
+# Fill ratio the default selection aims for: the middle of the good band, where the target
+# is large in the frame and still has room around it.
+_FILL_IDEAL = 0.35
+
 # Overlap assumed between neighbouring panels when estimating a mosaic grid.
 _MOSAIC_OVERLAP = 0.15
 
@@ -131,6 +135,31 @@ def build_frame(
         frame['mosaic_columns'] = columns
         frame['mosaic_rows'] = rows
     return frame
+
+
+def pick_default_frame(frames: list[dict[str, Any]]) -> str | None:
+    """Return the ``combination_id`` of the frame the simulator selects when it opens.
+
+    The best verdict wins (good, then tight, then anything with a known fill ratio), and
+    within a verdict the frame whose fill ratio is closest to ``_FILL_IDEAL``. Closeness
+    is measured on a log scale, so half and double the ideal are equally far. When no
+    frame has a fill ratio (target of unknown size), the first one - the widest field,
+    given how ``build_frames`` sorts - is used. None when there is no frame.
+    """
+    if not frames:
+        return None
+
+    def distance(frame: dict[str, Any]) -> float:
+        return abs(math.log(frame['fill_ratio'] / _FILL_IDEAL))
+
+    rated = [frame for frame in frames if frame.get('fill_ratio')]
+    for verdict in (VERDICT_GOOD, VERDICT_TIGHT):
+        candidates = [frame for frame in rated if frame.get('verdict') == verdict]
+        if candidates:
+            return min(candidates, key=distance)['combination_id']
+    if rated:
+        return min(rated, key=distance)['combination_id']
+    return frames[0]['combination_id']
 
 
 def build_frames(
