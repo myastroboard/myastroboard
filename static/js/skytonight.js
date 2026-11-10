@@ -2082,6 +2082,10 @@ async function renderSkyTonightRecommendationsPanel(container, options = {}) {
     title.className = 'mb-0';
     DOMUtils.append(title, DOMUtils.createIcon('bi bi-stars text-warning icon-inline'), ' ', i18n.t('recommender.title'));
     header.appendChild(title);
+    if (typeof shareTonight === 'function' && typeof createShareButton === 'function') {
+        header.classList.add('d-flex', 'align-items-center', 'gap-2');
+        header.appendChild(createShareButton(() => shareTonight(), 'btn btn-sm btn-outline-secondary share-card-header-action'));
+    }
     card.appendChild(header);
 
     const body = document.createElement('div');

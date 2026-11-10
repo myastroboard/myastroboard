@@ -28,6 +28,7 @@ If you want see more, maybe look at the [visual tour](docs/VISUAL_TOUR.md).
 - Plan My Night timeline builder with CSV/PDF export
 - Equipment profiles and field-of-view calculator
 - Framing simulator: what your sensor sees on a target, over a real image of the sky ([details](docs/SKYTONIGHT.md#framing-simulator))
+- Share cards: a picture with its acquisition details, a session, tonight's sky or an event as a ready-to-post image ([details](docs/SHARE_CARDS.md))
 - Observatory: live dashboard fed by external connectors
 - Connectors: AllSky all-sky camera integration (live image, keogram, startrails, timelapse, sensor data)
 - Home Assistant: publish sky conditions, weather, tonight's targets and your activity to an MQTT broker with automatic discovery ([details](docs/HOME_ASSISTANT.md))

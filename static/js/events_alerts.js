@@ -449,6 +449,14 @@ function createEventTimeline(events) {
             item.appendChild(altGraphBtn);
         }
 
+        if (typeof shareEvent === 'function' && typeof createShareButton === 'function') {
+            const shareBtn = createShareButton(() => shareEvent(event, {
+                timing: formatEventTiming(event),
+                status: event.days_until_event !== undefined ? getEventStatusText(event) : '',
+            }), 'btn btn-sm btn-outline-secondary mb-1 ms-1');
+            item.appendChild(shareBtn);
+        }
+
         timelineListUl.appendChild(item);
     });
 
