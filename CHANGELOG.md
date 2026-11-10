@@ -8,6 +8,20 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Features
 
+- None.
+
+### Fixes
+
+- None.
+
+### Breaking changes
+
+- None.
+
+## 1.8.0 (2026-11-10)
+
+### Features
+
 - Framing simulator: see what your sensor frames on a deep-sky target, over a real image of the sky, with rotation,
   comparison of up to three equipment combinations and PNG export - from SkyTonight, the Wishlist, Plan My Night and
   Astrodex. See [docs/SKYTONIGHT.md](docs/SKYTONIGHT.md#framing-simulator).
