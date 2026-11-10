@@ -27,6 +27,7 @@ If you want see more, maybe look at the [visual tour](docs/VISUAL_TOUR.md).
 - Observation Log, Your Sky and Wishlist: a private observing logbook, what it adds up to, and what is still on your list ([details](docs/OBSERVATION_LOG.md))
 - Plan My Night timeline builder with CSV/PDF export
 - Equipment profiles and field-of-view calculator
+- Framing simulator: what your sensor sees on a target, over a real image of the sky ([details](docs/SKYTONIGHT.md#framing-simulator))
 - Observatory: live dashboard fed by external connectors
 - Connectors: AllSky all-sky camera integration (live image, keogram, startrails, timelapse, sensor data)
 - Home Assistant: publish sky conditions, weather, tonight's targets and your activity to an MQTT broker with automatic discovery ([details](docs/HOME_ASSISTANT.md))

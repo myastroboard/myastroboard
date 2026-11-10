@@ -232,6 +232,8 @@ All paths are relative to `/data/skytonight/`.
 | `GET` | `/api/skytonight/data/comets` | Comet results (reactive, per-section) |
 | `POST` | `/api/skytonight/combination-recommendations` | Rate the user's equipment combinations (1-5) for one target |
 | `GET` | `/api/skytonight/visibility-calendar` | 12-month visibility calendar for one fixed deep-sky target - see below |
+| `GET` | `/api/skytonight/framing` | Framing simulator data for one fixed deep-sky target - see [Framing simulator](#framing-simulator) |
+| `GET` | `/api/skytonight/framing/image/<filename>` | Cached DSS2 background image of the framing simulator |
 | `GET` | `/api/skytonight/alttime/<id>` | Altitude-time data for one target |
 | `GET` | `/api/skytonight/skymap` | Sky map trajectory data |
 | `GET` | `/api/skytonight/log` | Last calculation log content (JSONL) |
@@ -316,6 +318,58 @@ brightness, no FOV fill, no integration estimate) stays in the result and is sho
 size / SB / integration filter only excludes a target whose value is *present and fails*. The
 response echoes `advanced_filters.size_band` and the resolved combination so the UI can label the
 result set and state how many targets were considered after filtering.
+
+---
+
+## Framing simulator
+
+**What does my sensor see on this target?** The framing simulator shows a real image of the sky
+around a deep-sky object with the sensor rectangle of an equipment combination drawn to scale. It
+opens from the frame icon next to a target in the Deep Sky Objects table, from a Wishlist item, from
+a Plan My Night entry, and as a **Framing** section in an Astrodex item detail.
+
+- Select up to three combinations to compare them on the same image. One is selected on opening:
+  from Plan My Night, the plan's own combination; otherwise the best fit - a *good fit* before a
+  *tight* one, and among equals the one whose target fill is closest to 35% of the short side.
+- Rotate the sensor (position angle, from north through east) and drag the frame - or use the
+  arrow keys - to move it off the target. The coordinates of the frame centre are shown.
+- A dashed circle marks the target's apparent size, when the catalogue gives one.
+- Each selected combination gets a verdict from the ratio "target size / short side of the field":
+  below 10% *small* (with the target's width in pixels), 10-60% *good fit*, 60-100% *tight*, above
+  *larger than the field*. In that last case an approximate mosaic grid is given, assuming 15%
+  overlap; only the target's longest dimension is known, so it is an upper bound for an elongated
+  object and is labelled as an estimate.
+- **Download image** saves the view as a PNG with the target name, the combinations and the image
+  credit.
+
+A combination appears when it is enabled and valid (own or shared), has a camera with sensor
+dimensions and pixel size, and a focal length - the telescope's effective one, or the lens of a
+camera-only combination. Planets and comets are not supported: they move against the stars, so a
+fixed image of the sky does not apply (`supported: false`, `reason: "moving_target"`).
+
+### Sky image
+
+The background is a 1000 px DSS2 colour cut-out from CDS hips2fits, north up and east left, in
+gnomonic (TAN) projection centred on the target. A camera sensor is a gnomonic projection too, so
+the frame is an exact rectangle on the image whatever the field of view.
+
+The server downloads each image once and keeps it in `data/cache/framing_images/` (trimmed to
+200 MiB, oldest first); the browser never calls CDS. To bound that cache, the field of view of a
+background is one of a fixed ladder (0.25 to 45 degrees): the page picks the smallest step that is
+about 2.2 times wider than the widest selected frame. The request carries the target's catalogue
+coordinates and nothing about the user. When CDS cannot be reached the frame is still drawn to
+scale on a dark background, and CDS is not retried for a few minutes.
+
+### API
+
+- `GET /api/skytonight/framing?target=<id_or_name>` - the resolved target (coordinates, apparent
+  size), the image key and allowed fields of view, and one frame per usable combination: field of
+  view, image scale, half extent in tangent-plane units, verdict, fill ratio, target size in pixels
+  and the mosaic estimate. `default_combination_id` names the best fit.
+- `GET /api/skytonight/framing/image/<ra>_<dec>_<fov>.jpg` - the cached background image.
+
+Implementation: `backend/observation/sky_framing.py` (target resolution, image cache),
+`backend/equipment/framing.py` (sensor geometry and verdict), `static/js/framing.js`.
 
 ---
 

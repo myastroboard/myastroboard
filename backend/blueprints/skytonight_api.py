@@ -10,10 +10,19 @@ from datetime import UTC, datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, send_from_directory
 
 from equipment import equipment_profiles, exposure_math
-from observation import astrodex, beginner_catalog, object_info, plan_my_night, visibility_calendar, wishlist
+from equipment import framing as equipment_framing
+from observation import (
+    astrodex,
+    beginner_catalog,
+    object_info,
+    plan_my_night,
+    sky_framing,
+    visibility_calendar,
+    wishlist,
+)
 from skytonight import skytonight_targets
 from skytonight.skytonight_calculator import (
     compute_comet_alttime_on_demand,
@@ -1278,6 +1287,28 @@ def _recommend_combinations_for_target(
     return recommendations
 
 
+def _active_combinations_for_user(user_id: str) -> list[dict[str, Any]]:
+    """Return the user's enabled and valid equipment combinations, own first then shared.
+
+    See equipment_profiles.compute_combination_validity_status for what "valid" means.
+    """
+    combos_blob = equipment_profiles.load_user_combinations(user_id)
+    own_combinations = list(combos_blob.get('items', []) if isinstance(combos_blob, dict) else [])
+
+    active_combinations: list[dict[str, Any]] = []
+    for combo in own_combinations:
+        if combo.get('is_disabled'):
+            continue
+        validity = equipment_profiles.compute_combination_validity_status(combo, user_id)
+        if validity['is_valid']:
+            active_combinations.append(combo)
+    for combo in equipment_profiles.load_all_shared_combinations(user_id):
+        if combo.get('is_disabled') or not combo.get('is_valid', True):
+            continue
+        active_combinations.append(combo)
+    return active_combinations
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -1572,6 +1603,86 @@ def get_skytonight_visibility_calendar_api():
     return jsonify(payload)
 
 
+@skytonight_bp.route('/api/skytonight/framing', methods=['GET'])
+@login_required
+def get_skytonight_framing_api():
+    """Return what the framing simulator needs for one fixed deep-sky target.
+
+    Query params:
+      - ``target``: catalogue id or name (required).
+
+    The payload carries the resolved target (coordinates, apparent size), the allowed
+    background image fields of view, one frame per enabled and valid equipment
+    combination (own or shared) that has a camera sensor and a focal length, and the
+    combination to select by default (the best fit).
+    """
+    target = (request.args.get('target') or '').strip()
+    if not target or not re.match(r'^[A-Za-z0-9 _.+\-]{1,64}$', target):
+        return jsonify({'error': 'Invalid target identifier'}), 400
+
+    try:
+        user = get_current_user()
+        user_id = user.user_id if user else None
+        if not user_id:  # pragma: no cover
+            return jsonify({'error': 'User not authenticated'}), 401
+
+        resolved = sky_framing.resolve_target(target)
+        if not resolved.get('supported'):
+            return jsonify({'supported': False, 'reason': resolved.get('reason'), 'target': {'name': resolved['name']}})
+
+        combinations = _active_combinations_for_user(user_id)
+        telescopes_by_id, cameras_by_id = equipment_profiles.index_telescopes_and_cameras(user_id)
+        frames = equipment_framing.build_frames(
+            combinations, telescopes_by_id, cameras_by_id, resolved.get('size_arcmin')
+        )
+        return jsonify(
+            {
+                'supported': True,
+                'target': {
+                    'target_id': resolved['target_id'],
+                    'name': resolved['name'],
+                    'object_type': resolved['object_type'],
+                    'ra_deg': resolved['ra_deg'],
+                    'dec_deg': resolved['dec_deg'],
+                    'size_arcmin': resolved['size_arcmin'],
+                },
+                'image': {
+                    'key': resolved['image_key'],
+                    'size_px': sky_framing.IMAGE_SIZE_PX,
+                    'fovs_deg': list(sky_framing.FOV_LADDER_DEG),
+                    'credit': 'DSS2 Color / CDS HiPS',
+                },
+                'has_combinations': bool(combinations),
+                'frames': frames,
+                'default_combination_id': equipment_framing.pick_default_frame(frames),
+            }
+        )
+    except Exception:
+        logger.exception(f'Error building framing data for {target!r}')
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@skytonight_bp.route('/api/skytonight/framing/image/<filename>', methods=['GET'])
+@login_required
+def get_skytonight_framing_image_api(filename):
+    """Serve a locally cached DSS2 background image, e.g. "10.684708_41.268750_4.00.jpg".
+
+    The filename encodes right ascension, declination and field of view (degrees); the
+    field of view must be one of sky_framing.FOV_LADDER_DEG. Downloaded from CDS hips2fits
+    on first request, then served from data/cache/framing_images/.
+    """
+    parsed = sky_framing.parse_image_filename(filename)
+    if parsed is None:
+        return jsonify({'error': 'invalid_filename'}), 400
+    ra_deg, dec_deg, fov_deg = parsed
+
+    if sky_framing.ensure_cached_image(ra_deg, dec_deg, fov_deg) is None:
+        return jsonify({'error': 'image_unavailable'}), 502
+
+    canonical = sky_framing.image_filename(ra_deg, dec_deg, fov_deg)
+    return send_from_directory(sky_framing.FRAMING_IMAGE_CACHE_DIR, canonical, max_age=2592000)
+
+
 @skytonight_bp.route('/api/skytonight/combination-recommendations', methods=['POST'])
 @login_required
 def get_skytonight_combination_recommendations_api():
@@ -1591,20 +1702,7 @@ def get_skytonight_combination_recommendations_api():
         if not isinstance(target_payload, dict):
             return jsonify({'error': 'Invalid payload'}), 400
 
-        combos_blob = equipment_profiles.load_user_combinations(user_id)
-        own_combinations = list(combos_blob.get('items', []) if isinstance(combos_blob, dict) else [])
-
-        active_combinations: list[dict[str, Any]] = []
-        for combo in own_combinations:
-            if combo.get('is_disabled'):
-                continue
-            validity = equipment_profiles.compute_combination_validity_status(combo, user_id)
-            if validity['is_valid']:
-                active_combinations.append(combo)
-        for combo in equipment_profiles.load_all_shared_combinations(user_id):
-            if combo.get('is_disabled') or not combo.get('is_valid', True):
-                continue
-            active_combinations.append(combo)
+        active_combinations = _active_combinations_for_user(user_id)
 
         if not active_combinations:
             return jsonify(

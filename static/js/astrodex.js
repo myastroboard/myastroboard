@@ -2729,6 +2729,7 @@ function _mountPictureSlideshow(slideshowPictures, opts) {
         if (infoContainer) {
             injectObjectInfoIntoContainer(opts.objectInfoName, infoContainer);
             appendVisibilityCalendarSection(opts.objectInfoName, infoContainer);
+            appendFramingSection(opts.objectInfoName, infoContainer);
         }
     }
 }
@@ -2765,6 +2766,42 @@ function appendVisibilityCalendarSection(identifier, container) {
         if (details.open && !loaded) {
             loaded = true;
             renderVisibilityCalendarInto(identifier, null, target);
+        }
+    });
+}
+
+/**
+ * Append a lazily-loaded "Framing" section under the object-info card in the Astrodex
+ * item detail modal. Renders the framing simulator the first time the section is
+ * expanded. Inline rather than in its own modal: opening one would close this detail.
+ * @param {string} identifier
+ * @param {HTMLElement} container
+ */
+function appendFramingSection(identifier, container) {
+    if (typeof renderFramingInto !== 'function' || !identifier || !container) return;
+    const t = (key, fb) => (typeof i18n !== 'undefined' && i18n.has(key)) ? i18n.t(key) : fb;
+
+    const details = document.createElement('details');
+    details.className = 'slideshow-info mt-3 framing-astrodex-details';
+    const summary = document.createElement('summary');
+    summary.className = 'fw-semibold';
+    DOMUtils.append(
+        summary,
+        DOMUtils.createIcon('bi bi-aspect-ratio icon-inline'),
+        ` ${t('framing.title', 'Framing')}`
+    );
+    details.appendChild(summary);
+
+    const target = document.createElement('div');
+    target.className = 'mt-2';
+    details.appendChild(target);
+    container.appendChild(details);
+
+    let loaded = false;
+    details.addEventListener('toggle', () => {
+        if (details.open && !loaded) {
+            loaded = true;
+            renderFramingInto(identifier, target);
         }
     });
 }

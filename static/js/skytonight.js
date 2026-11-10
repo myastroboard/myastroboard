@@ -3746,7 +3746,8 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
                         const infoId = (row['id'] || row['target name'] || '').trim();
                         if (infoId) {
                             const vcTitle = escapeHtml(tSkyTonightCompat('visibility_calendar_open'));
-                            html += `<td style="text-align: ${col.align}">${messierBadge}<a href="#" class="link-underline link-underline-opacity-0 skyt-info-link" data-identifier="${escapeHtml(infoId)}">${displayValue}</a> <a href="#" class="link-underline link-underline-opacity-0 vc-open-link" data-identifier="${escapeHtml(infoId)}" title="${vcTitle}" aria-label="${vcTitle}"><i class="bi bi-calendar-range icon-inline" aria-hidden="true"></i></a></td>`;
+                            const framingTitle = escapeHtml(i18n.t('framing.open'));
+                            html += `<td style="text-align: ${col.align}">${messierBadge}<a href="#" class="link-underline link-underline-opacity-0 skyt-info-link" data-identifier="${escapeHtml(infoId)}">${displayValue}</a> <a href="#" class="link-underline link-underline-opacity-0 vc-open-link" data-identifier="${escapeHtml(infoId)}" title="${vcTitle}" aria-label="${vcTitle}"><i class="bi bi-calendar-range icon-inline" aria-hidden="true"></i></a><a href="#" class="link-underline link-underline-opacity-0 framing-open-link" data-identifier="${escapeHtml(infoId)}" title="${framingTitle}" aria-label="${framingTitle}"><i class="bi bi-aspect-ratio icon-inline" aria-hidden="true"></i></a></td>`;
                         } else {
                             html += `<td style="text-align: ${col.align}">${messierBadge}${displayValue}</td>`;
                         }
@@ -4017,6 +4018,17 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
                 const identifier = link.getAttribute('data-identifier');
                 if (identifier && typeof openVisibilityCalendar === 'function') {
                     openVisibilityCalendar(identifier);
+                }
+            });
+        });
+
+        // DSO framing icon: open the framing simulator
+        document.querySelectorAll('.framing-open-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const identifier = link.getAttribute('data-identifier');
+                if (identifier && typeof openFraming === 'function') {
+                    openFraming(identifier);
                 }
             });
         });

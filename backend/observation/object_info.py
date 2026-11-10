@@ -497,16 +497,18 @@ def resolve_identifier_for_catalogue_lookup(identifier: str) -> dict[str, Any] |
 # ──────────────────────────────────────────────
 
 
-def _get_dss_image_url(ra: float, dec: float, size_deg: float = 0.5) -> str:
+def _get_dss_image_url(ra: float, dec: float, size_deg: float = 0.5, size_px: int = 400) -> str:
     """
     Construct a CDS hips2fits URL for a DSS2 color-composite image at the given coordinates.
 
-    The URL returns a JPEG image directly (no HTML wrapper).
+    The image is a square of ``size_px`` pixels covering ``size_deg`` degrees, north up and
+    east left, in gnomonic (TAN) projection. The URL returns a JPEG image directly (no HTML
+    wrapper).
     """
     params = {
         'hips': 'CDS/P/DSS2/color',
-        'width': '400',
-        'height': '400',
+        'width': str(int(size_px)),
+        'height': str(int(size_px)),
         'fov': f'{size_deg:.3f}',
         'projection': 'TAN',
         'coordsys': 'icrs',
@@ -566,13 +568,27 @@ def ensure_cached_object_image(ra: float, dec: float) -> str | None:
     local_path = os.path.join(OBJECT_IMAGE_CACHE_DIR, _object_image_filename(ra, dec))
     if os.path.isfile(local_path):
         return local_path
+    if download_hips2fits_image(_get_dss_image_url(ra, dec), local_path, f'ra={ra}, dec={dec}'):
+        return local_path
+    return None
 
+
+def download_hips2fits_image(
+    url: str, local_path: str, label: str, timeout: float | tuple[float, float] = REQUEST_TIMEOUT
+) -> bool:
+    """Download one hips2fits image to *local_path* (atomic write); return whether it succeeded.
+
+    Shares the ``hips2fits`` backoff with every other caller: while CDS is backed off the
+    call returns False at once, and a failure here backs it off for the others. *label*
+    names the image in the log line; *timeout* is passed to ``requests`` as is (seconds, or
+    a ``(connect, read)`` pair).
+    """
     if _is_backed_off('hips2fits'):
-        return None
+        return False
 
     try:
-        os.makedirs(OBJECT_IMAGE_CACHE_DIR, exist_ok=True)
-        resp = requests.get(_get_dss_image_url(ra, dec), timeout=REQUEST_TIMEOUT, stream=True)
+        os.makedirs(os.path.dirname(local_path), exist_ok=True)
+        resp = requests.get(url, timeout=timeout, stream=True)
         resp.raise_for_status()
         tmp_path = f'{local_path}.tmp-{os.getpid()}'
         with open(tmp_path, 'wb') as f:
@@ -580,11 +596,11 @@ def ensure_cached_object_image(ra: float, dec: float) -> str | None:
                 f.write(chunk)
         os.replace(tmp_path, local_path)
         _clear_backoff('hips2fits')
-        return local_path
+        return True
     except (requests.RequestException, OSError) as exc:
-        logger.warning(f'Failed to cache hips2fits image for ra={ra}, dec={dec}: {exc}')
+        logger.warning(f'Failed to cache hips2fits image for {label}: {exc}')
         _trigger_backoff('hips2fits')
-        return None
+        return False
 
 
 # ──────────────────────────────────────────────

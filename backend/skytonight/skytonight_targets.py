@@ -212,6 +212,30 @@ def get_lookup_entry(
     return lookup.get(alias_key, {}) or lookup.get(preferred_key, {}) or {}
 
 
+def find_target(identifier: str) -> SkyTonightTarget | None:
+    """Return the dataset target matching *identifier*, or None.
+
+    *identifier* is a ``target_id`` or any name the target is known by (preferred name,
+    catalogue names, aliases), compared after ``normalize_object_name``. The first match
+    in dataset order wins.
+    """
+    wanted = normalize_object_name(identifier)
+    if not wanted:
+        return None
+
+    dataset = load_targets_dataset()
+    targets = dataset.get('targets', []) if isinstance(dataset, dict) else []
+    for target in targets:
+        if target.target_id == identifier:
+            return target
+        candidates = list(target.catalogue_names.values()) + list(target.aliases)
+        if target.preferred_name:
+            candidates.append(target.preferred_name)
+        if any(name and normalize_object_name(name) == wanted for name in candidates):
+            return target
+    return None
+
+
 def get_aliases_map(catalogue: str, object_name: str, dataset_file: str | None = None) -> dict[str, str]:
     entry = get_lookup_entry(catalogue, object_name, dataset_file=dataset_file)
     aliases = entry.get('aliases', {}) if isinstance(entry, dict) else {}

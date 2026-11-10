@@ -84,19 +84,7 @@ def _resolve_target(identifier: str) -> dict[str, Any]:
     if not wanted:
         return {'supported': False, 'reason': 'not_found', 'name': identifier}
 
-    dataset = skytonight_targets.load_targets_dataset()
-    targets = dataset.get('targets', []) if isinstance(dataset, dict) else []
-    match = None
-    for target in targets:
-        if target.target_id == identifier:
-            match = target
-            break
-        candidates = list(target.catalogue_names.values()) + list(target.aliases)
-        if target.preferred_name:
-            candidates.append(target.preferred_name)
-        if any(name and normalize_object_name(name) == wanted for name in candidates):
-            match = target
-            break
+    match = skytonight_targets.find_target(identifier)
 
     if match is not None:
         name = match.preferred_name or identifier
