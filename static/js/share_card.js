@@ -70,6 +70,9 @@ const SHARE_MIN_IMAGE_HEIGHT = 380;
 const SHARE_MAX_LIST_ITEMS = 6;
 const SHARE_MAX_PARAGRAPH_LINES = 5;
 
+// Number of share modals opened so far, used to build unique element ids.
+let _shModalCount = 0;
+
 /**
  * Translate helper with an English fallback so a card still renders if a key is missing
  * in the active language.
@@ -542,7 +545,9 @@ async function openShareCard(model) {
         document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve(),
     ]);
 
-    const uid = Math.random().toString(36).slice(2, 8);
+    // Suffix that keeps the ids of this modal's controls unique if it is opened again.
+    _shModalCount += 1;
+    const uid = String(_shModalCount);
     const options = { format: SHARE_DEFAULT_FORMAT, theme: 'dark', brand: true, facts: {} };
     (model.facts || []).forEach((fact) => {
         options.facts[fact.id] = true;
