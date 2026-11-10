@@ -367,36 +367,47 @@ What changed from the previous 2.x plan:
 |---|---|
 | **Why** | The application has no shareable output and no visual answer to the first question every imager asks: "what will this target look like in my instrument?" Dedicated tools (Telescopius, the NINA framing assistant) answer it, so users leave MyAstroBoard at the exact moment they prepare a night. |
 | **Effort** | Medium |
-| **Status** | 🗓️ Planned - next in line |
+| **Status** | ✅ Implemented (framing simulator, share cards) - the website tour and the follow-ups below are still open |
 
 #### Framing simulator
 
-- A **Framing** action on SkyTonight target cards, Plan My Night, the Wishlist and Astrodex items
+Shipped:
+
+- A **Framing** action on the SkyTonight deep-sky table, Plan My Night entries, the Wishlist and
+  Astrodex items
 - Real sky imagery (DSS2 colour) centred on the target, with the sensor rectangle of the selected
   equipment combination drawn to scale
-- Sensor rotation, centre offset by dragging, overlay of two or three combinations for comparison
-- A plain-language verdict: fills 40% of the frame, too large (mosaic suggested), very small
-- Eyepiece field circle for visual observers
-- The framing (centre and rotation) can be saved on a Plan My Night entry
-- Built on the existing FOV formulas and the existing server-side cache of CDS imagery: the browser
-  never calls a third party
+- Sensor rotation, centre offset by dragging, overlay of up to three combinations for comparison;
+  the best fit is selected on opening, or the plan's own combination from Plan My Night
+- A plain-language verdict (good fit, tight, small, larger than the field with an estimated mosaic
+  grid) and PNG export
+- Built on the existing FOV formulas and a server-side cache of CDS imagery: the browser never
+  calls a third party
+
+Follow-ups:
+
+- Eyepiece field circle for visual observers - the equipment model has no eyepiece yet
+- Save the framing (centre and rotation) on a Plan My Night entry - needs a plan model change
+- The imagery depends on a single service (CDS hips2fits); it was unreachable during development
+  (CDS incident of November 2026), so a fallback source may be worth adding
 
 #### Share cards
 
-A **Share** action that renders a ready-to-post image, in square and portrait formats, from data
-the application already holds:
+A **Share** action that renders a ready-to-post image, in the formats the main image networks show
+uncropped (4:5 by default, 1:1, 16:9, 9:16), from data the application already holds:
 
 - **Astrodex photo** - the picture with its acquisition details (equipment, frames, sub-exposure,
   total integration, date)
 - **Session recap** - targets, total integration and conditions of a logged night
-- **Framing** - the framing simulator view
+- **Framing** - the framing simulator view (its own PNG export; moving it onto the share card
+  engine and its formats is a follow-up)
 - **My sky tonight** - night score, dark window, Moon phase, top targets
-- **Event** - an upcoming event (eclipse, meteor shower, ISS transit, comet) with its time and
-  altitude for the user's own location
+- **Event** - an upcoming event (eclipse, meteor shower, ISS transit, comet) with its time for the
+  user's own location; the altitude is not part of the event data yet
 
-Rendered in the browser, nothing is sent anywhere. No coordinates and no location name by default;
-each field can be removed before export. A small "MyAstroBoard" footer is on by default and can be
-turned off.
+Rendered in the browser, nothing is sent anywhere. No coordinates and no location name; each field
+can be removed before export. A small "MyAstroBoard - myastroboard.org" footer is on by default
+and can be turned off.
 
 #### Try before installing
 
@@ -417,7 +428,7 @@ turned off.
 |---|---|
 | **Why** | Your Sky already computes how an observer is doing, as a dashboard to consult. The same figures told as a dated story, and as milestones to reach, give a reason to go back out and something to show. Mostly a new presentation of existing aggregations. |
 | **Effort** | Medium |
-| **Status** | 💡 Idea - subject to change |
+| **Status** | 🗓️ Planned - next in line |
 
 #### Year in review
 
@@ -741,8 +752,8 @@ Also:
 | v1.5 | Session Analytics | All | Medium | ✅ Implemented |
 | v1.6 | MQTT Publisher & Home Assistant Integration + Astrodex Stream | All | Medium | ✅ Implemented |
 | v1.7 | Database storage (SQLite, relational, Alembic migrations, verified 1.6 import) | All | High | ✅ Implemented |
-| v1.8 | See and Show (framing simulator, share cards, guided tour) | All | Medium | 🗓️ Planned |
-| v1.9 | My Progress (year in review, achievements and challenges) | All | Medium | 💡 Idea |
+| v1.8 | See and Show (framing simulator, share cards, guided tour) | All | Medium | ✅ Implemented |
+| v1.9 | My Progress (year in review, achievements and challenges) | All | Medium | 🗓️ Planned |
 | v1.10 | Effortless Log (FITS import, imaging projects, exports, moon-aware advice) | Advanced | High | 💡 Idea |
 | v1.11 | Open to the Outside (7-night outlook, public page, transients, planetary and lunar) | All | High | 💡 Idea |
 | v2.0 | Interactive Sky Chart + mosaic planner | All | High | 💡 Idea |

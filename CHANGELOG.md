@@ -12,8 +12,8 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   comparison of up to three equipment combinations and PNG export - from SkyTonight, the Wishlist, Plan My Night and
   Astrodex. See [docs/SKYTONIGHT.md](docs/SKYTONIGHT.md#framing-simulator).
 - Share cards: turn an Astrodex picture (with its acquisition details), a logged session, tonight's sky or an upcoming
-  event into a ready-to-post image, square or portrait, made in the browser and never showing your location. See
-  [docs/SHARE_CARDS.md](docs/SHARE_CARDS.md).
+  event into a ready-to-post image in the social-network formats (4:5, 1:1, 16:9, 9:16), made in the browser and
+  never showing your location. See [docs/SHARE_CARDS.md](docs/SHARE_CARDS.md).
 
 ### Fixes
 
