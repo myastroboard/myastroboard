@@ -1891,6 +1891,16 @@ function renderPlanMyNight(payload) {
             item.appendChild(alttimeButton);
         }
 
+        const framingName = entry.name || entry.target_name;
+        if (framingName && typeof openFraming === 'function') {
+            const framingButton = document.createElement('button');
+            framingButton.type = 'button';
+            framingButton.className = 'btn btn-outline-primary btn-sm mt-1 ms-1';
+            DOMUtils.append(framingButton, DOMUtils.createIcon('bi bi-aspect-ratio icon-inline'), i18n.t('framing.title'));
+            framingButton.addEventListener('click', () => openFraming(framingName));
+            item.appendChild(framingButton);
+        }
+
         timelineList.appendChild(item);
     });
 

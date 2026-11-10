@@ -286,6 +286,8 @@ EXPECTED_ROUTES = {
     ('/api/skytonight/target-debug', ('GET',)),
     ('/api/skytonight/combination-recommendations', ('POST',)),
     ('/api/skytonight/visibility-calendar', ('GET',)),
+    ('/api/skytonight/framing', ('GET',)),
+    ('/api/skytonight/framing/image/<filename>', ('GET',)),
 }
 
 

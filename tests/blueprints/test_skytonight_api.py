@@ -3235,3 +3235,216 @@ def test_visibility_calendar_route_tolerates_bad_location_timezone(client_admin,
     resp = client_admin.get('/api/skytonight/visibility-calendar?target=M31')
     assert resp.status_code == 200
     assert isinstance(captured['year'], int)  # fell back to UTC's current year
+
+
+# ---------------------------------------------------------------------------
+# GET /api/skytonight/framing
+# ---------------------------------------------------------------------------
+
+_FRAMING_TARGET = {
+    'supported': True,
+    'target_id': 'NGC0224',
+    'name': 'M 31',
+    'object_type': 'Galaxy',
+    'ra_deg': 10.684708,
+    'dec_deg': 41.26875,
+    'size_arcmin': 177.8,
+    'image_key': '10.684708_41.268750',
+}
+
+
+def _stub_framing(monkeypatch, resolved=None, combinations=None, capture=None):
+    """Stub target resolution and the user's equipment for the framing route."""
+
+    def _resolve(identifier):
+        if capture is not None:
+            capture.append(identifier)
+        return dict(resolved if resolved is not None else _FRAMING_TARGET)
+
+    monkeypatch.setattr(skytonight_api_module.sky_framing, 'resolve_target', _resolve)
+    monkeypatch.setattr(
+        skytonight_api_module,
+        '_active_combinations_for_user',
+        lambda user_id: list(combinations if combinations is not None else []),
+    )
+    monkeypatch.setattr(
+        skytonight_api_module.equipment_profiles,
+        'index_telescopes_and_cameras',
+        lambda user_id: (
+            {'tel-1': {'id': 'tel-1', 'name': 'Refractor', 'effective_focal_length': 400}},
+            {
+                'cam-1': {
+                    'id': 'cam-1',
+                    'name': 'Cam',
+                    'sensor_width_mm': 23.5,
+                    'sensor_height_mm': 15.7,
+                    'pixel_size_um': 3.76,
+                }
+            },
+        ),
+    )
+
+
+def test_framing_requires_auth(client):
+    resp = client.get('/api/skytonight/framing?target=M31')
+    assert resp.status_code in (401, 302)
+
+
+def test_framing_rejects_invalid_target(client_admin):
+    resp = client_admin.get('/api/skytonight/framing?target=' + '%3Cscript%3E')
+    assert resp.status_code == 400
+
+
+def test_framing_missing_target_is_400(client_admin):
+    resp = client_admin.get('/api/skytonight/framing')
+    assert resp.status_code == 400
+
+
+def test_framing_returns_target_image_ladder_and_frames(client_admin, monkeypatch):
+    """A resolved target comes back with its coordinates, the image ladder and one frame per usable combination."""
+    captured = []
+    _stub_framing(
+        monkeypatch,
+        combinations=[
+            {'id': 'combo-1', 'name': 'Refractor + Cam', 'telescope_id': 'tel-1', 'camera_id': 'cam-1'},
+            {'id': 'combo-2', 'name': 'Visual', 'telescope_id': 'tel-1'},
+        ],
+        capture=captured,
+    )
+
+    resp = client_admin.get('/api/skytonight/framing?target=M 31')
+
+    assert resp.status_code == 200
+    payload = resp.get_json()
+    assert captured == ['M 31']
+    assert payload['supported'] is True
+    assert payload['target'] == {
+        'target_id': 'NGC0224',
+        'name': 'M 31',
+        'object_type': 'Galaxy',
+        'ra_deg': 10.684708,
+        'dec_deg': 41.26875,
+        'size_arcmin': 177.8,
+    }
+    assert payload['image']['key'] == '10.684708_41.268750'
+    assert payload['image']['fovs_deg'] == list(skytonight_api_module.sky_framing.FOV_LADDER_DEG)
+    assert payload['image']['size_px'] == skytonight_api_module.sky_framing.IMAGE_SIZE_PX
+    assert payload['image']['credit']
+    assert payload['has_combinations'] is True
+    assert [frame['combination_id'] for frame in payload['frames']] == ['combo-1']
+    assert payload['frames'][0]['verdict'] == 'too_large'
+
+
+def test_framing_without_combinations_still_returns_the_target(client_admin, monkeypatch):
+    """A user with no equipment gets the target and an empty frame list, not an error."""
+    _stub_framing(monkeypatch, combinations=[])
+
+    payload = client_admin.get('/api/skytonight/framing?target=M31').get_json()
+
+    assert payload['supported'] is True
+    assert payload['has_combinations'] is False
+    assert payload['frames'] == []
+
+
+def test_framing_reports_unsupported_target_with_reason(client_admin, monkeypatch):
+    """A moving target is a normal outcome: 200 with the reason."""
+    _stub_framing(monkeypatch, resolved={'supported': False, 'reason': 'moving_target', 'name': 'Jupiter'})
+
+    resp = client_admin.get('/api/skytonight/framing?target=Jupiter')
+
+    assert resp.status_code == 200
+    assert resp.get_json() == {'supported': False, 'reason': 'moving_target', 'target': {'name': 'Jupiter'}}
+
+
+def test_framing_internal_error_is_500(client_admin, monkeypatch):
+    def _boom(identifier):
+        raise RuntimeError('dataset unreadable')
+
+    monkeypatch.setattr(skytonight_api_module.sky_framing, 'resolve_target', _boom)
+
+    resp = client_admin.get('/api/skytonight/framing?target=M31')
+
+    assert resp.status_code == 500
+    assert resp.get_json() == {'error': 'Internal server error'}
+
+
+def test_active_combinations_keep_enabled_valid_own_and_shared(monkeypatch):
+    """Disabled or invalid combinations are left out, for own and shared ones alike."""
+    own = [
+        {'id': 'own-ok'},
+        {'id': 'own-disabled', 'is_disabled': True},
+        {'id': 'own-invalid'},
+    ]
+    shared = [
+        {'id': 'shared-ok', 'is_valid': True},
+        {'id': 'shared-disabled', 'is_disabled': True},
+        {'id': 'shared-invalid', 'is_valid': False},
+    ]
+    profiles = skytonight_api_module.equipment_profiles
+    monkeypatch.setattr(profiles, 'load_user_combinations', lambda user_id: {'items': own})
+    monkeypatch.setattr(
+        profiles,
+        'compute_combination_validity_status',
+        lambda combo, user_id: {'is_valid': combo['id'] != 'own-invalid'},
+    )
+    monkeypatch.setattr(profiles, 'load_all_shared_combinations', lambda user_id: shared)
+
+    result = skytonight_api_module._active_combinations_for_user('user-1')
+
+    assert [combo['id'] for combo in result] == ['own-ok', 'shared-ok']
+
+
+# ---------------------------------------------------------------------------
+# GET /api/skytonight/framing/image/<filename>
+# ---------------------------------------------------------------------------
+
+
+def test_framing_image_requires_auth(client):
+    resp = client.get('/api/skytonight/framing/image/10.684708_41.268750_4.00.jpg')
+    assert resp.status_code in (401, 302)
+
+
+@pytest.mark.parametrize(
+    'filename',
+    [
+        'not-a-valid-filename.jpg',
+        '10.684708_41.268750_4.01.jpg',  # field of view outside the ladder
+        '400.000000_41.268750_4.00.jpg',
+        '10.684708_41.268750.jpg',
+    ],
+)
+def test_framing_image_rejects_invalid_filename(client_admin, filename):
+    resp = client_admin.get(f'/api/skytonight/framing/image/{filename}')
+    assert resp.status_code == 400
+
+
+def test_framing_image_serves_cached_file(client_admin, monkeypatch, tmp_path):
+    """A valid filename is served from the cache directory with a long cache lifetime."""
+    framing_module = skytonight_api_module.sky_framing
+    monkeypatch.setattr(framing_module, 'FRAMING_IMAGE_CACHE_DIR', str(tmp_path))
+    cached_file = tmp_path / '10.684708_41.268750_4.00.jpg'
+    cached_file.write_bytes(b'fakejpegbytes')
+    requested = []
+
+    def _ensure(ra, dec, fov):
+        requested.append((ra, dec, fov))
+        return str(cached_file)
+
+    monkeypatch.setattr(framing_module, 'ensure_cached_image', _ensure)
+
+    resp = client_admin.get('/api/skytonight/framing/image/10.684708_41.268750_4.00.jpg')
+
+    assert resp.status_code == 200
+    assert resp.mimetype == 'image/jpeg'
+    assert resp.data == b'fakejpegbytes'
+    assert 'max-age' in resp.headers.get('Cache-Control', '')
+    assert requested == [(10.684708, 41.26875, 4.0)]
+    resp.close()
+
+
+def test_framing_image_upstream_failure_returns_502(client_admin, monkeypatch):
+    monkeypatch.setattr(skytonight_api_module.sky_framing, 'ensure_cached_image', lambda ra, dec, fov: None)
+
+    resp = client_admin.get('/api/skytonight/framing/image/10.684708_41.268750_4.00.jpg')
+
+    assert resp.status_code == 502

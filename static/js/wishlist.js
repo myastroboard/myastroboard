@@ -361,6 +361,20 @@ function _wlBuildRow(item) {
         top.appendChild(calendarBtn);
     }
 
+    if (item.placed && !item.moving && typeof openFraming === 'function') {
+        const framingBtn = document.createElement('button');
+        framingBtn.type = 'button';
+        framingBtn.className = 'btn btn-sm btn-outline-info';
+        framingBtn.title = _wlT('framing.open', 'Framing: what your sensor sees');
+        framingBtn.setAttribute('aria-label', framingBtn.title);
+        const framingIcon = document.createElement('i');
+        framingIcon.className = 'bi bi-aspect-ratio';
+        framingIcon.setAttribute('aria-hidden', 'true');
+        framingBtn.appendChild(framingIcon);
+        framingBtn.addEventListener('click', () => openFraming(item.name));
+        top.appendChild(framingBtn);
+    }
+
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.className = 'btn btn-sm btn-outline-danger';
