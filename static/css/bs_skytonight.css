@@ -151,6 +151,32 @@ button.in-astrodex-badge:focus-visible {
     transition: transform 220ms var(--transition-smooth), filter 220ms var(--transition-smooth);
 }
 
+/* Beginner-catalogue card thumbnail (the recommendation strip uses the rule above). */
+.skyt-card-thumb {
+    max-height: 140px;
+    object-fit: cover;
+}
+
+/* Card thumbnail still loading: invisible, so a slow or failing fetch never shows
+   the browser's broken-image glyph and alt text. */
+.skyt-thumb-pending {
+    opacity: 0;
+}
+
+/* Stand-in for a card thumbnail whose image could not be loaded (CDS hips2fits down,
+   object without imagery): same height as a loaded thumbnail, so cards stay even. */
+.skyt-card-thumb-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 140px;
+    background: linear-gradient(160deg, var(--surface-2), var(--surface-elevated));
+    color: var(--text-muted);
+    font-size: 2rem;
+    opacity: 0.8;
+}
+
 .skyt-reco-thumb::after {
     content: "";
     position: absolute;

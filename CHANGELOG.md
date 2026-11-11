@@ -12,7 +12,8 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
-- None.
+- SkyTonight recommendation and beginner-catalogue cards show a neutral placeholder instead of a broken image
+  when the DSS2 sky survey (CDS) is unreachable; Astrodex cards fall back to the default artwork.
 
 ### Breaking changes
 

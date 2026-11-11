@@ -497,21 +497,50 @@ function _buildCapturedBadge() {
  * Populate a card thumbnail <img>: use a server-provided thumbnail_url directly
  * if present, otherwise fall back to resolving it client-side via fetchObjectInfo
  * (used when the caller has no known coordinates to build a thumbnail URL from).
+ *
+ * The <img> stays transparent until it has actually loaded. When no image can be had
+ * (the DSS2 proxy answers 502 while CDS hips2fits is down, or the object has no
+ * image at all) it is replaced by a themed placeholder of the same height, so the
+ * card never shows a broken-image glyph with its alt text and the strip keeps an
+ * even layout.
  */
 function _loadCardThumbnail(imgEl, thumbnailUrl, identifier) {
-    if (thumbnailUrl) {
-        imgEl.src = appUrl(thumbnailUrl);
+    const showPlaceholder = () => {
+        if (imgEl.parentNode) imgEl.replaceWith(_buildCardThumbPlaceholder());
+    };
+    const loadFrom = (url) => {
+        // Kept in the layout (a lazy <img> under display:none is never fetched), only
+        // transparent until it has decoded.
+        imgEl.classList.add('skyt-thumb-pending');
+        imgEl.addEventListener('load', () => imgEl.classList.remove('skyt-thumb-pending'), { once: true });
+        imgEl.addEventListener('error', showPlaceholder, { once: true });
+        imgEl.src = appUrl(url);
         imgEl.style.display = '';
+    };
+
+    if (thumbnailUrl) {
+        loadFrom(thumbnailUrl);
         return;
     }
     if (identifier && typeof fetchObjectInfo === 'function') {
-        fetchObjectInfo(identifier).then((data) => {
-            if (data?.image?.url) {
-                imgEl.src = appUrl(data.image.url);
-                imgEl.style.display = '';
-            }
-        });
+        Promise.resolve(fetchObjectInfo(identifier))
+            .then((data) => {
+                if (data?.image?.url) loadFrom(data.image.url);
+                else showPlaceholder();
+            })
+            .catch(showPlaceholder);
+        return;
     }
+    showPlaceholder();
+}
+
+/** Neutral stand-in for a card thumbnail that could not be loaded. */
+function _buildCardThumbPlaceholder() {
+    const placeholder = document.createElement('div');
+    placeholder.className = 'skyt-card-thumb-placeholder';
+    placeholder.setAttribute('aria-hidden', 'true');
+    placeholder.appendChild(DOMUtils.createIcon('bi bi-stars'));
+    return placeholder;
 }
 
 /**
@@ -2145,8 +2174,6 @@ function _buildRecommendationCard(target) {
     thumbBtn.disabled = !identifier;
     const img = document.createElement('img');
     img.className = 'card-img-top';
-    img.style.maxHeight = '140px';
-    img.style.objectFit = 'cover';
     img.loading = 'lazy';
     img.alt = target.preferred_name || '';
     img.style.display = 'none';
@@ -2443,9 +2470,7 @@ function _buildBeginnerCatalogCard(obj) {
     if (obj.in_astrodex) card.classList.add('border-success');
 
     const img = document.createElement('img');
-    img.className = 'card-img-top';
-    img.style.maxHeight = '140px';
-    img.style.objectFit = 'cover';
+    img.className = 'card-img-top skyt-card-thumb';
     img.loading = 'lazy';
     img.alt = obj.preferred_name || '';
     img.style.display = 'none';
