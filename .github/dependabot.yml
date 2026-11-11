@@ -43,6 +43,12 @@ updates:
     labels:
       - "dependencies"
       - "docker"
+    # A new Python minor (3.15 -> 3.16, alphas included) is a deliberate upgrade: it also
+    # moves pyproject.toml, the CI workflows and the docs, and needs a full test run.
+    # Dependabot keeps the patch releases (3.15.2 -> 3.15.3).
+    ignore:
+      - dependency-name: "python"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
     commit-message:
       prefix: "chore"
       prefix-development: "chore"

@@ -6,8 +6,21 @@ name: CPU compatibility
 # The release workflow runs the same check on the image it publishes.
 # See CONTRIBUTING.md "CPU compatibility".
 
+# Pull request runs only get a read-only Actions cache token from GitHub, so they
+# restore the build cache but cannot save it ("cache write denied: token has no
+# writable scopes" failed the build). The push run on main keeps the cache warm for
+# them, and ignore-error stops a refused cache save from failing the check.
 on:
   pull_request:
+    paths:
+      - requirements.txt
+      - Dockerfile
+      - scripts/check_cpu_compat.sh
+      - scripts/cpu_compat_smoke.py
+      - .github/workflows/cpu-compat.yml
+  push:
+    branches:
+      - main
     paths:
       - requirements.txt
       - Dockerfile
@@ -42,7 +55,7 @@ jobs:
           load: true
           tags: myastroboard:cpu-compat
           cache-from: type=gha,scope=cpu-compat
-          cache-to: type=gha,scope=cpu-compat,mode=max
+          cache-to: type=gha,scope=cpu-compat,mode=max,ignore-error=true
 
       - name: Check the image on an emulated kvm64 CPU
         run: sh scripts/check_cpu_compat.sh myastroboard:cpu-compat
