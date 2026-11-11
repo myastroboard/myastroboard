@@ -4,6 +4,7 @@
 [![Docker Pulls](https://img.shields.io/docker/pulls/myastroboard/myastroboard)](https://hub.docker.com/r/myastroboard/myastroboard)
 [![Docker Image Size](https://img.shields.io/docker/image-size/myastroboard/myastroboard/latest)](https://hub.docker.com/r/myastroboard/myastroboard)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0--or--later-blue.svg)](LICENSE)
+[![Live demo](https://img.shields.io/badge/live%20demo-demo.myastroboard.org-brightgreen)](https://demo.myastroboard.org/)
 
 MyAstroBoard is a self-hosted astronomy dashboard with Docker-first deployment, also available as a
 Home Assistant app.
@@ -14,6 +15,10 @@ This project is inspired by `mawinkler/uptonight`. Previously this project run U
 Now MyAstroBoard has removed its dependency on UpTonight to better meet its needs and gain full control over display and calculations.
 
 ![Demo MyAstroBoard](docs/img/overview.gif)
+
+**Try it live: [demo.myastroboard.org](https://demo.myastroboard.org/)** - a public, read-only
+instance with no sign-in. Everything is live (tonight's sky, the weather, SkyTonight targets), but
+nothing you change is saved.
 
 If you want see more, maybe look at the [visual tour](docs/VISUAL_TOUR.md).
 

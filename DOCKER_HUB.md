@@ -6,6 +6,8 @@ MyAstroBoard combines weather analysis, automated sky calculations, and planning
 
 ![Demo MyAstroBoard](https://raw.githubusercontent.com/myastroboard/myastroboard/main/docs/img/overview.gif)
 
+**👉 Try it live: [demo.myastroboard.org](https://demo.myastroboard.org/)** - a public, read-only instance with no sign-in. Everything is live (tonight's sky, the weather, SkyTonight targets), but nothing you change is saved.
+
 ---
 
 ## ✨ Features
