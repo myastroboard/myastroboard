@@ -85,6 +85,10 @@ The `SECRET_KEY` is generated once on first startup and stored in the database. 
 
 The session cookie name is `session`. Session expiry follows Flask defaults (browser session unless `SESSION_COOKIE_SECURE` is enabled).
 
+A session is only valid while its account exists. When an admin deletes an account, or a backup restore
+replaces it, the next request from that browser is answered `401` and its session is cleared: the user is
+back on the sign-in page and reads nothing more, install-wide data included.
+
 ---
 
 ## User preferences
@@ -313,8 +317,8 @@ local/global account check:
    new login (which an attacker who already has the password can always do) does not reset it. A
    6-digit TOTP code is a much smaller search space than a password, so this endpoint has a tighter
    limit than password sign-in (see [Security notes](#security-notes)).
-4. `login_required` needs no special handling for the pending state: it only checks for
-   `'username' in session`, which stays unset throughout - every existing authenticated route
+4. `login_required` needs no special handling for the pending state: it requires
+   `'username' in session` (and that account to exist), and `username` stays unset throughout - every existing authenticated route
    stays correctly locked out mid-2FA.
 
 ### Admin: forced disable

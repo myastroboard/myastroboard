@@ -16,6 +16,10 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Maps no longer fail with HTTP 502 on every tile not already cached: the map tile proxy could not read
   OpenStreetMap's responses since niquests replaced urllib3.
+- A browser still signed in to a deleted (or restored-over) account is signed out at its next request instead
+  of reading install data. See [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md#sessions).
+- Only admins can clear the Celestrak block of the ISS / CSS trackers, as documented; the button is hidden
+  from other accounts.
 
 ### Breaking changes
 

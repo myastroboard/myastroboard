@@ -1008,12 +1008,26 @@ class TestAuthDecorators:
             # Should not be 401 or 403
             assert resp.status_code in (200, 500)
 
-    def test_admin_required_blocks_unknown_user_in_session(self, flask_app):
+    def test_admin_required_signs_out_a_session_without_account(self, flask_app):
+        """A session whose account no longer exists is not a permission problem: it is signed out."""
         with flask_app.test_client() as c:
             with c.session_transaction() as sess:
                 sess['username'] = 'ghost_user_not_in_db'
             resp = c.post('/api/skytonight/scheduler/trigger')
-            assert resp.status_code == 403
+            assert resp.status_code == 401
+            with c.session_transaction() as sess:
+                assert 'username' not in sess
+
+    def test_login_required_signs_out_a_session_without_account(self, flask_app):
+        """An account deleted (or replaced by a restore) after sign-in: the session is cleared, 401."""
+        with flask_app.test_client() as c:
+            with c.session_transaction() as sess:
+                sess['username'] = 'ghost_user_not_in_db'
+            resp = c.get('/api/config')
+            assert resp.status_code == 401
+            assert resp.get_json() == {'error': 'Authentication required'}
+            with c.session_transaction() as sess:
+                assert 'username' not in sess
 
     def test_get_current_user_returns_none_when_no_session(self, flask_app):
         with flask_app.test_request_context('/'):
@@ -1251,7 +1265,9 @@ class TestUserRequiredDecorator:
             with c.session_transaction() as sess:
                 sess['username'] = 'ghost_user_not_in_db'
             resp = c.get('/protected')
-            assert resp.status_code == 403
+            assert resp.status_code == 401
+            with c.session_transaction() as sess:
+                assert 'username' not in sess
 
     def test_user_required_allows_regular_user(self, isolated_user_manager):
         from flask import Flask

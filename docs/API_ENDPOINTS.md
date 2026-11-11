@@ -148,10 +148,10 @@ This page lists the HTTP routes currently declared across `backend/blueprints/*.
 - `GET /api/aurora/predictions`
 - `GET /api/iss/passes` - Returns ISS passes, solar transits, and lunar transits; all times in configured local TZ. Response includes `passes`, `solar_transits`, `lunar_transits`, `next_visible_passage`, `next_solar_transit`, `next_lunar_transit`, `total_passes`, `total_solar_transits`, `total_lunar_transits`.
 - `GET /api/iss/location`
-- `POST /api/iss/celestrak/restart`
+- `POST /api/iss/celestrak/restart` - Admin only. Clears the Celestrak block flag so the next crawl may query Celestrak again.
 - `GET /api/css/passes` - Returns CSS (China Space Station, NORAD 48274/Tiangong) passes, solar transits, and lunar transits. Same response structure as ISS; includes `station: "CSS"` field.
 - `GET /api/css/location`
-- `POST /api/css/celestrak/restart`
+- `POST /api/css/celestrak/restart` - Admin only. Same as the ISS one, for the CSS TLE crawl.
 - `GET /api/sun/today`
 - `GET /api/sun/next-eclipse`
 - `GET /api/moon/next-eclipse`

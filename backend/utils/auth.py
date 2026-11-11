@@ -1054,17 +1054,36 @@ user_manager = UserManager()
 
 
 # Authentication decorators
+def _session_account():
+    """The account the session is signed in as, or ``(None, 401 response)``.
+
+    A session can outlive its account: deleted by an admin, or replaced by a backup restore,
+    while the browser kept its cookie. Such a session is cleared and refused like a missing one,
+    so it never reads install data nor reaches a route that expects a user.
+    """
+    client_ip = request.remote_addr
+    if 'username' not in session:
+        logger.warning(f"Unauthorized access attempt to {request.path} from {client_ip} (no valid session cookie)")
+        return None, (jsonify({'error': 'Authentication required'}), 401)
+    user = user_manager.get_user(session['username'])
+    if user is None:
+        logger.warning(
+            f"Session for missing account {session.get('username')} from {client_ip} on {request.path}: signed out"
+        )
+        session.clear()
+        return None, (jsonify({'error': 'Authentication required'}), 401)
+    return user, None
+
+
 # Is read-only role, can only access GET endpoints (enforced in route handlers)
 def login_required(f):
-    """Decorator to require authentication"""
+    """Decorator to require a signed-in session whose account still exists"""
 
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'username' not in session:
-            # Log failed authentication attempt via cookie
-            client_ip = request.remote_addr
-            logger.warning(f"Unauthorized access attempt to {request.path} from {client_ip} (no valid session cookie)")
-            return jsonify({'error': 'Authentication required'}), 401
+        user, refusal = _session_account()
+        if user is None:
+            return refusal
         return f(*args, **kwargs)
 
     return decorated_function
@@ -1076,13 +1095,11 @@ def user_required(f):
 
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'username' not in session:
-            client_ip = request.remote_addr
-            logger.warning(f"Unauthorized access attempt to {request.path} from {client_ip} (no valid session cookie)")
-            return jsonify({'error': 'Authentication required'}), 401
+        user, refusal = _session_account()
+        if user is None:
+            return refusal
 
-        user = user_manager.get_user(session['username'])
-        if not user or not (user.is_admin() or user.is_user()):
+        if not (user.is_admin() or user.is_user()):
             client_ip = request.remote_addr
             logger.warning(
                 f"User {session.get('username')} from {client_ip} attempted to access"
@@ -1101,13 +1118,11 @@ def admin_required(f):
 
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'username' not in session:
-            client_ip = request.remote_addr
-            logger.warning(f"Unauthorized access attempt to {request.path} from {client_ip} (no valid session cookie)")
-            return jsonify({'error': 'Authentication required'}), 401
+        user, refusal = _session_account()
+        if user is None:
+            return refusal
 
-        user = user_manager.get_user(session['username'])
-        if not user or not user.is_admin():
+        if not user.is_admin():
             client_ip = request.remote_addr
             logger.warning(
                 f"Non-admin user {session.get('username')} from {client_ip} attempted to access {request.path}"

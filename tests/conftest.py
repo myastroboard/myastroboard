@@ -400,7 +400,6 @@ def sample_coordinates():
 
 import tempfile as _tmpfile
 import types as _types
-import uuid as _uuid
 
 if 'psutil' not in sys.modules:
     sys.modules['psutil'] = _types.ModuleType('psutil')
@@ -438,13 +437,16 @@ def client_admin():
 def client_user():
     """Regular-user (non-admin) Flask test client."""
     from app import app as _flask_app
+    from utils.auth import user_manager as _um
 
     _flask_app.config['TESTING'] = True
     with _tmpfile.TemporaryDirectory():
         with _flask_app.test_client() as c:
-            temp_id = str(_uuid.uuid4())
+            # A real account: a session whose account does not exist is signed out (login_required)
+            user = _um.get_user_by_username('testuser') or _um.create_user('testuser', 'testuser-pw', 'user')
+            assert user is not None
             with c.session_transaction() as sess:
-                sess['user_id'] = temp_id
-                sess['username'] = 'testuser'
-                sess['role'] = 'user'
+                sess['user_id'] = user.user_id
+                sess['username'] = user.username
+                sess['role'] = user.role
             yield c

@@ -321,19 +321,24 @@ function _appendCelestrakBanner(container, celestrakStatus, station) {
     linksWrap.appendChild(policyLink);
     alert.appendChild(linksWrap);
 
-    const hint = document.createElement('div');
-    hint.className = 'small text-muted mb-2';
-    hint.textContent = i18n.t('iss.celestrak_restart_hint');
-    alert.appendChild(hint);
-
+    // Clearing the block lets the server call Celestrak again: an admin-only decision, so the
+    // hint and the button are only offered to admins (the route refuses everyone else).
+    const isAdmin = typeof currentUser !== 'undefined' && currentUser?.role === 'admin';
     const restartBtn = document.createElement('button');
-    restartBtn.type = 'button';
-    restartBtn.className = 'btn btn-warning btn-sm';
-    restartBtn.textContent = i18n.t('iss.celestrak_restart_button');
-    restartBtn.disabled = true;
-    alert.appendChild(restartBtn);
+    if (isAdmin) {
+        const hint = document.createElement('div');
+        hint.className = 'small text-muted mb-2';
+        hint.textContent = i18n.t('iss.celestrak_restart_hint');
+        alert.appendChild(hint);
 
-    checkLink.addEventListener('click', () => { restartBtn.disabled = false; });
+        restartBtn.type = 'button';
+        restartBtn.className = 'btn btn-warning btn-sm';
+        restartBtn.textContent = i18n.t('iss.celestrak_restart_button');
+        restartBtn.disabled = true;
+        alert.appendChild(restartBtn);
+        checkLink.addEventListener('click', () => { restartBtn.disabled = false; });
+    }
+
     restartBtn.addEventListener('click', async () => {
         if (!window.confirm(i18n.t('iss.celestrak_restart_confirm'))) return;
         restartBtn.disabled = true;

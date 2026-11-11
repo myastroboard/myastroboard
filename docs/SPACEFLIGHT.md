@@ -105,7 +105,8 @@ Pass prediction requires up-to-date Two-Line Element (TLE) data. The service tri
 
 TLE data is cached locally in `data/cache/iss_tle_cache.json` for up to **6 hours**. (Skyfield's own ephemeris files are stored separately under `data/cache/skyfield/`.) If all sources fail, the last valid TLE is used for up to 3 hours before the prediction is considered unreliable.
 
-The TLE cache can be force-refreshed via `POST /api/iss/celestrak/restart`.
+After Celestrak blocked the server, an admin can clear the block with `POST /api/iss/celestrak/restart`
+(`/api/css/celestrak/restart` for the CSS); the banner offers the button to admins only.
 
 ### Pass prediction algorithm
 
@@ -150,7 +151,7 @@ Similarly, a **lunar transit** occurs when the ISS crosses the lunar disk. Both 
 |--------|------|-------------|
 | `GET` | `/api/iss/passes` | Upcoming passes, solar transits, and lunar transits |
 | `GET` | `/api/iss/location` | Real-time ISS position and ground track |
-| `POST` | `/api/iss/celestrak/restart` | Force TLE re-fetch |
+| `POST` | `/api/iss/celestrak/restart` | Clear the Celestrak block flag (admin only) |
 
 The `/api/iss/passes` response includes:
 
