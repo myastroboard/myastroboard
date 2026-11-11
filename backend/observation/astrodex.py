@@ -351,7 +351,7 @@ def get_visible_astrodex(
                     str(picture.get('filename', '')),
                 )
                 if picture_key in seen_picture_keys:
-                    continue  # pragma: no cover
+                    continue
                 seen_picture_keys.add(picture_key)
                 picture_copy = copy.deepcopy(picture)
                 if not picture_copy.get('is_owned_by_current_user'):
@@ -1177,7 +1177,7 @@ def switch_item_catalogue_name(user_id: str, item_id: str, target_catalogue: str
         item['catalogue'] = target_catalogue
         if target_aliases:
             item['catalogue_aliases'] = target_aliases
-        else:  # pragma: no cover
+        else:  # pragma: no cover - target_aliases falls back to the item's aliases, checked non-empty above
             item.pop('catalogue_aliases', None)
         item.pop('catalogue_group_id', None)
         item['updated_at'] = datetime.now(UTC).isoformat()

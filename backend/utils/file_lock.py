@@ -36,7 +36,7 @@ if sys.platform == "win32":
                     raise
                 time.sleep(0.2)
 
-else:  # pragma: no cover
+else:  # pragma: no cover - import-time platform choice; the flock calls are tested
     import fcntl
 
 
@@ -56,7 +56,7 @@ def interprocess_lock(lock_path: str) -> Iterator[None]:
         if sys.platform == "win32":
             lock_file.seek(0)
             _msvcrt_lock(lock_file.fileno())
-        else:  # pragma: no cover
+        else:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
         yield
     finally:
@@ -64,7 +64,7 @@ def interprocess_lock(lock_path: str) -> Iterator[None]:
             if sys.platform == "win32":
                 lock_file.seek(0)
                 msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
-            else:  # pragma: no cover
+            else:
                 fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
         finally:
             lock_file.close()

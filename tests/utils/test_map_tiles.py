@@ -277,3 +277,75 @@ class TestPruneCache:
         assert runs == []
         _raster(4, 1, 0)
         assert runs == [1]
+
+    def test_unreadable_files_are_skipped_when_measuring(self, tile_env, monkeypatch):
+        """A file that vanishes or cannot be stat'ed is left out of the size count."""
+        path = self._write_file(0, 5000, time.time())
+        real_stat = os.stat
+        monkeypatch.setattr(
+            map_tiles.os, 'stat', lambda p: (_ for _ in ()).throw(OSError('gone')) if p == path else real_stat(p)
+        )
+        assert map_tiles.prune_cache(max_bytes=1000) == 0
+        # Listed rather than os.path.exists(): on POSIX that goes through the patched os.stat
+        assert os.path.basename(path) in os.listdir(os.path.dirname(path))
+
+    def test_files_that_cannot_be_removed_are_kept_and_not_counted(self, tile_env, monkeypatch):
+        """A file the OS refuses to delete stays; pruning goes on with the next ones, then stops."""
+        now = time.time()
+        locked = self._write_file(0, 600, now - 300)
+        other = self._write_file(1, 600, now - 200)
+        real_remove = os.remove
+        monkeypatch.setattr(
+            map_tiles.os,
+            'remove',
+            lambda p: (_ for _ in ()).throw(PermissionError('in use')) if p == locked else real_remove(p),
+        )
+        # 1200 bytes against a 1000-byte cap: the locked file stays, the other one goes, and the
+        # loop ends without ever getting back under the target.
+        assert map_tiles.prune_cache(max_bytes=1000) == 1
+        assert os.path.exists(locked)
+        assert not os.path.exists(other)
+
+
+class TestUpstreamAndStoreFailures:
+    def test_no_free_upstream_slot_means_unavailable(self, tile_env, monkeypatch):
+        """All upstream slots busy past the timeout: the fetch gives up without calling OpenStreetMap."""
+
+        class _Busy:
+            def acquire(self, timeout=None):
+                return False
+
+            def release(self):
+                raise AssertionError('a slot never acquired must not be released')
+
+        monkeypatch.setattr(map_tiles, '_UPSTREAM_SLOTS', _Busy())
+        with pytest.raises(map_tiles.TileUnavailable):
+            _raster(5, 0, 0)
+        assert tile_env['calls'] == []
+
+    def test_a_cache_write_failure_still_serves_the_resource(self, tile_env, monkeypatch):
+        """The download is returned even when it cannot be cached, and the temp file is cleaned up."""
+        removed = []
+        monkeypatch.setattr(map_tiles.os, 'replace', lambda src, dst: (_ for _ in ()).throw(OSError('disk full')))
+        real_remove = os.remove
+        monkeypatch.setattr(map_tiles.os, 'remove', lambda p: removed.append(p) or real_remove(p))
+
+        assert _raster(5, 1, 0) == PNG
+        assert len(removed) == 1 and removed[0].endswith('.tmp')
+        assert not os.path.exists(removed[0])
+
+    def test_a_cache_write_failure_without_temp_file_is_harmless(self, tile_env, monkeypatch):
+        """The cache folder cannot even be created: nothing to clean up, the resource is still served."""
+        monkeypatch.setattr(map_tiles.os, 'makedirs', lambda *a, **k: (_ for _ in ()).throw(OSError('read-only')))
+
+        assert _raster(5, 2, 0) == PNG
+
+    def test_spent_budget_serves_a_stale_cached_copy(self, tile_env, monkeypatch):
+        """A user over the upstream budget still gets the stale cached copy rather than an error."""
+        _raster(6, 0, 0)
+        path = map_tiles.cache_path(map_tiles.RASTER, 6, 0, '0.png')
+        _age(path, map_tiles.RASTER.fresh_seconds + 60)
+        monkeypatch.setattr(map_tiles._upstream_budget, 'exceeded', lambda user_key: True)
+
+        assert _raster(6, 0, 0) == PNG
+        assert len(tile_env['calls']) == 1

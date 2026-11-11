@@ -218,6 +218,81 @@ def reset_app_settings_module_cache():
 
 
 @pytest.fixture
+def fake_msvcrt(monkeypatch):
+    """Drive a module's Windows file-locking branch on any OS.
+
+    Backend lock code imports ``msvcrt`` only on Windows and ``fcntl`` elsewhere, then
+    branches on ``sys.platform``. Calling ``fake_msvcrt(module, locking=...)`` forces
+    ``sys.platform`` to ``"win32"`` and installs a stand-in ``msvcrt`` on ``module``
+    (created when the real one was never imported), so the Windows branch runs - and its
+    tests pass - on Linux CI as well as on Windows. Returns the stand-in.
+    """
+
+    def _install(module, locking=None):
+        fake = _types.SimpleNamespace(
+            LK_UNLCK=0,
+            LK_LOCK=1,
+            LK_NBLCK=2,
+            LK_RLCK=3,
+            LK_NBRLCK=4,
+            locking=locking if locking is not None else (lambda *_a, **_k: None),
+        )
+        monkeypatch.setattr(sys, "platform", "win32")
+        monkeypatch.setattr(module, "msvcrt", fake, raising=False)
+        return fake
+
+    return _install
+
+
+@pytest.fixture
+def fake_fcntl(monkeypatch):
+    """Drive a module's POSIX file-locking branch on any OS (the mirror of ``fake_msvcrt``).
+
+    ``fake_fcntl(module, flock=...)`` forces ``sys.platform`` to ``"linux"`` and installs a
+    stand-in ``fcntl`` on ``module``, so the flock branch runs on Windows too. The stand-in
+    records every ``flock(fd, operation)`` call in ``.calls`` unless ``flock`` replaces it.
+    """
+
+    def _install(module, flock=None):
+        calls = []
+        fake = _types.SimpleNamespace(LOCK_SH=1, LOCK_EX=2, LOCK_NB=4, LOCK_UN=8, calls=calls)
+        fake.flock = flock if flock is not None else (lambda fd, operation: calls.append((fd, operation)))
+        monkeypatch.setattr(sys, "platform", "linux")
+        monkeypatch.setattr(module, "fcntl", fake, raising=False)
+        return fake
+
+    return _install
+
+
+@pytest.fixture
+def symlink_escape(monkeypatch, tmp_path):
+    """Make every entry of a folder resolve outside of it, as a planted symlink would.
+
+    ``symlink_escape(folder)`` patches ``os.path.realpath`` so that any path directly inside
+    ``folder`` resolves into a separate ``outside`` directory, which it returns. Code that confines
+    its writes with ``realpath(...).startswith(base + os.sep)`` must then refuse; the test checks
+    that nothing landed in ``outside``. (Real symlinks need privileges on Windows.)
+    """
+    real_realpath = os.path.realpath
+    outside = tmp_path / 'outside'
+    outside.mkdir()
+
+    def _install(folder):
+        base = real_realpath(str(folder))
+
+        def _realpath(path, *args, **kwargs):
+            resolved = real_realpath(path, *args, **kwargs)
+            if os.path.dirname(resolved) == base:
+                return os.path.join(str(outside), os.path.basename(resolved))
+            return resolved
+
+        monkeypatch.setattr(os.path, 'realpath', _realpath)
+        return outside
+
+    return _install
+
+
+@pytest.fixture
 def temp_dir():
     """Create a temporary directory for a test"""
     tmp = tempfile.mkdtemp()

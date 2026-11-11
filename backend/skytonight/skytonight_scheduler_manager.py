@@ -28,7 +28,7 @@ from utils.repo_config import load_config
 # Windows-compatible file locking
 if sys.platform == 'win32':
     import msvcrt
-else:  # pragma: no cover
+else:  # pragma: no cover - import-time platform choice; the flock calls are tested
     import fcntl
 
 logger = get_logger(__name__)
@@ -188,7 +188,7 @@ def get_or_create_skytonight_scheduler(app, cache_ready_event=None):
                     app.config['is_skytonight_scheduler_worker'] = False
                     lock_file.close()
                     return None
-            else:  # pragma: no cover
+            else:
                 fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
 
             logger.debug('Creating SkyTonight scheduler instance (acquired lock)...')
@@ -249,7 +249,7 @@ def get_skytonight_scheduler_for_api():
                     return None
                 except OSError:
                     return 'remote_scheduler'
-            else:  # pragma: no cover
+            else:
                 fcntl.flock(test_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                 return None
         except OSError:

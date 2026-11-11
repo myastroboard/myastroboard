@@ -394,3 +394,264 @@ def test_run_once_waits_for_the_target_dataset(demo_env, monkeypatch):
     monkeypatch.setattr(demo_life.skytonight_targets, 'find_target', lambda name: None)
     demo_life.run_once()
     assert user_manager.get_user_by_username('demo') is None
+
+
+# ---------------------------------------------------------------------------
+# Edge cases
+# ---------------------------------------------------------------------------
+
+
+class _User:
+    user_id = 'u-demo'
+    username = 'demo'
+
+
+def test_apply_demo_location_needs_an_install_location_with_an_id(monkeypatch):
+    """Without an install location preset carrying an id, nothing is changed."""
+    config = load_config()
+    config['location_configured'] = False
+    save_config(config)
+    monkeypatch.setattr(demo_life, 'get_install_default_location', lambda config: {'name': 'No id'})
+
+    assert demo_life.apply_demo_location() is False
+    assert load_config()['location_configured'] is False
+
+
+def test_ensure_equipment_skips_a_setup_whose_equipment_cannot_be_created(monkeypatch):
+    """A telescope the store refuses leaves that setup out, the others are kept."""
+    monkeypatch.setattr(demo_life.equipment_profiles, 'load_user_combinations', lambda user_id: {'items': []})
+    monkeypatch.setattr(
+        demo_life.equipment_profiles,
+        'create_telescope',
+        lambda user_id, data: None if data['name'] == 'Seestar S50' else {'id': 't-' + data['name']},
+    )
+    monkeypatch.setattr(demo_life.equipment_profiles, 'create_camera', lambda user_id, data: {'id': 'c'})
+    monkeypatch.setattr(demo_life.equipment_profiles, 'create_combination', lambda user_id, data: {'id': 'k'})
+
+    assert demo_life._ensure_equipment(_User()) == {'refractor': {'id': 'k'}}
+
+
+def test_ensure_equipment_drops_a_combination_the_store_refuses(monkeypatch):
+    """A combination that cannot be saved is not returned."""
+    monkeypatch.setattr(demo_life.equipment_profiles, 'load_user_combinations', lambda user_id: {'items': []})
+    monkeypatch.setattr(demo_life.equipment_profiles, 'create_telescope', lambda user_id, data: {'id': 't'})
+    monkeypatch.setattr(demo_life.equipment_profiles, 'create_camera', lambda user_id, data: {'id': 'c'})
+    monkeypatch.setattr(demo_life.equipment_profiles, 'create_combination', lambda user_id, data: None)
+
+    assert demo_life._ensure_equipment(_User()) == {}
+
+
+def test_catalogue_of_falls_back_to_the_first_catalogue_then_to_nothing():
+    """The preferred name's catalogue wins; otherwise the first one; no names gives an empty string."""
+    names = {'OpenNGC': 'NGC 224', 'Messier': 'M31'}
+    assert demo_life._catalogue_of(names, 'M31') == 'Messier'
+    assert demo_life._catalogue_of(names, 'Andromeda') == 'OpenNGC'
+    assert demo_life._catalogue_of({}, 'M31') == ''
+    assert demo_life._catalogue_of(None, 'M31') == ''
+
+
+def test_seed_wishlist_skips_unknown_targets_and_adds_nothing_when_none_is_known(monkeypatch):
+    """Unknown wishlist targets are skipped; with none known, the wishlist is not touched."""
+    added = []
+    monkeypatch.setattr(demo_life.wishlist, 'add_targets', lambda user_id, username, targets: added.append(targets))
+    monkeypatch.setattr(
+        demo_life.skytonight_targets, 'find_target', lambda name: _fake_find_target(name) if name == 'M33' else None
+    )
+    demo_life._seed_wishlist(_User())
+    assert [[target['name'] for target in batch] for batch in added] == [['M33']]
+
+    added.clear()
+    monkeypatch.setattr(demo_life.skytonight_targets, 'find_target', lambda name: None)
+    demo_life._seed_wishlist(_User())
+    assert added == []
+
+
+def _tonight(monkeypatch, night_date='2026-11-12'):
+    metadata = {'night_start': f'{night_date}T18:00:00+00:00', 'night_end': f'{night_date}T23:00:00+00:00'}
+    monkeypatch.setattr(demo_life, '_load_tonight', lambda: (metadata, []))
+    monkeypatch.setattr(demo_life.astrodex, 'load_user_astrodex', lambda user_id, username: {'items': []})
+    return metadata
+
+
+def test_refresh_tonight_skips_a_setup_without_its_combination(monkeypatch):
+    """Only the setups that have a combination are planned."""
+    _tonight(monkeypatch)
+    seen = []
+    monkeypatch.setattr(
+        demo_life.plan_my_night,
+        'load_user_plan',
+        lambda user_id, username, combination_id: seen.append(combination_id) or {'plan': None},
+    )
+    monkeypatch.setattr(demo_life, 'pick_targets', lambda rows, setup, exclude: [])
+
+    demo_life.refresh_tonight(_User(), {'refractor': {'id': 'k-refractor'}})
+
+    assert seen == ['k-refractor']
+
+
+def test_refresh_tonight_clears_an_empty_old_plan_without_logging_it(monkeypatch):
+    """An old plan with no entries is cleared, never logged; no fitting target means no new plan."""
+    _tonight(monkeypatch)
+    monkeypatch.setattr(
+        demo_life.plan_my_night,
+        'load_user_plan',
+        lambda user_id, username, combination_id: {'plan': {'plan_date': '2026-11-11', 'entries': []}},
+    )
+    cleared, logged, built = [], [], []
+    monkeypatch.setattr(
+        demo_life.plan_my_night, 'clear_plan', lambda user_id, username, combination_id: cleared.append(combination_id)
+    )
+    monkeypatch.setattr(demo_life, '_log_plan', lambda *args: logged.append(args))
+    monkeypatch.setattr(demo_life, '_build_plan', lambda *args: built.append(args))
+    monkeypatch.setattr(demo_life, 'pick_targets', lambda rows, setup, exclude: [])
+
+    demo_life.refresh_tonight(_User(), {'smart': {'id': 'k-smart'}})
+
+    assert cleared == ['k-smart']
+    assert logged == []
+    assert built == []
+
+
+def test_refresh_tonight_does_not_log_a_plan_dated_tonight_or_later(monkeypatch):
+    """A plan with entries but not older than tonight (clock moved back) is cleared, not logged."""
+    _tonight(monkeypatch, night_date='2026-11-12')
+    monkeypatch.setattr(
+        demo_life.plan_my_night,
+        'load_user_plan',
+        lambda user_id, username, combination_id: {'plan': {'plan_date': '2026-11-13', 'entries': [{'name': 'M1'}]}},
+    )
+    logged = []
+    monkeypatch.setattr(demo_life.plan_my_night, 'clear_plan', lambda *args, **kwargs: None)
+    monkeypatch.setattr(demo_life, '_log_plan', lambda *args: logged.append(args))
+    monkeypatch.setattr(demo_life, 'pick_targets', lambda rows, setup, exclude: [])
+
+    demo_life.refresh_tonight(_User(), {'smart': {'id': 'k-smart'}})
+
+    assert logged == []
+
+
+def test_build_plan_keeps_the_added_order_when_the_optimizer_has_none(monkeypatch):
+    """No optimized order: the plan is left in the order the targets were added."""
+    added, applied = [], []
+    monkeypatch.setattr(demo_life.plan_my_night, 'create_or_add_target', lambda **kwargs: added.append(kwargs))
+    monkeypatch.setattr(demo_life.plan_my_night, 'compute_optimized_schedule', lambda *args: {'order': []})
+    monkeypatch.setattr(demo_life.plan_my_night, 'apply_optimized_schedule', lambda *args: applied.append(args))
+    metadata = {'night_start': '2026-11-12T18:00:00+00:00', 'night_end': '2026-11-13T05:00:00+00:00'}
+
+    demo_life._build_plan(
+        _User(), metadata, demo_life._setup_by_key('smart'), {'id': 'k', 'name': 'Rig'}, [_row('M31', 0.9, 190.0)]
+    )
+
+    assert [item['item_data']['name'] for item in added] == ['M31']
+    assert added[0]['duration_hours'] == 0.0
+    assert applied == []
+
+
+def _session_with(monkeypatch, entries, session=True):
+    stored = {'id': 's1', 'entries': entries}
+    monkeypatch.setattr(
+        demo_life.observation_sessions,
+        'create_session_from_plan',
+        lambda user_id, username, plan: {'id': 's1'} if session else None,
+    )
+    monkeypatch.setattr(
+        demo_life.observation_sessions, 'load_user_sessions', lambda user_id, username: {'sessions': [stored]}
+    )
+    monkeypatch.setattr(demo_life.observation_sessions, 'save_user_sessions', lambda *args, **kwargs: None)
+    links = []
+    monkeypatch.setattr(demo_life.observation_sessions, 'link_entry_to_astrodex', lambda *args: links.append(args))
+    added = []
+    monkeypatch.setattr(demo_life, '_add_to_astrodex', lambda *args, **kwargs: added.append(args) or (None, None))
+    return stored, links, added
+
+
+_PLAN = {'plan_date': '2026-11-11'}
+
+
+def test_log_plan_stops_when_no_session_can_be_created(monkeypatch):
+    """No session created: nothing is filled and nothing joins the Astrodex."""
+    stored, links, added = _session_with(monkeypatch, [{'id': 'e1', 'name': 'M31'}], session=False)
+
+    demo_life._log_plan(_User(), _PLAN, demo_life._setup_by_key('smart'), {'id': 'k'}, set())
+
+    assert 'frame_count' not in stored['entries'][0]
+    assert added == []
+
+
+def test_log_plan_does_not_add_a_best_target_already_in_the_astrodex(monkeypatch):
+    """The session is still filled, but a best target already captured is not added again."""
+    stored, links, added = _session_with(monkeypatch, [{'id': 'e1', 'name': 'M 31', 'ra': 0.7, 'dec': 41.0}])
+
+    demo_life._log_plan(_User(), _PLAN, demo_life._setup_by_key('smart'), {'id': 'k'}, {'m31'})
+
+    assert stored['notes'] == demo_life.DEMO_SESSION_NOTE
+    assert stored['entries'][0]['frame_count'] > 0
+    assert added == []
+
+
+def test_log_plan_skips_a_best_target_without_coordinates(monkeypatch):
+    """A best entry with no usable coordinates cannot get a survey picture: it is not added."""
+    stored, links, added = _session_with(monkeypatch, [{'id': 'e1', 'name': 'M31', 'ra': 'n/a', 'dec': 41.0}])
+
+    demo_life._log_plan(_User(), _PLAN, demo_life._setup_by_key('smart'), {'id': 'k'}, set())
+
+    assert added == []
+
+
+def test_log_plan_does_not_link_when_the_astrodex_item_cannot_be_created(monkeypatch):
+    """The Astrodex refused the item: the entry is not linked and the target stays unknown."""
+    stored, links, added = _session_with(monkeypatch, [{'id': 'e1', 'name': 'M31', 'ra': 0.7, 'dec': 41.0}])
+    in_astrodex = set()
+
+    demo_life._log_plan(_User(), _PLAN, demo_life._setup_by_key('smart'), {'id': 'k'}, in_astrodex)
+
+    assert len(added) == 1
+    assert links == []
+    assert in_astrodex == set()
+
+
+def test_add_to_astrodex_returns_nothing_when_the_item_is_refused(monkeypatch):
+    """The Astrodex store refused the item: no picture is downloaded."""
+    monkeypatch.setattr(demo_life.astrodex, 'create_astrodex_item', lambda *args, **kwargs: None)
+    downloads = []
+    monkeypatch.setattr(demo_life, '_download_picture', lambda *args: downloads.append(args))
+
+    result = demo_life._add_to_astrodex(
+        _User(),
+        {'name': 'M31'},
+        ra_deg=10.7,
+        dec_deg=41.3,
+        setup=demo_life._setup_by_key('smart'),
+        combination={'id': 'k'},
+        when=date(2026, 11, 11),
+        frames=10,
+        integration_minutes=1.5,
+        rating=4.0,
+    )
+
+    assert result == (None, None)
+    assert downloads == []
+
+
+def _unreadable_image(monkeypatch, remove_fails):
+    def _strip(data):
+        raise ValueError('not an image')
+
+    monkeypatch.setattr(demo_life, 'strip_image_metadata', _strip)
+    if remove_fails:
+        monkeypatch.setattr(demo_life.os, 'remove', lambda path: (_ for _ in ()).throw(OSError('locked')))
+
+
+def test_download_picture_drops_an_unreadable_survey_image(demo_env, monkeypatch):
+    """A downloaded file that is not a valid image is deleted and no picture is recorded."""
+    _unreadable_image(monkeypatch, remove_fails=False)
+
+    assert demo_life._download_picture('u1', 10.0, 41.0, 1.0) is None
+    assert os.listdir(astrodex.ASTRODEX_IMAGES_DIR) == []
+
+
+def test_download_picture_survives_a_file_that_cannot_be_deleted(demo_env, monkeypatch):
+    """Even when the unreadable file cannot be removed, the call returns no picture instead of raising."""
+    _unreadable_image(monkeypatch, remove_fails=True)
+
+    assert demo_life._download_picture('u1', 10.0, 41.0, 1.0) is None

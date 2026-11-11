@@ -290,6 +290,26 @@ def test_parse_changelog_keeps_only_versions_between_installed_and_latest():
     assert releases[0]["date"] == "2026-03-10"
 
 
+def test_parse_changelog_ignores_free_text_outside_bullets():
+    """A paragraph inside a release section, not part of any bullet, is not shown as an entry."""
+    markdown = """# Changelog
+
+## 1.3.0 (2026-03-10)
+
+A short note about this release, before any group.
+
+### Features
+
+Some free text under the heading.
+
+- The only entry.
+"""
+    (latest,) = module.parse_changelog(markdown, "1.2.0", "1.3.0", "v1.3.0")
+
+    assert latest["features"] == ["The only entry."]
+    assert latest["fixes"] == [] and latest["breaking"] == []
+
+
 def test_parse_changelog_joins_wrapped_bullets_and_drops_none_placeholders():
     latest, previous = module.parse_changelog(_SAMPLE_CHANGELOG, "1.1.0", "1.3.0", "v1.3.0")
 

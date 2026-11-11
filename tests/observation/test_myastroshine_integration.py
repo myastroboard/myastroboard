@@ -555,3 +555,13 @@ def test_create_enhanced_duplicate_item_vanishes_on_save_is_404(temp_data_dir, m
     with pytest.raises(integration.EnhancedDuplicateError) as excinfo:
         integration.create_enhanced_duplicate(_claims_for(item, source), b"jpeg", {"parameters": {}})
     assert excinfo.value.status == 404
+
+
+def test_save_enhanced_image_refuses_a_path_resolving_outside_the_images_folder(temp_data_dir, symlink_escape):
+    """A symlink planted in the images folder must not redirect the enhanced picture elsewhere."""
+    astrodex.ensure_astrodex_directories()
+    outside = symlink_escape(astrodex.ASTRODEX_IMAGES_DIR)
+
+    assert integration._save_enhanced_image(_UID, b"jpeg") is None
+    assert list(outside.iterdir()) == []
+    assert os.listdir(astrodex.ASTRODEX_IMAGES_DIR) == []

@@ -207,3 +207,43 @@ class TestHealth:
 
         monkeypatch.setattr(MqttConnector, 'probe', boom)
         assert client_admin.post('/api/mqtt-connections/health', json={'url': 'mqtt://x'}).status_code == 500
+
+    def test_id_alone_probes_the_saved_connection_with_its_password(self, client_admin, store, probe):
+        """The connectors' picker test button sends only the id: the saved connection is probed as is."""
+        resp = client_admin.post('/api/mqtt-connections/health', json={'id': 'c1'})
+        assert resp.status_code == 200
+        assert probe['calls'] == [
+            {'url': 'mqtt://broker.lan:1883', 'username': 'u', 'password': 'saved-pw', 'tls_insecure': False}
+        ]
+
+    def test_unknown_id_alone_is_a_400(self, client_admin, store, probe):
+        """An id that matches no saved connection, without a URL, cannot be probed."""
+        resp = client_admin.post('/api/mqtt-connections/health', json={'id': 'nope'})
+        assert resp.status_code == 400
+        assert resp.get_json() == {'reachable': False, 'error': 'unknown connection'}
+        assert probe['calls'] == []
+
+
+class TestUnexpectedErrors:
+    """Every write route reports an unexpected failure as a generic 500, never the exception text."""
+
+    @pytest.fixture
+    def broken(self, monkeypatch, store):
+        def boom(*args, **kwargs):
+            raise RuntimeError('secret detail')
+
+        for name in ('create_connection', 'update_connection', 'delete_connection'):
+            monkeypatch.setattr(f'blueprints.mqtt_connections.{name}', boom)
+
+    @pytest.mark.parametrize(
+        'method, path',
+        [
+            ('POST', '/api/mqtt-connections'),
+            ('PUT', '/api/mqtt-connections/c1'),
+            ('DELETE', '/api/mqtt-connections/c1'),
+        ],
+    )
+    def test_write_failure_is_a_generic_500(self, client_admin, broken, method, path):
+        resp = client_admin.open(path, method=method, json={'name': 'X', 'url': 'mqtt://x'})
+        assert resp.status_code == 500
+        assert resp.get_json() == {'error': 'Internal server error'}

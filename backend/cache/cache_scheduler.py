@@ -10,7 +10,7 @@ from utils.logging_config import get_logger
 # Windows-compatible file locking
 if sys.platform == "win32":
     import msvcrt
-else:  # pragma: no cover
+else:  # pragma: no cover - import-time platform choice; the flock calls are tested
     import fcntl
 
 # Initialize logger for this module
@@ -63,7 +63,7 @@ class CacheScheduler:
                     self._lock_file.close()
                     self._lock_file = None
                     return False
-            else:  # pragma: no cover
+            else:
                 # Unix file locking
                 fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
 
@@ -85,7 +85,7 @@ class CacheScheduler:
                     # Windows file unlocking — seek to 0 to match where the lock was acquired
                     self._lock_file.seek(0)
                     msvcrt.locking(self._lock_file.fileno(), msvcrt.LK_UNLCK, 1)
-                else:  # pragma: no cover
+                else:
                     # Unix file unlocking
                     fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_UN)
 

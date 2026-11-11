@@ -224,7 +224,7 @@ def _location_preset_sqm(location_id) -> float | None:
         return None
     try:
         location = get_location_by_id(load_config(), location_id)
-    except Exception as error:  # pragma: no cover - config read failure
+    except Exception as error:
         logger.error(f'Error reading location preset {location_id} for SQM prefill: {error}')
         return None
     if not location:
@@ -251,7 +251,7 @@ def _compute_moon_illumination_for_date(date_str: str | None) -> float | None:
         return None
     try:
         return round(moon_illumination_percent(parsed_date.replace(hour=12, tzinfo=UTC)), 1)
-    except Exception as error:  # pragma: no cover - ephemeris library failure
+    except Exception as error:
         logger.error(f'Error computing moon illumination for {date_str}: {error}')
         return None
 
@@ -866,7 +866,7 @@ def upload_observation_session_attachment(session_id):
         observation_sessions.ensure_observation_sessions_directories()
         base_dir = os.path.realpath(observation_sessions.attachments_dir())
         file_path = os.path.realpath(os.path.join(base_dir, unique_filename))
-        if not file_path.startswith(base_dir + os.sep):  # pragma: no cover
+        if not file_path.startswith(base_dir + os.sep):
             logger.warning(f'Attempted path traversal attack: {file_path}')
             return jsonify({'error': 'Invalid file path'}), 400
 

@@ -320,3 +320,23 @@ class TestPersonalEligiblePictures:
         astrodex.save_user_astrodex(user_id, data)
 
         assert astrodex_stream._eligible_pictures_personal(user_id) == []
+
+
+def test_banner_font_falls_back_to_the_default_when_dejavu_cannot_load(monkeypatch):
+    """Without the bundled DejaVu font the banner still renders, with Pillow's default font, cached."""
+    monkeypatch.setattr(astrodex_stream, '_font_cache', {})
+
+    real_truetype = astrodex_stream.ImageFont.truetype
+
+    def _missing(font, *args, **kwargs):
+        # Only DejaVu is missing: load_default() loads its own fallback font through truetype too.
+        if 'DejaVuSans' in str(font):
+            raise OSError('cannot open resource')
+        return real_truetype(font, *args, **kwargs)
+
+    monkeypatch.setattr(astrodex_stream.ImageFont, 'truetype', _missing)
+
+    font = astrodex_stream._font(31)
+
+    assert font is not None
+    assert astrodex_stream._font(31) is font

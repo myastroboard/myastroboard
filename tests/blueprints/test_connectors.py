@@ -171,6 +171,20 @@ class TestSaveConnectorConfig:
         assert stored['image_path'] == 'custom/path'
         assert stored['image_filename'] == 'image.jpg'  # blank falls back to the field's default
 
+    def test_config_the_connector_rejects_is_a_400_and_is_not_saved(self, client_admin, monkeypatch):
+        """The connector's own validation (an MQTT wildcard topic for AllSky) refuses the save."""
+        saved = {}
+        monkeypatch.setattr('blueprints.connectors.load_config', lambda: {'connectors': {}})
+        monkeypatch.setattr('blueprints.connectors.save_config', lambda cfg: saved.update(cfg) or True)
+
+        resp = client_admin.post(
+            '/api/connectors/allsky/config', json={'url': 'http://allsky.local', 'mqtt_topic': 'allsky/#'}
+        )
+
+        assert resp.status_code == 400
+        assert resp.get_json()['error'] == 'topic must not contain + or # (an exact topic, no wildcard)'
+        assert saved == {}
+
 
 # ---------------------------------------------------------------------------
 # Typed CONFIG_FIELDS and the credentials sidecar - exercised with a stub connector so

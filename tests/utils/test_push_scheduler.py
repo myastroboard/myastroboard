@@ -1185,21 +1185,20 @@ def test_start_spawns_thread_and_stop_sets_event(monkeypatch):
     assert release_calls == [1]
 
 
-def test_release_lock_handles_unlock_errors(monkeypatch, tmp_path):
+def test_release_lock_handles_unlock_errors(fake_msvcrt, monkeypatch, tmp_path):
     from utils import push_scheduler
 
     lock_path = tmp_path / 'lock.tmp'
     fp = open(lock_path, 'w', encoding='utf-8')
     push_scheduler._lock_file = fp
 
-    monkeypatch.setattr(push_scheduler.sys, 'platform', 'win32')
-    monkeypatch.setattr(push_scheduler.msvcrt, 'locking', lambda *a, **k: (_ for _ in ()).throw(PermissionError('x')))
+    fake_msvcrt(push_scheduler, lambda *a, **k: (_ for _ in ()).throw(PermissionError('x')))
 
     push_scheduler._release_lock()
     assert push_scheduler._lock_file is None
 
 
-def test_release_lock_handles_close_error_after_unlock_error(monkeypatch):
+def test_release_lock_handles_close_error_after_unlock_error(fake_msvcrt, monkeypatch):
     """Both the unlock call and the subsequent close() fail - the close-time error
     must be swallowed too, not left to propagate out of _release_lock()."""
     from utils import push_scheduler
@@ -1213,26 +1212,24 @@ def test_release_lock_handles_close_error_after_unlock_error(monkeypatch):
 
     push_scheduler._lock_file = _BrokenLockFile()
 
-    monkeypatch.setattr(push_scheduler.sys, 'platform', 'win32')
-    monkeypatch.setattr(push_scheduler.msvcrt, 'locking', lambda *a, **k: (_ for _ in ()).throw(PermissionError('x')))
+    fake_msvcrt(push_scheduler, lambda *a, **k: (_ for _ in ()).throw(PermissionError('x')))
 
     push_scheduler._release_lock()  # must not raise
     assert push_scheduler._lock_file is None
 
 
-def test_acquire_lock_success_and_failure(monkeypatch, tmp_path):
+def test_acquire_lock_success_and_failure(fake_msvcrt, monkeypatch, tmp_path):
     from utils import push_scheduler
 
     fake_constants = types.SimpleNamespace(DATA_DIR_CACHE=str(tmp_path))
     monkeypatch.setitem(sys.modules, 'utils.constants', fake_constants)
-    monkeypatch.setattr(push_scheduler.sys, 'platform', 'win32')
-    monkeypatch.setattr(push_scheduler.msvcrt, 'locking', lambda *a, **k: None)
+    fake_msvcrt(push_scheduler, lambda *a, **k: None)
 
     assert push_scheduler._acquire_lock() is True
     assert push_scheduler._lock_file is not None
     push_scheduler._release_lock()
 
-    monkeypatch.setattr(push_scheduler.msvcrt, 'locking', lambda *a, **k: (_ for _ in ()).throw(OSError('busy')))
+    fake_msvcrt(push_scheduler, lambda *a, **k: (_ for _ in ()).throw(OSError('busy')))
     assert push_scheduler._acquire_lock() is False
 
 
@@ -2298,3 +2295,20 @@ def test_push_with_location_multi_but_no_name():
 
     user = _make_user()
     assert push_scheduler._with_location(user, 'Body', None, True) == 'Body'
+
+
+def test_posix_lock_is_a_non_blocking_exclusive_flock(fake_fcntl, monkeypatch, tmp_path):
+    """On POSIX the push scheduler takes LOCK_EX | LOCK_NB, refuses a held lock, and unlocks on release."""
+    from utils import push_scheduler
+
+    fake_constants = types.SimpleNamespace(DATA_DIR_CACHE=str(tmp_path))
+    monkeypatch.setitem(sys.modules, 'utils.constants', fake_constants)
+    fake = fake_fcntl(push_scheduler)
+
+    assert push_scheduler._acquire_lock() is True
+    push_scheduler._release_lock()
+    assert [op for _fd, op in fake.calls] == [fake.LOCK_EX | fake.LOCK_NB, fake.LOCK_UN]
+
+    fake_fcntl(push_scheduler, flock=lambda fd, op: (_ for _ in ()).throw(BlockingIOError('held')))
+    assert push_scheduler._acquire_lock() is False
+    assert push_scheduler._lock_file is None

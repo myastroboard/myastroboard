@@ -60,14 +60,13 @@ def test_start_returns_false_when_lock_not_acquired(monkeypatch):
     assert scheduler.thread.started is False
 
 
-def test_acquire_lock_success_windows_branch(monkeypatch, tmp_path):
+def test_acquire_lock_success_windows_branch(fake_msvcrt, monkeypatch, tmp_path):
     scheduler = module.CacheScheduler(interval_seconds=1)
     dummy_file = DummyFile()
 
     monkeypatch.setattr(module, "DATA_DIR_CACHE", str(tmp_path))
-    monkeypatch.setattr(module.sys, "platform", "win32")
     monkeypatch.setattr("builtins.open", lambda *_args, **_kwargs: dummy_file)
-    monkeypatch.setattr(module.msvcrt, "locking", lambda *_args, **_kwargs: None)
+    fake_msvcrt(module, lambda *_args, **_kwargs: None)
     monkeypatch.setattr(module.os, "getpid", lambda: 1234)
 
     assert scheduler._acquire_lock() is True
@@ -75,33 +74,31 @@ def test_acquire_lock_success_windows_branch(monkeypatch, tmp_path):
     assert scheduler._lock_file is dummy_file
 
 
-def test_acquire_lock_failure_releases_file(monkeypatch, tmp_path):
+def test_acquire_lock_failure_releases_file(fake_msvcrt, monkeypatch, tmp_path):
     scheduler = module.CacheScheduler(interval_seconds=1)
     dummy_file = DummyFile()
 
     monkeypatch.setattr(module, "DATA_DIR_CACHE", str(tmp_path))
-    monkeypatch.setattr(module.sys, "platform", "win32")
     monkeypatch.setattr("builtins.open", lambda *_args, **_kwargs: dummy_file)
 
     def _fail_lock(*_args, **_kwargs):
         raise OSError("locked")
 
-    monkeypatch.setattr(module.msvcrt, "locking", _fail_lock)
+    fake_msvcrt(module, _fail_lock)
 
     assert scheduler._acquire_lock() is False
     assert scheduler._lock_file is None
     assert dummy_file.closed is True
 
 
-def test_release_lock_unlinks_file(monkeypatch, tmp_path):
+def test_release_lock_unlinks_file(fake_msvcrt, monkeypatch, tmp_path):
     scheduler = module.CacheScheduler(interval_seconds=1)
     scheduler._lock_file = DummyFile()
     scheduler._has_lock = True
 
     deleted = []
     monkeypatch.setattr(module, "DATA_DIR_CACHE", str(tmp_path))
-    monkeypatch.setattr(module.sys, "platform", "win32")
-    monkeypatch.setattr(module.msvcrt, "locking", lambda *_args, **_kwargs: None)
+    fake_msvcrt(module, lambda *_args, **_kwargs: None)
     monkeypatch.setattr(module.os.path, "exists", lambda _p: True)
     monkeypatch.setattr(module.os, "unlink", lambda p: deleted.append(p))
 
@@ -221,15 +218,14 @@ def test_release_lock_when_no_lock_file(monkeypatch):
     scheduler._release_lock()  # Must not raise
 
 
-def test_release_lock_when_lock_file_not_on_disk(monkeypatch, tmp_path):
+def test_release_lock_when_lock_file_not_on_disk(fake_msvcrt, monkeypatch, tmp_path):
     """Lock file already gone from disk — os.path.exists returns False, no unlink."""
     scheduler = module.CacheScheduler(interval_seconds=1)
     scheduler._lock_file = DummyFile()
     scheduler._has_lock = True
 
     deleted = []
-    monkeypatch.setattr(module.sys, "platform", "win32")
-    monkeypatch.setattr(module.msvcrt, "locking", lambda *_a, **_k: None)
+    fake_msvcrt(module, lambda *_a, **_k: None)
     monkeypatch.setattr(module.os.path, "exists", lambda _p: False)
     monkeypatch.setattr(module.os, "unlink", lambda p: deleted.append(p))
 
@@ -238,14 +234,13 @@ def test_release_lock_when_lock_file_not_on_disk(monkeypatch, tmp_path):
     assert scheduler._lock_file is None
 
 
-def test_release_lock_exception_swallowed(monkeypatch, tmp_path):
+def test_release_lock_exception_swallowed(fake_msvcrt, monkeypatch, tmp_path):
     """Exception during _release_lock is swallowed (not propagated)."""
     scheduler = module.CacheScheduler(interval_seconds=1)
     scheduler._lock_file = DummyFile()
     scheduler._has_lock = True
 
-    monkeypatch.setattr(module.sys, "platform", "win32")
-    monkeypatch.setattr(module.msvcrt, "locking", lambda *_a, **_k: (_ for _ in ()).throw(Exception("unlink error")))
+    fake_msvcrt(module, lambda *_a, **_k: (_ for _ in ()).throw(Exception("unlink error")))
 
     scheduler._release_lock()  # Must not raise
 
@@ -346,48 +341,44 @@ def test_run_does_not_set_cache_ready_twice(monkeypatch):
     assert scheduler.cache_ready_event.is_set()
 
 
-def test_acquire_lock_fcntl_ioerror_closes_file_and_returns_false(monkeypatch, tmp_path):
-    """IOError from flock on non-windows propagates to outer except.
-
-    Open succeeds (lock_file is set), then flock raises → outer except closes file.
-    The fcntl branch is not coverable on Windows (fcntl is not imported).
-    This test is skipped on Windows.
-    """
-    import sys
-
-    if sys.platform == "win32":
-        pytest.skip("fcntl branch not coverable on Windows")
-
+def test_acquire_lock_fcntl_ioerror_closes_file_and_returns_false(fake_fcntl, monkeypatch, tmp_path):
+    """On POSIX, a lock held by another process makes flock raise: the file is closed, no lock."""
     scheduler = module.CacheScheduler(interval_seconds=1)
     dummy_file = DummyFile()
 
     monkeypatch.setattr(module, "DATA_DIR_CACHE", str(tmp_path))
-    monkeypatch.setattr(module.sys, "platform", "linux")
     monkeypatch.setattr("builtins.open", lambda *_a, **_k: dummy_file)
-
-    import types
-
-    mock_fcntl = types.SimpleNamespace(
-        LOCK_EX=2,
-        LOCK_NB=4,
-        flock=lambda fd, op: (_ for _ in ()).throw(OSError("device busy")),
-    )
-    monkeypatch.setattr(module, "fcntl", mock_fcntl)
+    fake_fcntl(module, flock=lambda fd, op: (_ for _ in ()).throw(OSError("device busy")))
 
     assert scheduler._acquire_lock() is False
     assert scheduler._lock_file is None
     assert dummy_file.closed is True
 
 
-def test_release_lock_logger_raises_is_swallowed(monkeypatch, tmp_path):
+def test_acquire_and_release_lock_posix_branch(fake_fcntl, monkeypatch, tmp_path):
+    """On POSIX the scheduler takes a non-blocking exclusive flock, then unlocks and deletes the file."""
+    scheduler = module.CacheScheduler(interval_seconds=1)
+    dummy_file = DummyFile()
+    monkeypatch.setattr(module, "DATA_DIR_CACHE", str(tmp_path))
+    monkeypatch.setattr("builtins.open", lambda *_a, **_k: dummy_file)
+    fake = fake_fcntl(module)
+
+    assert scheduler._acquire_lock() is True
+    assert [op for _fd, op in fake.calls] == [fake.LOCK_EX | fake.LOCK_NB]
+
+    scheduler._release_lock()
+    assert [op for _fd, op in fake.calls][-1] == fake.LOCK_UN
+    assert scheduler._has_lock is False and dummy_file.closed is True
+
+
+def test_release_lock_logger_raises_is_swallowed(fake_msvcrt, monkeypatch, tmp_path):
     """ValueError from logger.error is caught silently."""
     scheduler = module.CacheScheduler(interval_seconds=1)
     scheduler._lock_file = DummyFile()
     scheduler._has_lock = True
 
-    monkeypatch.setattr(module.sys, "platform", "win32")
     # locking raises → outer except → logger.error raises ValueError
-    monkeypatch.setattr(module.msvcrt, "locking", lambda *_a, **_k: (_ for _ in ()).throw(Exception("fail")))
+    fake_msvcrt(module, lambda *_a, **_k: (_ for _ in ()).throw(Exception("fail")))
     monkeypatch.setattr(module.logger, "error", lambda *_a, **_k: (_ for _ in ()).throw(ValueError("log closed")))
 
     scheduler._release_lock()  # must not propagate any exception
@@ -419,7 +410,7 @@ def test_run_exception_in_update_all_caches_is_logged(monkeypatch):
     assert calls[0] == 1
 
 
-def test_acquire_lock_write_ioerror_closes_file_and_returns_false(monkeypatch, tmp_path):
+def test_acquire_lock_write_ioerror_closes_file_and_returns_false(fake_msvcrt, monkeypatch, tmp_path):
     """Open succeeds (lock_file set) but write raises IOError → outer except closes file."""
     scheduler = module.CacheScheduler(interval_seconds=1)
 
@@ -428,9 +419,8 @@ def test_acquire_lock_write_ioerror_closes_file_and_returns_false(monkeypatch, t
             raise OSError("disk full")
 
     monkeypatch.setattr(module, "DATA_DIR_CACHE", str(tmp_path))
-    monkeypatch.setattr(module.sys, "platform", "win32")
     monkeypatch.setattr("builtins.open", lambda *_a, **_k: WriteFailFile())
-    monkeypatch.setattr(module.msvcrt, "locking", lambda *_a, **_k: None)
+    fake_msvcrt(module, lambda *_a, **_k: None)
 
     assert scheduler._acquire_lock() is False
     assert scheduler._lock_file is None

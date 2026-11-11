@@ -732,7 +732,7 @@ def upload_astrodex_image():
                 logger.warning("User not authenticated for file upload")
                 return jsonify({'error': 'User not authenticated'}), 401
 
-        except TypeError, ValueError:  # pragma: no cover
+        except TypeError, ValueError:  # pragma: no cover - defensive: reading user_id raises neither
             logger.warning("Invalid user ID")
             return jsonify({'error': 'Invalid user ID'}), 400
 
@@ -755,7 +755,7 @@ def upload_astrodex_image():
         # Confinement check (anti path traversal). realpath + startswith
         # (rather than os.path.commonpath) is the pattern CodeQL's
         # py/path-injection query recognises as a sanitizer barrier.
-        if not file_path.startswith(base_dir + os.sep):  # pragma: no cover
+        if not file_path.startswith(base_dir + os.sep):
             logger.warning(f"Attempted path traversal attack: {file_path}")
             return jsonify({'error': 'Invalid file path'}), 400
 

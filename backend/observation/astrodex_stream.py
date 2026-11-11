@@ -293,7 +293,7 @@ def _font(size: int) -> _AnyFont:
 
         path = os.path.join(matplotlib.get_data_path(), "fonts", "ttf", "DejaVuSans.ttf")
         font = ImageFont.truetype(path, size)
-    except Exception as exc:  # pragma: no cover - matplotlib always ships this file
+    except Exception as exc:
         logger.warning("Astrodex Stream: could not load DejaVuSans.ttf, falling back to default: %s", exc)
         font = ImageFont.load_default()
     _font_cache[size] = font

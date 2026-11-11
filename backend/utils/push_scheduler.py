@@ -24,7 +24,7 @@ from utils.logging_config import get_logger
 
 if sys.platform == 'win32':
     import msvcrt
-else:  # pragma: no cover
+else:  # pragma: no cover - import-time platform choice; the flock calls are tested
     import fcntl
 
 logger = get_logger(__name__)
@@ -835,7 +835,7 @@ def _acquire_lock() -> bool:
         lock_file = open(lock_path, 'w')
         if sys.platform == 'win32':
             msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
-        else:  # pragma: no cover
+        else:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         lock_file.write(str(os.getpid()))
         lock_file.flush()
@@ -861,7 +861,7 @@ def _release_lock() -> None:
             # Seek to 0 to match where the lock was acquired before unlocking
             lf.seek(0)
             msvcrt.locking(lf.fileno(), msvcrt.LK_UNLCK, 1)
-        else:  # pragma: no cover
+        else:
             fcntl.flock(lf.fileno(), fcntl.LOCK_UN)
     except Exception as e:
         try:

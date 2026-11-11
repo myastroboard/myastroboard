@@ -425,6 +425,17 @@ class TestMigrationBackups:
         assert sorted(os.listdir(tmp_path / 'backups')) == ['my-own-copy.zip']
         assert legacy_import.migration_backups_summary(str(tmp_path))['exists'] is False
 
+    def test_delete_skips_entries_that_resolve_outside_the_backups_folder(
+        self, tmp_path, empty_db, notes_source, symlink_escape
+    ):
+        """An import entry that is a symlink to somewhere else is not followed: nothing is deleted."""
+        self._import(tmp_path, notes_source)
+        before = sorted(os.listdir(tmp_path / 'backups'))
+        symlink_escape(tmp_path / 'backups')
+
+        assert legacy_import.delete_migration_backups(str(tmp_path)) == 0
+        assert sorted(os.listdir(tmp_path / 'backups')) == before
+
     def test_delete_removes_the_folder_once_empty(self, tmp_path, empty_db, notes_source):
         self._import(tmp_path, notes_source)
         legacy_import.delete_migration_backups(str(tmp_path))

@@ -318,6 +318,42 @@ def test_prune_cache_keeps_everything_under_the_limit(monkeypatch, tmp_path):
     assert os.listdir(str(tmp_path)) == ['a.jpg']
 
 
+def test_prune_cache_skips_files_it_cannot_stat(monkeypatch, tmp_path):
+    """A file that vanishes between the listing and the stat is left out of the size count."""
+    monkeypatch.setattr(sky_framing, 'FRAMING_IMAGE_CACHE_DIR', str(tmp_path))
+    gone = tmp_path / 'gone.jpg'
+    gone.write_bytes(b'x' * 5000)
+    real_stat = os.stat
+    monkeypatch.setattr(
+        sky_framing.os,
+        'stat',
+        lambda path: (_ for _ in ()).throw(FileNotFoundError(path)) if path == str(gone) else real_stat(path),
+    )
+
+    assert sky_framing.prune_cache(max_bytes=1000) == 0
+    assert gone.exists()
+
+
+def test_prune_cache_keeps_files_it_cannot_remove(monkeypatch, tmp_path):
+    """A file the OS refuses to delete stays, the next ones go, and pruning ends without raising."""
+    monkeypatch.setattr(sky_framing, 'FRAMING_IMAGE_CACHE_DIR', str(tmp_path))
+    locked = tmp_path / 'locked.jpg'
+    other = tmp_path / 'other.jpg'
+    for index, path in enumerate((locked, other)):
+        path.write_bytes(b'x' * 600)
+        os.utime(path, (1000 + index, 1000 + index))
+    real_remove = os.remove
+    monkeypatch.setattr(
+        sky_framing.os,
+        'remove',
+        lambda path: (_ for _ in ()).throw(PermissionError(path)) if path == str(locked) else real_remove(path),
+    )
+
+    assert sky_framing.prune_cache(max_bytes=1000) == 1
+    assert locked.exists()
+    assert not other.exists()
+
+
 def test_prune_cache_without_directory_is_a_no_op(monkeypatch, tmp_path):
     """A cache directory that does not exist yet is not an error."""
     monkeypatch.setattr(sky_framing, 'FRAMING_IMAGE_CACHE_DIR', str(tmp_path / 'missing'))

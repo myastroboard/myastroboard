@@ -141,7 +141,7 @@ def convert_coordinates_api():
         else:
             return jsonify({"status": "error", "message": "Invalid DMS format. Use format like: 48d38m36.16s"}), 400
 
-    except Exception as e:  # pragma: no cover
+    except Exception as e:
         logger.error(f"Error converting coordinates: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 

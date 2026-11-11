@@ -446,6 +446,32 @@ class TestWishlistCapturedState:
         _post_target(wishlist_client)
         assert wishlist_client.get('/api/wishlist').get_json()['progress']['captured'] == 1
 
+    def test_an_astrodex_item_contributes_its_dataset_group_id(self, monkeypatch):
+        """An Astrodex item that resolves in the dataset adds its group id to the capture keys,
+        so a wish filed under another name of the same object counts as captured."""
+        user = types.SimpleNamespace(user_id='u1', username='alice')
+        monkeypatch.setattr(session_analytics_bp_module, '_user_sessions', lambda u: [])
+        monkeypatch.setattr(
+            session_analytics_bp_module,
+            '_user_astrodex_items',
+            lambda u: [{'name': 'Andromeda Galaxy', 'catalogue': ''}],
+        )
+        monkeypatch.setattr(
+            session_analytics_bp_module.target_coordinates,
+            'resolve_target',
+            lambda name, catalogue=None: {'group_id': 'group-m31'},
+        )
+        received = {}
+        monkeypatch.setattr(
+            session_analytics_bp_module.wishlist,
+            'build_captured_index',
+            lambda keys, names: received.update(keys=list(keys)) or set(),
+        )
+
+        session_analytics_bp_module._captured_index(user)
+
+        assert received['keys'] == ['group-m31']
+
     def test_captured_index_tolerates_an_unresolvable_astrodex_item(self, wishlist_client, admin_user_id):
         """An astrodex item outside the dataset resolves to an empty group id - it must
         still be processed without error, contributing no group-id key."""

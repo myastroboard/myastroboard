@@ -498,3 +498,186 @@ class TestStatusAndLifecycle:
         monkeypatch.setattr(sub, "MqttSubscriber", _Loser)
         monkeypatch.setattr(sub, "_subscriber", None)
         assert sub.start() is False
+
+    def test_module_level_stop_without_a_subscriber_is_a_no_op(self, monkeypatch):
+        """Stopping when this process never started the subscriber does nothing."""
+        monkeypatch.setattr(sub, "_subscriber", None)
+        sub.stop()
+        assert sub._subscriber is None
+
+
+# ---------------------------------------------------------------------------
+# Lock file and loop edge cases
+# ---------------------------------------------------------------------------
+
+
+class _LockFile:
+    """A lock file stand-in: fails on write when asked, records close()."""
+
+    def __init__(self, fail_write=False):
+        self.fail_write = fail_write
+        self.closed = False
+
+    def fileno(self):
+        return 3
+
+    def write(self, _text):
+        if self.fail_write:
+            raise OSError("disk full")
+
+    def flush(self):
+        pass
+
+    def seek(self, _pos):
+        pass
+
+    def close(self):
+        self.closed = True
+
+
+class TestLockAndLoop:
+    def test_a_lock_file_that_cannot_be_opened_means_no_lock(self, env, monkeypatch):
+        """open() failing (read-only data volume) leaves the subscriber off, without raising."""
+        monkeypatch.setattr("builtins.open", lambda *a, **k: (_ for _ in ()).throw(OSError("read-only")))
+        subscriber = env["subscriber"]
+        assert subscriber._acquire_lock() is False
+        assert subscriber._lock_file is None and subscriber._has_lock is False
+
+    def test_a_lock_file_that_cannot_be_written_is_closed(self, env, monkeypatch, fake_msvcrt):
+        """Locked but the pid cannot be written: the file is closed and the lock is not kept."""
+        lock_file = _LockFile(fail_write=True)
+        monkeypatch.setattr("builtins.open", lambda *a, **k: lock_file)
+        fake_msvcrt(sub)
+        subscriber = env["subscriber"]
+        assert subscriber._acquire_lock() is False
+        assert lock_file.closed is True
+        assert subscriber._lock_file is None
+
+    def test_a_lock_held_by_another_process_is_refused(self, env, monkeypatch, fake_msvcrt):
+        """The non-blocking lock fails: the subscriber does not start in this process."""
+        lock_file = _LockFile()
+        monkeypatch.setattr("builtins.open", lambda *a, **k: lock_file)
+        fake_msvcrt(sub, lambda *a, **k: (_ for _ in ()).throw(OSError("busy")))
+        subscriber = env["subscriber"]
+        assert subscriber._acquire_lock() is False
+        assert lock_file.closed is True
+
+    def test_release_without_the_lock_does_nothing(self, env):
+        """Releasing a lock never acquired touches no file."""
+        subscriber = env["subscriber"]
+        subscriber._release_lock()
+        assert subscriber._lock_file is None and subscriber._has_lock is False
+
+    def test_release_skips_the_unlink_when_the_lock_file_is_gone(self, env, monkeypatch):
+        """The lock file deleted under us: release still closes and forgets the lock."""
+        subscriber = env["subscriber"]
+        assert subscriber._acquire_lock() is True
+        monkeypatch.setattr(sub.os.path, "exists", lambda path: False)
+        unlinked = []
+        monkeypatch.setattr(sub.os, "unlink", unlinked.append)
+        subscriber._release_lock()
+        assert unlinked == []
+        assert subscriber._has_lock is False
+
+    def test_release_swallows_an_unlock_error_and_a_broken_logger(self, env, monkeypatch, fake_msvcrt):
+        """At shutdown an unlock failure is logged when possible, and never raised."""
+        subscriber = env["subscriber"]
+        subscriber._lock_file = _LockFile()
+        subscriber._has_lock = True
+        fake_msvcrt(sub, lambda *a, **k: (_ for _ in ()).throw(OSError("unlock failed")))
+        errors = []
+        monkeypatch.setattr(sub.logger, "error", lambda message: errors.append(message))
+        subscriber._release_lock()
+        assert errors and "unlock failed" in errors[0]
+        assert subscriber._has_lock is False
+
+        subscriber._lock_file = _LockFile()
+        subscriber._has_lock = True
+        monkeypatch.setattr(sub.logger, "error", lambda message: (_ for _ in ()).throw(ValueError("stream closed")))
+        subscriber._release_lock()  # must not raise
+        assert subscriber._lock_file is None
+
+    def test_stop_without_a_running_thread_still_releases(self, env):
+        """stop() on a subscriber whose thread never started skips the join."""
+        subscriber = env["subscriber"]
+        assert subscriber._acquire_lock() is True
+        subscriber.stop()
+        assert subscriber._has_lock is False
+
+    def test_run_returns_at_once_when_already_stopped(self, env, monkeypatch):
+        """A stop requested before the loop starts means no tick at all."""
+        subscriber = env["subscriber"]
+        ticks = []
+        monkeypatch.setattr(subscriber, "_tick", lambda: ticks.append(1))
+        subscriber._stop_event.set()
+        subscriber._run()
+        assert ticks == []
+
+    def test_run_ticks_again_after_a_full_wait(self, env, monkeypatch):
+        """The wait timing out (no stop) leads to the next tick."""
+        subscriber = env["subscriber"]
+        ticks = []
+        monkeypatch.setattr(subscriber, "_tick", lambda: ticks.append(1))
+        waits = iter([False, True])
+        monkeypatch.setattr(subscriber._stop_event, "wait", lambda timeout: next(waits))
+        subscriber._run()
+        assert ticks == [1, 1]
+
+
+class TestCallbackEdges:
+    def test_tls_without_insecure_keeps_certificate_checks(self, env):
+        """A TLS connection that is not marked insecure verifies the broker certificate."""
+        env["config"] = _config(url="mqtts://broker.lan:8883")
+        env["signature"] = ("tls",)
+        client = _connected(env)
+        assert client.tls is True
+        assert client.insecure is False
+
+    def test_a_clean_disconnect_is_not_logged_as_a_failure(self, env, monkeypatch):
+        """A normal disconnect only marks the connection down."""
+        client = _connected(env)
+        infos = []
+        monkeypatch.setattr(sub.logger, "info", lambda *args: infos.append(args))
+        client.on_disconnect(client, None, {}, _Reason())
+        assert env["subscriber"].status()["connectors"]["listener"]["connected"] is False
+        assert infos == []
+
+    def test_disconnecting_a_client_without_state_does_not_create_one(self, env):
+        """A client whose state was already dropped is stopped without recreating its state."""
+        client = _connected(env)
+        env["subscriber"]._state.clear()
+        env["subscriber"]._disconnect("listener")
+        assert client.disconnected is True
+        assert env["subscriber"].status()["connectors"] == {}
+
+    def test_message_for_a_name_without_a_message_file_still_counts(self, env, monkeypatch):
+        """No last-message file for this connector: the message is counted but not stored."""
+        client = _connected(env)
+        monkeypatch.setattr(sub, "last_message_file", lambda name: None)
+        written = []
+        monkeypatch.setattr(sub, "_write_json", lambda path, payload: written.append(path))
+        client.on_message(client, None, _Message({"a": 1}))
+        assert written == []
+        assert env["subscriber"].status()["connectors"]["listener"]["messages_total"] == 1
+
+
+class TestPosixLock:
+    """The flock branch of the subscriber lock, driven on any OS."""
+
+    def test_acquire_and_release_use_a_non_blocking_exclusive_flock(self, env, fake_fcntl):
+        subscriber = env["subscriber"]
+        fake = fake_fcntl(sub)
+
+        assert subscriber._acquire_lock() is True
+        subscriber._release_lock()
+
+        assert [op for _fd, op in fake.calls] == [fake.LOCK_EX | fake.LOCK_NB, fake.LOCK_UN]
+        assert subscriber._has_lock is False
+
+    def test_a_lock_held_elsewhere_is_refused(self, env, fake_fcntl):
+        """flock raising (another worker holds it) means this process does not subscribe."""
+        subscriber = env["subscriber"]
+        fake_fcntl(sub, flock=lambda fd, op: (_ for _ in ()).throw(BlockingIOError("held")))
+
+        assert subscriber._acquire_lock() is False
+        assert subscriber._lock_file is None

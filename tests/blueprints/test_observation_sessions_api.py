@@ -414,6 +414,25 @@ class TestPrivateHelpersDirect:
         monkeypatch.setattr(observation_sessions_bp_module, 'get_location_by_id', lambda config, location_id: None)
         assert observation_sessions_bp_module._location_preset_sqm('missing') is None
 
+    def test_location_preset_sqm_survives_a_config_read_failure(self, monkeypatch):
+        """No SQM prefill when the configuration cannot be read; the session is still created."""
+
+        def _boom():
+            raise OSError('database locked')
+
+        monkeypatch.setattr(observation_sessions_bp_module, 'load_config', _boom)
+        assert observation_sessions_bp_module._location_preset_sqm('loc-1') is None
+
+    def test_moon_illumination_survives_an_ephemeris_failure(self, monkeypatch):
+        """An ephemeris error leaves the illumination empty instead of failing the session."""
+
+        def _boom(when):
+            raise RuntimeError('ephemeris unavailable')
+
+        monkeypatch.setattr(observation_sessions_bp_module, 'moon_illumination_percent', _boom)
+        assert observation_sessions_bp_module._compute_moon_illumination_for_date('2026-07-14') is None
+        assert observation_sessions_bp_module._compute_moon_illumination_for_date('not-a-date') is None
+
     def test_ensure_astrodex_item_for_entry_requires_a_name(self):
         assert (
             observation_sessions_bp_module._ensure_astrodex_item_for_entry(
@@ -990,6 +1009,24 @@ class TestAttachments:
         buffer = io.BytesIO()
         Image.new('RGB', (8, 8), (20, 40, 60)).save(buffer, 'JPEG', exif=exif)
         return buffer.getvalue()
+
+    def test_upload_whose_path_resolves_outside_the_folder_is_refused(self, client, symlink_escape):
+        """A symlink planted in the attachments folder must not redirect the write elsewhere."""
+        session = _create_session(client)
+        observation_sessions.ensure_observation_sessions_directories()
+        folder = observation_sessions.attachments_dir()
+        outside = symlink_escape(folder)
+
+        upload = client.post(
+            f"/api/observation-sessions/{session['id']}/attachments",
+            data={'file': (io.BytesIO(self._geotagged_jpeg()), 'guiding-graph.jpg')},
+            content_type='multipart/form-data',
+        )
+
+        assert upload.status_code == 400
+        assert upload.get_json() == {'error': 'Invalid file path'}
+        assert list(outside.iterdir()) == []
+        assert os.listdir(folder) == []
 
     def test_upload_download_and_delete_round_trip(self, client):
         session = _create_session(client)

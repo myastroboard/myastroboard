@@ -25,7 +25,7 @@ from utils.logging_config import get_logger
 # Windows-compatible file locking (mirrors cache_store.py's cross-platform pattern).
 if sys.platform == 'win32':
     import msvcrt
-else:  # pragma: no cover
+else:  # pragma: no cover - import-time platform choice; the flock calls are tested
     import fcntl
 
 logger = get_logger(__name__)
@@ -160,14 +160,14 @@ def _backoff_file_lock():
     try:
         if sys.platform == 'win32':
             msvcrt.locking(lock_file.fileno(), msvcrt.LK_LOCK, 1)
-        else:  # pragma: no cover
+        else:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
         yield
     finally:
         try:
             if sys.platform == 'win32':
                 msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
-            else:  # pragma: no cover
+            else:
                 fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
         finally:
             lock_file.close()

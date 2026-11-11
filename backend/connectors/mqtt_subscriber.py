@@ -39,7 +39,7 @@ from utils.mqtt_connections import connection_for, connection_password
 # Windows-compatible file locking (same split as mqtt_publisher.py)
 if sys.platform == "win32":
     import msvcrt
-else:  # pragma: no cover
+else:  # pragma: no cover - import-time platform choice; the flock calls are tested
     import fcntl
 
 logger = get_logger(__name__)
@@ -260,7 +260,7 @@ class MqttSubscriber:
                     self._lock_file.close()
                     self._lock_file = None
                     return False
-            else:  # pragma: no cover
+            else:
                 fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             self._lock_file.write(str(os.getpid()))
             self._lock_file.flush()
@@ -278,7 +278,7 @@ class MqttSubscriber:
                 if sys.platform == "win32":
                     self._lock_file.seek(0)
                     msvcrt.locking(self._lock_file.fileno(), msvcrt.LK_UNLCK, 1)
-                else:  # pragma: no cover
+                else:
                     fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_UN)
                 self._lock_file.close()
                 if os.path.exists(LOCK_FILE):

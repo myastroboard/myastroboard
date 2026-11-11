@@ -80,7 +80,7 @@ if sys.platform == "win32":
                     raise
                 time.sleep(0.2)
 
-else:  # pragma: no cover
+else:  # pragma: no cover - import-time platform choice; the flock calls are tested
     import fcntl
 
 # ---------------------------------------------------------------------------
@@ -170,14 +170,14 @@ def _cache_file_read_lock():
         if sys.platform == "win32":
             # msvcrt has no native shared lock; fall back to exclusive on Windows.
             _msvcrt_lock(lock_file.fileno())
-        else:  # pragma: no cover
+        else:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_SH)
         yield
     finally:
         try:
             if sys.platform == "win32":
                 msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
-            else:  # pragma: no cover
+            else:
                 fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
         finally:
             lock_file.close()
@@ -191,14 +191,14 @@ def _cache_file_write_lock():
     try:
         if sys.platform == "win32":
             _msvcrt_lock(lock_file.fileno())
-        else:  # pragma: no cover
+        else:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
         yield
     finally:
         try:
             if sys.platform == "win32":
                 msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
-            else:  # pragma: no cover
+            else:
                 fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
         finally:
             lock_file.close()

@@ -348,6 +348,17 @@ class TestLegacyMigration:
         assert mc.migrate_legacy_mqtt(config) is False
         assert config['connectors']['mqtt']['password'] == 'in-config'
 
+    def test_migrate_leaves_the_secrets_alone_for_a_connection_of_its_own(self, monkeypatch):
+        """A connector already on a connection other than the legacy one keeps its secrets; only a
+        stray password key in its block is dropped."""
+        stored = []
+        monkeypatch.setattr(mc, 'save_secrets', lambda name, values: stored.append(name) or True)
+        config = {'connectors': {'mqtt': {'mqtt_connection_id': 'c-own', 'password': 'stray'}}}
+
+        assert mc.migrate_legacy_mqtt(config) is True
+        assert 'password' not in config['connectors']['mqtt']
+        assert stored == []
+
     def test_migrate_without_an_mqtt_block_does_nothing(self):
         """No connector block, nothing to migrate."""
         assert mc.migrate_legacy_mqtt({}) is False

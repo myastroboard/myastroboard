@@ -1371,3 +1371,20 @@ class TestObjectInfoMissingBranches:
                 result = _wikipedia_with_fallback(aliases, lang="fr")
 
         assert result is None  # all attempts returned None
+
+
+# ---------------------------------------------------------------------------
+# POSIX locking branch of the shared back-off file (flock), driven on any OS
+# ---------------------------------------------------------------------------
+
+
+def test_backoff_file_lock_uses_an_exclusive_flock_on_posix(fake_fcntl, monkeypatch, tmp_path):
+    """Writers of the shared back-off state hold LOCK_EX and release it afterwards."""
+    monkeypatch.setattr(oi, 'DATA_DIR_CACHE', str(tmp_path))
+    monkeypatch.setattr(oi, '_BACKOFF_LOCK_FILE', str(tmp_path / 'backoff.lock'))
+    fake = fake_fcntl(oi)
+
+    with oi._backoff_file_lock():
+        assert [op for _fd, op in fake.calls] == [fake.LOCK_EX]
+
+    assert [op for _fd, op in fake.calls] == [fake.LOCK_EX, fake.LOCK_UN]

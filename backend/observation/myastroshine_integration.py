@@ -445,7 +445,7 @@ def _save_enhanced_image(user_id: str, image_bytes: bytes) -> str | None:
     filename = f"{user_id}_{uuid.uuid4()}.jpg"
     base_dir = os.path.realpath(astrodex.ASTRODEX_IMAGES_DIR)
     file_path = os.path.realpath(os.path.join(base_dir, filename))
-    if not file_path.startswith(base_dir + os.sep):  # pragma: no cover - uuid name can't traverse
+    if not file_path.startswith(base_dir + os.sep):
         logger.warning("MyAstroShine enhanced image path escaped images dir")
         return None
     with open(file_path, 'wb') as handle:
