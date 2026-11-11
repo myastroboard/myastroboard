@@ -20,6 +20,8 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   of reading install data. See [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md#sessions).
 - Only admins can clear the Celestrak block of the ISS / CSS trackers, as documented; the button is hidden
   from other accounts.
+- The setup wizard closes as soon as Skip, Skip all, Finish or "Go to SkyTonight" is clicked, instead of
+  staying on screen until its choice was saved (a second click then skipped a step or saved twice).
 
 ### Breaking changes
 
