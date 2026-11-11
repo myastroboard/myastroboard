@@ -13,7 +13,8 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
-- None.
+- Maps no longer fail with HTTP 502 on every tile not already cached: the map tile proxy could not read
+  OpenStreetMap's responses since niquests replaced urllib3.
 
 ### Breaking changes
 

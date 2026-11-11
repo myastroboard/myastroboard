@@ -205,8 +205,15 @@ def _fetch_upstream(kind: MapResourceKind, url: str) -> bytes:
         try:
             if resp.status_code != 200:
                 raise TileUnavailable(f'Upstream answered HTTP {resp.status_code}')
-            # Reading the decoded stream caps the decompressed size too
-            content = resp.raw.read(kind.max_bytes + 1, decode_content=True)
+            # Reading the decoded stream chunk by chunk caps the decompressed size too. Not
+            # resp.raw.read(): under urllib3-future (installed by niquests) it raises
+            # UnavailableTraffic on every call, so no uncached resource could ever be fetched.
+            buffer = bytearray()
+            for chunk in resp.iter_content(chunk_size=64 * 1024):
+                buffer.extend(chunk)
+                if len(buffer) > kind.max_bytes:
+                    break
+            content = bytes(buffer)
         finally:
             resp.close()
     except TileUnavailable:
