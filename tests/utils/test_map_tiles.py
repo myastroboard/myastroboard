@@ -286,7 +286,8 @@ class TestPruneCache:
             map_tiles.os, 'stat', lambda p: (_ for _ in ()).throw(OSError('gone')) if p == path else real_stat(p)
         )
         assert map_tiles.prune_cache(max_bytes=1000) == 0
-        assert os.path.exists(path)
+        # Listed rather than os.path.exists(): on POSIX that goes through the patched os.stat
+        assert os.path.basename(path) in os.listdir(os.path.dirname(path))
 
     def test_files_that_cannot_be_removed_are_kept_and_not_counted(self, tile_env, monkeypatch):
         """A file the OS refuses to delete stays; pruning goes on with the next ones, then stops."""
