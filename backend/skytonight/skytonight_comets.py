@@ -147,7 +147,7 @@ def _comet_ra_dec(
             N_h = n * dt
             F = _solve_kepler_hyperbolic(N_h, e)
             r = a * (e * math.cosh(F) - 1.0)
-            if r <= 0:  # pragma: no cover
+            if r <= 0:  # pragma: no cover - e > 1 and cosh(F) >= 1 keep r > 0 on a hyperbolic orbit
                 return None, None, None, None
             th = math.sqrt((e + 1.0) / (e - 1.0)) * math.tanh(F / 2.0)
             f = 2.0 * math.atan(th)

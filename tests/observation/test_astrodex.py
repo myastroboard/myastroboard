@@ -774,6 +774,27 @@ class TestAstrodexVisibilityModes:
         owners = {picture.get('owner_username') for picture in merged_item.get('pictures', [])}
         assert owners == {'alice', 'bob'}
 
+    def test_public_mode_lists_a_picture_shared_by_two_merged_items_once(self, temp_data_dir, monkeypatch):
+        """Two items of one owner merged as the same object, carrying the same picture record (a
+        duplicated entry), show that picture once in the merged view."""
+        monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', self._fake_alias_entry)
+        monkeypatch.setattr(catalogue_aliases, 'get_alias_entry', self._fake_alias_entry)
+        picture = {'id': 'pic-1', 'filename': 'u1_pic.jpg'}
+        collection = {
+            'user_id': 'user1',
+            'username': 'alice',
+            'items': [
+                {'id': 'a', 'name': 'M81', 'catalogue': 'GaryImm', 'pictures': [dict(picture)]},
+                {'id': 'b', 'name': 'NGC 3031', 'catalogue': 'OpenNGC', 'pictures': [dict(picture)]},
+            ],
+        }
+        monkeypatch.setattr(astrodex, 'load_all_users_astrodex', lambda usernames_by_id: [collection])
+
+        payload = astrodex.get_visible_astrodex(current_user_id='user1', current_username='alice', private_mode=False)
+
+        assert len(payload['items']) == 1
+        assert [p['id'] for p in payload['items'][0]['pictures']] == ['pic-1']
+
     def test_private_mode_shows_only_own_items(self, temp_data_dir, monkeypatch):
         """Private mode hides other users items and pictures."""
         monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', self._fake_alias_entry)

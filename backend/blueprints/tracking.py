@@ -360,7 +360,7 @@ def spaceflight_image(filename):
                     return jsonify({"error": "Image unavailable"}), 404
             else:
                 return jsonify({"error": "Image not found"}), 404
-    except ValueError:  # pragma: no cover  # regex above prevents path traversal
+    except ValueError:
         return jsonify({"error": "Invalid filename"}), 400
     return send_from_directory(img_dir, filename, max_age=86400)
 

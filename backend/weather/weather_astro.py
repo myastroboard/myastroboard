@@ -715,7 +715,7 @@ class AstroWeatherAnalyzer:
             return 1.0
 
         slot_hours = float(positive_diffs.median())
-        if slot_hours <= 0:  # pragma: no cover
+        if slot_hours <= 0:  # pragma: no cover - the median of strictly positive gaps is positive
             return 1.0  # pragma: no cover
 
         # Clamp to a sane range to avoid outliers creating unrealistic durations.
@@ -781,7 +781,7 @@ class AstroWeatherAnalyzer:
         def _finalize_current_period() -> None:
             if (
                 current_period_start is None or current_period_last_slot is None or len(current_period_qualities) == 0
-            ):  # pragma: no cover
+            ):  # pragma: no cover - only called once a period has started
                 return  # pragma: no cover
 
             period_end = current_period_last_slot + slot_delta

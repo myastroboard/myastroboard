@@ -878,9 +878,15 @@ class TestSpaceEndpoints:
         resp = client_admin.get('/api/iss/passes')
         assert resp.status_code in (200, 202)
 
-    def test_iss_location_returns_response(self, client_admin):
+    def test_iss_location_returns_the_computed_position(self, client_admin, monkeypatch):
+        """The route returns the position computed from the cached TLE as JSON, unchanged."""
+        position = {'latitude': 12.5, 'longitude': -45.25, 'altitude_km': 418.0, 'track': []}
+        monkeypatch.setattr(_tracking_mod.iss_passes, 'get_current_position', lambda **_kwargs: position)
+
         resp = client_admin.get('/api/iss/location')
-        assert resp.status_code in (200, 202, 400, 500)
+
+        assert resp.status_code == 200
+        assert resp.get_json() == position
 
     def test_spaceflight_launches_returns_response(self, client_admin):
         resp = client_admin.get('/api/spaceflight/launches')
@@ -3527,6 +3533,34 @@ class TestAstrodexUploadValidation:
         assert stored.startswith(b'\xff\xd8')
         assert b'Exif' not in stored
 
+    def test_upload_whose_path_resolves_outside_the_images_folder_is_refused(
+        self, client_admin, monkeypatch, tmp_path, symlink_escape
+    ):
+        """A symlink planted in the images folder must not redirect the write elsewhere."""
+        import io as _io
+
+        from PIL import Image
+
+        from observation import astrodex as _ad
+
+        images = tmp_path / 'images'
+        images.mkdir()
+        monkeypatch.setattr(_ad, 'ASTRODEX_IMAGES_DIR', str(images))
+        monkeypatch.setattr(_ad, 'ensure_astrodex_directories', lambda: None)
+        outside = symlink_escape(images)
+        buffer = _io.BytesIO()
+        Image.new('RGB', (8, 8)).save(buffer, 'JPEG')
+
+        resp = client_admin.post(
+            '/api/astrodex/upload',
+            data={'file': (_io.BytesIO(buffer.getvalue()), 'photo.jpg')},
+            content_type='multipart/form-data',
+        )
+
+        assert resp.status_code == 400
+        assert resp.get_json() == {'error': 'Invalid file path'}
+        assert list(outside.iterdir()) == [] and list(images.iterdir()) == []
+
     def test_upload_jpg_that_is_not_an_image_returns_400(self, client_admin):
         import io as _io
 
@@ -4335,9 +4369,33 @@ class TestCacheSchedulerManagement:
 
 
 class TestISSLocation:
-    def test_iss_location_returns_response(self, client_admin):
+    def test_iss_location_passes_the_active_location_as_observer(self, client_admin, monkeypatch):
+        """The observer given to the position computation is the requester's active location,
+        with numeric coordinates and the elevation in metres."""
+        observer = {'latitude': 48.85, 'longitude': 2.35, 'elevation': 35}
+        monkeypatch.setattr(_tracking_mod, '_resolve_active_location', lambda: observer)
+        calls = []
+        monkeypatch.setattr(
+            _tracking_mod.iss_passes, 'get_current_position', lambda **kwargs: calls.append(kwargs) or {'ok': True}
+        )
+
         resp = client_admin.get('/api/iss/location')
-        assert resp.status_code in (200, 202, 400, 500)
+
+        assert resp.status_code == 200
+        assert calls == [{'latitude': 48.85, 'longitude': 2.35, 'elevation_m': 35.0}]
+
+    def test_iss_location_without_coordinates_passes_no_observer(self, client_admin, monkeypatch):
+        """A location without coordinates (or elevation) yields an observer-less computation."""
+        monkeypatch.setattr(_tracking_mod, '_resolve_active_location', lambda: {})
+        calls = []
+        monkeypatch.setattr(
+            _tracking_mod.iss_passes, 'get_current_position', lambda **kwargs: calls.append(kwargs) or {'ok': True}
+        )
+
+        resp = client_admin.get('/api/iss/location')
+
+        assert resp.status_code == 200
+        assert calls == [{'latitude': None, 'longitude': None, 'elevation_m': 0.0}]
 
     def test_iss_location_unauthenticated_returns_401(self, client):
         resp = client.get('/api/iss/location')
@@ -4358,6 +4416,22 @@ class TestSpaceflightImage:
     def test_spaceflight_img_path_traversal_blocked(self, client_admin):
         resp = client_admin.get('/api/spaceflight/img/../../../etc/passwd')
         assert resp.status_code in (400, 404)
+
+    def test_an_image_resolving_outside_the_cache_folder_is_refused(
+        self, client_admin, monkeypatch, tmp_path, symlink_escape
+    ):
+        """A cached image that is a symlink to elsewhere is not served."""
+        img_dir = tmp_path / 'spaceflight_images'
+        img_dir.mkdir()
+        filename = 'b' * 32 + '.jpg'
+        (img_dir / filename).write_bytes(b'\xff\xd8\xff\xe0jpeg')
+        monkeypatch.setattr(_tracking_mod, 'DATA_DIR_CACHE', str(tmp_path))
+        symlink_escape(img_dir)
+
+        resp = client_admin.get(f'/api/spaceflight/img/{filename}')
+
+        assert resp.status_code == 400
+        assert resp.get_json() == {'error': 'Invalid filename'}
 
 
 # ---------------------------------------------------------------------------
@@ -6202,6 +6276,23 @@ class TestTranslateSpecialPhenomenaEvents:
 
     def setup_method(self):
         self._fn = _astronomy_mod._translate_special_phenomena_events
+
+    def test_a_translation_failure_keeps_the_event_untranslated(self, monkeypatch):
+        """A broken translation of one event leaves it as cached instead of dropping it."""
+
+        class _BrokenI18n:
+            def __init__(self, language):
+                pass
+
+            def t(self, key, **kwargs):
+                raise KeyError(key)
+
+        monkeypatch.setattr(_astronomy_mod, 'I18nManager', _BrokenI18n)
+        event = {'event_type': 'Equinox', 'title': 'Vernal Equinox', 'raw_data': {'event': 'spring_equinox'}}
+
+        result = self._fn({'events': [event]}, 'fr')
+
+        assert result['events'] == [event]
 
     def test_unknown_event_type_not_translated(self):
         """event_type doesn't match any branch → unchanged."""
@@ -10284,3 +10375,49 @@ class TestCachedAstroAnalysisIfDefault:
         )
         monkeypatch.setattr(_weather_mod.cache_store, 'is_cache_valid', lambda entry, ttl: True)
         assert _weather_mod._cached_astro_analysis_if_default(24, 'en', 'loc-1') == {'analysis': 'warm'}
+
+
+# ---------------------------------------------------------------------------
+# Unexpected failures answered with a generic 500 (never the exception text)
+# ---------------------------------------------------------------------------
+
+
+class TestGenericServerErrors:
+    def test_convert_coordinates_with_a_non_object_body_is_a_500(self, client_admin):
+        """A JSON body that is not an object is not understood: a generic 500, no detail leaked."""
+        resp = client_admin.post('/api/convert-coordinates', json=[1, 2])
+        assert resp.status_code == 500
+        assert resp.get_json() == {'error': 'Internal server error'}
+
+    def test_logs_with_a_non_numeric_limit_is_a_500(self, client_admin, monkeypatch, tmp_path):
+        """A malformed paging parameter fails the read without exposing the error."""
+        (tmp_path / 'myastroboard.log').write_text('2026-01-01 INFO line\n', encoding='utf-8')
+        monkeypatch.setattr(_admin_mod, 'DATA_DIR', str(tmp_path))
+
+        resp = client_admin.get('/api/logs?limit=abc')
+
+        assert resp.status_code == 500
+        assert resp.get_json() == {'error': 'Internal server error'}
+
+    def test_restore_failure_while_reading_the_archive_is_a_500(self, client_admin, monkeypatch):
+        """An archive that breaks the restore planner is reported generically, nothing is written."""
+        import io as _io
+        import zipfile as _zipfile
+
+        buffer = _io.BytesIO()
+        with _zipfile.ZipFile(buffer, 'w') as archive:
+            archive.writestr('config.json', '{}')
+
+        def _boom(archive):
+            raise RuntimeError('corrupt member')
+
+        monkeypatch.setattr(_admin_mod.backup_archive, 'plan_restore', _boom)
+
+        resp = client_admin.post(
+            '/api/backup/restore',
+            data={'file': (_io.BytesIO(buffer.getvalue()), 'backup.zip')},
+            content_type='multipart/form-data',
+        )
+
+        assert resp.status_code == 500
+        assert resp.get_json() == {'error': 'Internal server error'}

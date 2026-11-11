@@ -413,7 +413,7 @@ def get_launch_vidurls(launch_id: str) -> list[dict[str, Any]]:
         try:
             host = urllib.parse.urlparse(url).hostname or ""
             return host == "www.youtube.com" or host == "youtube.com"
-        except Exception:  # pragma: no cover
+        except Exception:
             return False
 
     def _sort_key(v):

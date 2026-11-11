@@ -123,7 +123,7 @@ def restart_app_api():
     # Capture session data before leaving the request context — threads have no context.
     username = session.get('username', '?')
 
-    def _deferred_restart():  # pragma: no cover
+    def _deferred_restart():  # pragma: no cover - kills the process (PID 1 or this worker)
         time.sleep(1.5)
         logger.info(f"Container restart requested by {username} via admin UI")
         if os.path.exists('/.dockerenv'):
@@ -258,7 +258,7 @@ def backup_restore_api():
             }
         )
 
-    except Exception as e:  # pragma: no cover
+    except Exception as e:
         logger.error(f"Error restoring backup: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
@@ -426,7 +426,7 @@ def get_logs_api():
                     "message": "No log file found yet",
                 }
             )
-    except Exception as e:  # pragma: no cover
+    except Exception as e:
         logger.error(f"Error reading logs: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 

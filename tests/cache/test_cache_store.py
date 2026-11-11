@@ -910,3 +910,33 @@ class TestLocationSignaturesAcrossWorkers:
         monkeypatch.setattr(cache_store.os, 'replace', _failing_replace)
         cache_store._save_location_signatures()  # must not raise
         assert [p.name for p in sig_file.parent.iterdir() if p.name.endswith('.tmp')] == []
+
+
+# ---------------------------------------------------------------------------
+# POSIX locking branch (flock), driven on any OS
+# ---------------------------------------------------------------------------
+
+
+def test_read_lock_takes_a_shared_flock_and_releases_it(fake_fcntl, monkeypatch, tmp_path):
+    """On POSIX, readers share the lock (LOCK_SH) and unlock it on the way out."""
+    monkeypatch.setattr(cs, "DATA_DIR_CACHE", str(tmp_path))
+    monkeypatch.setattr(cs, "_SHARED_CACHE_LOCK", str(tmp_path / "cache.lock"))
+    fake = fake_fcntl(cs)
+
+    with cs._cache_file_read_lock():
+        assert [op for _fd, op in fake.calls] == [fake.LOCK_SH]
+
+    assert [op for _fd, op in fake.calls] == [fake.LOCK_SH, fake.LOCK_UN]
+
+
+def test_write_lock_takes_an_exclusive_flock_and_releases_it_on_error(fake_fcntl, monkeypatch, tmp_path):
+    """On POSIX, a writer holds LOCK_EX and still unlocks when the guarded block raises."""
+    monkeypatch.setattr(cs, "DATA_DIR_CACHE", str(tmp_path))
+    monkeypatch.setattr(cs, "_SHARED_CACHE_LOCK", str(tmp_path / "cache.lock"))
+    fake = fake_fcntl(cs)
+
+    with pytest.raises(RuntimeError):
+        with cs._cache_file_write_lock():
+            raise RuntimeError("write failed")
+
+    assert [op for _fd, op in fake.calls] == [fake.LOCK_EX, fake.LOCK_UN]

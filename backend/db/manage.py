@@ -112,5 +112,5 @@ def main(argv: list[str] | None = None) -> int:
     return args.func(args)
 
 
-if __name__ == '__main__':  # pragma: no cover
+if __name__ == '__main__':  # pragma: no cover - command-line entry point
     sys.exit(main())

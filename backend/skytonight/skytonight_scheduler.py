@@ -160,7 +160,7 @@ def _set_calculation_progress_listener(listener):
         from skytonight.skytonight_calculator import set_progress_listener
 
         set_progress_listener(listener)
-    except Exception as exc:  # pragma: no cover - progress publishing is best-effort
+    except Exception as exc:
         logger.debug('Could not set SkyTonight progress listener: %s', exc)
 
 

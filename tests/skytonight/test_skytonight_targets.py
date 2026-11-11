@@ -354,3 +354,30 @@ def test_unchanged_dataset_is_kept_after_the_check_interval(tmp_path):
 
     assert second is first
     assert second['checked_at'] > aged_check
+
+
+def test_find_target_matches_id_names_and_aliases_ignoring_spacing_and_case(monkeypatch):
+    """A target is found by its id or by any name it is known by, compared normalized."""
+    monkeypatch.setattr(skytonight_targets, 'load_targets_dataset', lambda: {'targets': _sample_targets()})
+
+    for identifier in ('DSO-0001', 'M31', 'm 31', 'NGC224', 'C 23', 'andromeda galaxy'):
+        found = skytonight_targets.find_target(identifier)
+        assert found is not None and found.target_id == 'DSO-0001', identifier
+    assert skytonight_targets.find_target('M 33') is None
+
+
+def test_find_target_without_an_identifier_does_not_load_the_dataset(monkeypatch):
+    """A blank or empty identifier finds nothing, without reading the dataset."""
+    loads = []
+    monkeypatch.setattr(skytonight_targets, 'load_targets_dataset', lambda: loads.append(1) or {'targets': []})
+
+    assert skytonight_targets.find_target('') is None
+    assert skytonight_targets.find_target('   ') is None
+    assert loads == []
+
+
+def test_find_target_tolerates_a_dataset_that_is_not_a_dict(monkeypatch):
+    """A corrupt dataset finds nothing instead of raising."""
+    monkeypatch.setattr(skytonight_targets, 'load_targets_dataset', lambda: None)
+
+    assert skytonight_targets.find_target('M 31') is None

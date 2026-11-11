@@ -709,9 +709,9 @@ class TestGetSkytonigtSchedulerForApi:
 class TestGetOrCreateSchedulerLockLoggedBranch:
     """Cover already-logged OSError branch."""
 
-    def test_second_lock_failure_skips_debug_log(self, tmp_path):
-        """when skytonight_scheduler_lock_logged is True,
-        the if-block body is skipped and we jump directly to ."""
+    def test_second_lock_failure_skips_debug_log(self, tmp_path, fake_msvcrt):
+        """A lock already held elsewhere, with the "already running" message logged once before:
+        the worker gives up without logging it again."""
         import sys
 
         module = sys.modules['skytonight.skytonight_scheduler_manager']
@@ -719,17 +719,19 @@ class TestGetOrCreateSchedulerLockLoggedBranch:
 
         mock_app = MagicMock()
         mock_app.config = {
-            'skytonight_scheduler_lock_logged': True,  # already logged → False branch at 146
+            'skytonight_scheduler_lock_logged': True,  # the "already running" message was logged before
         }
 
         lock_path = str(tmp_path / "test.lock")
+        fake_msvcrt(module, MagicMock(side_effect=OSError("locked")))
 
         with (
             patch.object(module, 'get_skytonight_scheduler_lock_file', return_value=lock_path),
-            patch.object(module.sys, 'platform', 'win32'),
-            patch.object(module.msvcrt, 'locking', side_effect=OSError("locked")),
+            patch.object(module.logger, 'debug') as debug_log,
         ):
             result = get_or_create_skytonight_scheduler(mock_app)
+
+        debug_log.assert_not_called()
 
         assert result is None
         assert mock_app.config.get('is_skytonight_scheduler_worker') is False
@@ -748,27 +750,27 @@ class TestGetOrCreateSchedulerLockCleanup:
         mock_app.config = {}
         return mock_app
 
-    def test_ioerror_after_open_close_succeeds(self, tmp_path):
+    def test_ioerror_after_open_close_succeeds(self, tmp_path, fake_msvcrt):
         """IOError after open → lock_file.close() called (succeeds)."""
+        from skytonight import skytonight_scheduler_manager as module
         from skytonight.skytonight_scheduler_manager import get_or_create_skytonight_scheduler
 
         lock_path = str(tmp_path / "sched.lock")
+        fake_msvcrt(module)
         with patch(
             "skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
             return_value=lock_path,
         ):
-            with patch("skytonight.skytonight_scheduler_manager.msvcrt") as mock_msvcrt:
-                mock_msvcrt.locking.return_value = None
-                mock_msvcrt.LK_NBLCK = 1
-                with patch(
-                    "skytonight.skytonight_scheduler.SkyTonightScheduler",
-                    side_effect=OSError("io error during scheduler creation"),
-                ):
-                    result = get_or_create_skytonight_scheduler(self._make_app())
+            with patch(
+                "skytonight.skytonight_scheduler.SkyTonightScheduler",
+                side_effect=OSError("io error during scheduler creation"),
+            ):
+                result = get_or_create_skytonight_scheduler(self._make_app())
         assert result is None
 
-    def test_ioerror_after_open_close_also_fails(self, tmp_path):
+    def test_ioerror_after_open_close_also_fails(self, tmp_path, fake_msvcrt):
         """IOError after open → lock_file.close() also raises."""
+        from skytonight import skytonight_scheduler_manager as module
         from skytonight.skytonight_scheduler_manager import get_or_create_skytonight_scheduler
 
         lock_path = str(tmp_path / "sched2.lock")
@@ -778,20 +780,19 @@ class TestGetOrCreateSchedulerLockCleanup:
         def _mock_open(path, *args, **kwargs):
             return mock_lf
 
+        fake_msvcrt(module)
         with patch(
             "skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
             return_value=lock_path,
         ):
             with patch("builtins.open", side_effect=_mock_open):
-                with patch("skytonight.skytonight_scheduler_manager.msvcrt") as mock_msvcrt:
-                    mock_msvcrt.locking.return_value = None
-                    mock_msvcrt.LK_NBLCK = 1
-                    with patch(
-                        "skytonight.skytonight_scheduler.SkyTonightScheduler",
-                        side_effect=OSError("io error"),
-                    ):
-                        result = get_or_create_skytonight_scheduler(self._make_app())
+                with patch(
+                    "skytonight.skytonight_scheduler.SkyTonightScheduler",
+                    side_effect=OSError("io error"),
+                ):
+                    result = get_or_create_skytonight_scheduler(self._make_app())
         assert result is None
+        mock_lf.close.assert_called()  # open() is patched process-wide: see the test below
 
     def test_exception_handler_lock_file_none(self, tmp_path):
         """open() raises non-IOError/OSError → lock_file stays None."""
@@ -806,25 +807,89 @@ class TestGetOrCreateSchedulerLockCleanup:
                 result = get_or_create_skytonight_scheduler(self._make_app())
         assert result is None
 
-    def test_exception_handler_close_also_fails(self, tmp_path):
+    def test_exception_handler_close_also_fails(self, tmp_path, fake_msvcrt):
         """general Exception after open + lock_file.close() raises."""
+        from skytonight import skytonight_scheduler_manager as module
         from skytonight.skytonight_scheduler_manager import get_or_create_skytonight_scheduler
 
         lock_path = str(tmp_path / "sched4.lock")
         mock_lf = MagicMock()
         mock_lf.close.side_effect = ValueError("close also failed")
 
+        fake_msvcrt(module)
         with patch(
             "skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
             return_value=lock_path,
         ):
             with patch("builtins.open", return_value=mock_lf):
-                with patch("skytonight.skytonight_scheduler_manager.msvcrt") as mock_msvcrt:
-                    mock_msvcrt.locking.return_value = None
-                    mock_msvcrt.LK_NBLCK = 1
-                    with patch(
-                        "skytonight.skytonight_scheduler.SkyTonightScheduler",
-                        side_effect=RuntimeError("scheduler init crashed"),
-                    ):
-                        result = get_or_create_skytonight_scheduler(self._make_app())
+                with patch(
+                    "skytonight.skytonight_scheduler.SkyTonightScheduler",
+                    side_effect=RuntimeError("scheduler init crashed"),
+                ):
+                    result = get_or_create_skytonight_scheduler(self._make_app())
         assert result is None
+        # open() is patched process-wide, so other opens during the call may share mock_lf:
+        # what matters is that the error handler tried to close the lock file.
+        mock_lf.close.assert_called()
+
+
+class TestPosixLock:
+    """The flock branches of the SkyTonight scheduler lock, driven on any OS."""
+
+    def test_the_worker_holding_the_flock_creates_the_scheduler(self, tmp_path, fake_fcntl):
+        from skytonight import skytonight_scheduler_manager as module
+
+        fake = fake_fcntl(module)
+        started = []
+
+        class _Scheduler:
+            def __init__(self, **kwargs):
+                pass
+
+            def start(self):
+                started.append(True)
+
+        app = MagicMock()
+        app.config = {}
+        with (
+            patch.object(module, 'get_skytonight_scheduler_lock_file', return_value=str(tmp_path / 's.lock')),
+            patch('skytonight.skytonight_scheduler.SkyTonightScheduler', _Scheduler),
+        ):
+            scheduler = module.get_or_create_skytonight_scheduler(app)
+
+        assert isinstance(scheduler, _Scheduler) and started == [True]
+        assert app.config['is_skytonight_scheduler_worker'] is True
+        assert [op for _fd, op in fake.calls] == [fake.LOCK_EX | fake.LOCK_NB]
+        app.config['skytonight_scheduler_lock_file'].close()
+
+    def test_a_flock_held_by_another_worker_skips_creation(self, tmp_path, fake_fcntl):
+        from skytonight import skytonight_scheduler_manager as module
+
+        fake_fcntl(module, flock=lambda fd, op: (_ for _ in ()).throw(BlockingIOError('held')))
+        app = MagicMock()
+        app.config = {}
+        with patch.object(module, 'get_skytonight_scheduler_lock_file', return_value=str(tmp_path / 's.lock')):
+            assert module.get_or_create_skytonight_scheduler(app) is None
+        assert app.config['is_skytonight_scheduler_worker'] is False
+
+    def test_api_tells_a_free_lock_from_one_held_by_another_worker(self, tmp_path, fake_fcntl):
+        """With no scheduler in this worker: a lock file nobody holds means none runs at all, a held one
+        means another worker runs it."""
+        from flask import Flask
+
+        from skytonight import skytonight_scheduler_manager as module
+
+        lock_file = tmp_path / 's.lock'
+        lock_file.write_text('')
+        app = Flask(__name__)
+        with (
+            app.app_context(),
+            patch.object(module, 'get_or_create_skytonight_scheduler', return_value=None),
+            patch.object(module, 'get_skytonight_scheduler_lock_file', return_value=str(lock_file)),
+        ):
+            fake = fake_fcntl(module)
+            assert module.get_skytonight_scheduler_for_api() is None
+            assert [op for _fd, op in fake.calls] == [fake.LOCK_EX | fake.LOCK_NB]
+
+            fake_fcntl(module, flock=lambda fd, op: (_ for _ in ()).throw(BlockingIOError('held')))
+            assert module.get_skytonight_scheduler_for_api() == 'remote_scheduler'

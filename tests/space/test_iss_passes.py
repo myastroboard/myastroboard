@@ -2093,6 +2093,18 @@ def test_get_ephemeris_inner_recheck_skips_when_already_attempted(monkeypatch):
     assert calls == []
 
 
+def test_get_ephemeris_is_loaded_once_and_reused(monkeypatch):
+    """The ephemeris file is opened on the first call only; later calls reuse it without the lock."""
+    calls = []
+    sentinel = object()
+    monkeypatch.setattr(mod, "_EPHEMERIS", mod._EPHEMERIS_UNSET)
+    monkeypatch.setattr(mod, "SKYFIELD_LOADER", lambda name: calls.append(name) or sentinel)
+
+    assert mod._get_ephemeris() is sentinel
+    assert mod._get_ephemeris() is sentinel
+    assert calls == ["de421.bsp"]
+
+
 # ---------------------------------------------------------------------------
 # _sun_altaz_radius_arrays / _sun_altaz_arrays_astropy — Astropy fallback path
 # ---------------------------------------------------------------------------

@@ -25,3 +25,12 @@ class TestDefaultHooks:
     def test_fetch_sensor_data_defaults_to_empty(self):
         connector = _MinimalConnector({'url': 'http://x'})
         assert connector.fetch_sensor_data() == {}
+
+    def test_mqtt_subscriptions_default_to_none(self):
+        """A connector that does not read a broker subscribes to nothing."""
+        assert _MinimalConnector({'url': 'http://x'}).mqtt_subscriptions() == []
+
+    def test_mqtt_client_id_is_the_trimmed_configured_value(self):
+        """The configured client id, trimmed; none configured asks for a generated one."""
+        assert _MinimalConnector({'client_id': ' rig-1 '}).mqtt_client_id() == 'rig-1'
+        assert _MinimalConnector({}).mqtt_client_id() == ''

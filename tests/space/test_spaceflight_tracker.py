@@ -945,6 +945,18 @@ class TestGetLaunchVidurls:
             result = get_launch_vidurls("launch-123")
         assert result[0]["url"] == "https://www.youtube.com/watch?v=abc"
 
+    def test_a_malformed_video_url_is_kept_and_sorted_after_youtube(self):
+        """A URL urlparse cannot read (an unclosed IPv6 bracket) is not YouTube: it is kept, after it."""
+        raw = {
+            "vidURLs": [
+                {"url": "https://[::1/stream", "title": "Broken", "priority": 99},
+                {"url": "https://youtube.com/watch?v=x", "title": "YT", "priority": 1},
+            ]
+        }
+        with patch("space.spaceflight_tracker._get", return_value=raw):
+            result = get_launch_vidurls("launch-malformed")
+        assert [v["title"] for v in result] == ["YT", "Broken"]
+
     def test_cached_result_returned_without_api_call(self):
         spaceflight_tracker._vidurls_cache["cached-id"] = {
             "data": [{"url": "https://example.com", "title": "Test"}],

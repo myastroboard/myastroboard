@@ -526,7 +526,7 @@ def _translate_special_phenomena_events(data: dict[str, Any], language: str) -> 
                         ),
                         gc_altitude=altitude_text,
                     )
-        except Exception as e:  # pragma: no cover
+        except Exception as e:
             logger.debug(f"Error translating special phenomenon event: {e}")
 
         translated_events.append(translated_event)

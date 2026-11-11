@@ -25,7 +25,7 @@ try:
     import numpy as _np
 
     _HAS_NUMPY = True
-except ImportError:  # pragma: no cover
+except ImportError:  # pragma: no cover - numpy is a hard dependency
     _np = None  # type: ignore[assignment]
     _HAS_NUMPY = False
 

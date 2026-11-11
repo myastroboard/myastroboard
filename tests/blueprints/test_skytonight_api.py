@@ -3450,3 +3450,99 @@ def test_framing_image_upstream_failure_returns_502(client_admin, monkeypatch):
     resp = client_admin.get('/api/skytonight/framing/image/10.684708_41.268750_4.00.jpg')
 
     assert resp.status_code == 502
+
+
+# ---------------------------------------------------------------------------
+# Report size cap: 1000 deep-sky rows without a catalogue filter
+# ---------------------------------------------------------------------------
+
+
+def _many_calc_rows(count):
+    template = _make_calc_result()['deep_sky'][0]
+    rows = []
+    for index in range(count):
+        row = dict(template)
+        row['target_id'] = f'dso-openngc-ngc{index}'
+        row['preferred_name'] = f'NGC {index}'
+        row['catalogue_names'] = {'OpenNGC': f'NGC {index}'}
+        rows.append(row)
+    return rows
+
+
+def _many_dataset_targets(count):
+    return {
+        'targets': [
+            {
+                'target_id': f'dso-openngc-ngc{index}',
+                'category': 'deep_sky',
+                'preferred_name': f'NGC {index}',
+                'catalogue_names': {'OpenNGC': f'NGC {index}'},
+                'object_type': 'Galaxy',
+                'constellation': 'And',
+                'magnitude': 10.0,
+            }
+            for index in range(count)
+        ]
+    }
+
+
+@pytest.fixture
+def quiet_user_data(monkeypatch):
+    """No plan, no Astrodex, no aliases: the cap is the only thing that limits the report."""
+    monkeypatch.setattr(
+        skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda *a, **k: {'state': 'none'}
+    )
+    monkeypatch.setattr(skytonight_api_module.astrodex, 'load_user_astrodex', lambda *a, **k: {'items': []})
+    monkeypatch.setattr(skytonight_api_module.astrodex, 'is_item_in_preloaded_astrodex', lambda *a, **k: False)
+    monkeypatch.setattr(skytonight_api_module.plan_my_night, 'list_user_plan_combination_ids', lambda uid: [])
+    monkeypatch.setattr(skytonight_api_module.plan_my_night, 'is_target_in_current_plan', lambda *a, **k: False)
+    monkeypatch.setattr(skytonight_api_module, '_get_catalogue_alias_payload', lambda c, n: ('', {}))
+
+
+class TestReportSizeCap:
+    def test_dso_report_from_results_stops_at_the_cap_and_says_so(self, monkeypatch, quiet_user_data):
+        """Tonight's results with more rows than the cap: 1000 rows, flagged as truncated."""
+        data = {'deep_sky': _many_calc_rows(1001), 'metadata': {}}
+        monkeypatch.setattr(skytonight_api_module, 'has_dso_results', lambda *_a, **_k: True)
+        monkeypatch.setattr(skytonight_api_module, 'load_json_file', lambda *a, **k: data)
+
+        result = skytonight_api_module._build_dso_section_payload(None, 'uid-1', 'user1')
+
+        assert len(result['report']) == 1000
+        assert result['report_truncated'] is True and result['report_limit'] == 1000
+
+    def test_dso_report_from_the_dataset_stops_at_the_cap(self, monkeypatch, quiet_user_data):
+        """Before any calculation, the static dataset fallback is capped the same way."""
+        monkeypatch.setattr(skytonight_api_module, 'has_dso_results', lambda *_a, **_k: False)
+        monkeypatch.setattr(
+            skytonight_api_module.skytonight_targets, 'load_targets_dataset', lambda: _many_dataset_targets(1001)
+        )
+
+        result = skytonight_api_module._build_dso_section_payload(None, 'uid-1', 'user1')
+
+        assert len(result['report']) == 1000
+        assert result['report_truncated'] is True
+
+    def test_full_report_from_results_stops_at_the_cap(self, monkeypatch, quiet_user_data):
+        """The combined report keeps at most 1000 deep-sky rows from tonight's results."""
+        calc = _make_calc_result()
+        calc['deep_sky'] = _many_calc_rows(1001)
+        monkeypatch.setattr(skytonight_api_module, 'has_calculation_results', lambda *_a, **_k: True)
+        monkeypatch.setattr(skytonight_api_module, 'load_calculation_results', lambda *_a, **_k: calc)
+
+        result = skytonight_api_module._build_skytonight_reports_payload(None, 'uid-1', 'user1')
+
+        deep_sky = [row for row in result['report'] if row['id'].startswith('NGC ')]
+        assert len(deep_sky) == 1000
+
+    def test_full_report_from_the_dataset_stops_at_the_cap(self, monkeypatch, quiet_user_data):
+        """The combined report's dataset fallback keeps at most 1000 deep-sky rows too."""
+        monkeypatch.setattr(skytonight_api_module, 'has_calculation_results', lambda *_a, **_k: False)
+        monkeypatch.setattr(
+            skytonight_api_module.skytonight_targets, 'load_targets_dataset', lambda: _many_dataset_targets(1001)
+        )
+
+        result = skytonight_api_module._build_skytonight_reports_payload(None, 'uid-1', 'user1')
+
+        deep_sky = [row for row in result['report'] if str(row.get('id', '')).startswith('NGC ')]
+        assert len(deep_sky) == 1000

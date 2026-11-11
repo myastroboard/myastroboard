@@ -519,7 +519,7 @@ def delete_migration_backups(root: str | None = None) -> int:
     backups_dir = _backups_dir(root)
     removed = 0
     for path in _managed_entries(backups_dir):
-        if not os.path.realpath(path).startswith(backups_dir + os.sep):  # pragma: no cover - listdir names
+        if not os.path.realpath(path).startswith(backups_dir + os.sep):
             continue
         removed += len(_files_under(path))
         if os.path.isdir(path):

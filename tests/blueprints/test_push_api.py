@@ -324,3 +324,27 @@ def test_user_manager_persists_push_subscriptions():
     loaded = mgr2.get_user_by_id(user.user_id)
     assert loaded is not None
     assert loaded.push_subscriptions == user.push_subscriptions
+
+
+def test_subscription_list_names_the_push_provider_and_survives_a_malformed_endpoint(client_admin, monkeypatch):
+    """Each subscription is summarized by provider; an endpoint urlparse cannot read (an unclosed
+    IPv6 bracket) is listed as 'other' instead of failing the whole list."""
+    import types
+
+    subscriptions = [
+        {'endpoint': 'https://web.push.apple.com/abc', 'created_at': '2026-01-01'},
+        {'endpoint': 'https://fcm.googleapis.com/fcm/send/abc'},
+        {'endpoint': 'https://updates.push.services.mozilla.com/wpush/v2/abc'},
+        {'endpoint': 'https://push.example.org/abc'},
+        {'endpoint': 'https://[::1/broken'},
+    ]
+    user = types.SimpleNamespace(push_subscriptions=subscriptions)
+    monkeypatch.setattr('blueprints.push.get_current_user', lambda: user)
+
+    resp = client_admin.get('/api/push/subscriptions')
+
+    assert resp.status_code == 200
+    listed = resp.get_json()['subscriptions']
+    assert [s['provider'] for s in listed] == ['apple', 'google', 'mozilla', 'other', 'other']
+    assert listed[0]['created_at'] == '2026-01-01'
+    assert all(len(s['endpoint_tail']) <= 20 for s in listed)

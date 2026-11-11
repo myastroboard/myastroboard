@@ -118,3 +118,15 @@ def test_separate_processes_exclude_each_other(tmp_path):
         assert proc.returncode == 0, err
 
     assert int(counter.read_text(encoding="utf-8")) == workers * times
+
+
+def test_posix_branch_takes_and_releases_an_exclusive_flock(fake_fcntl, tmp_path):
+    """On POSIX the lock is an exclusive flock, released even when the guarded block raises."""
+    fake = fake_fcntl(file_lock)
+
+    with pytest.raises(RuntimeError):
+        with interprocess_lock(str(tmp_path / "posix.lock")):
+            assert [op for _fd, op in fake.calls] == [fake.LOCK_EX]
+            raise RuntimeError("boom")
+
+    assert [op for _fd, op in fake.calls] == [fake.LOCK_EX, fake.LOCK_UN]

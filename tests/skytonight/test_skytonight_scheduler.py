@@ -1565,3 +1565,11 @@ def test_any_location_missing_results_exception_falls_back_to_default_check(monk
     monkeypatch.setattr(sched_mod, 'has_calculation_results', lambda *_a, **_k: True)
 
     assert sched_mod._any_location_missing_results({}) is False
+
+
+def test_progress_listener_failure_is_best_effort():
+    """A calculator that refuses the progress listener does not stop the scheduler."""
+    from skytonight import skytonight_scheduler as module
+
+    with patch('skytonight.skytonight_calculator.set_progress_listener', side_effect=RuntimeError('boom')):
+        module._set_calculation_progress_listener(lambda *a: None)  # must not raise

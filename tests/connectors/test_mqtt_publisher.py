@@ -484,21 +484,21 @@ class TestLifecycle:
 
         assert publisher._has_lock is False
 
-    def test_release_lock_swallows_unlock_errors(self, env, monkeypatch):
+    def test_release_lock_swallows_unlock_errors(self, env, monkeypatch, fake_msvcrt):
         publisher = env["publisher"]
         assert publisher._acquire_lock() is True
-        monkeypatch.setattr(pub.msvcrt, "locking", lambda *a, **k: (_ for _ in ()).throw(OSError("unlock failed")))
+        fake_msvcrt(pub, lambda *a, **k: (_ for _ in ()).throw(OSError("unlock failed")))
 
         publisher._release_lock()  # must not raise
 
         assert publisher._has_lock is False
 
-    def test_release_lock_swallows_a_broken_logger_too(self, env, monkeypatch):
+    def test_release_lock_swallows_a_broken_logger_too(self, env, monkeypatch, fake_msvcrt):
         """Best-effort logging during release: a log stream already closed at shutdown
         must not turn a harmless cleanup failure into a crash."""
         publisher = env["publisher"]
         assert publisher._acquire_lock() is True
-        monkeypatch.setattr(pub.msvcrt, "locking", lambda *a, **k: (_ for _ in ()).throw(OSError("unlock failed")))
+        fake_msvcrt(pub, lambda *a, **k: (_ for _ in ()).throw(OSError("unlock failed")))
         monkeypatch.setattr(pub.logger, "error", lambda *a, **k: (_ for _ in ()).throw(ValueError("stream closed")))
 
         publisher._release_lock()  # must not raise even though logging itself fails
@@ -958,3 +958,26 @@ class TestDefaults:
 
         monkeypatch.setattr(repo_config, "config_revision", _boom)
         assert pub.MqttPublisher._current_source_signature() == (None, None)
+
+
+class TestPosixLock:
+    """The flock branch of the publisher lock, driven on any OS."""
+
+    def test_acquire_and_release_use_a_non_blocking_exclusive_flock(self, env, fake_fcntl):
+        publisher = env["publisher"]
+        fake = fake_fcntl(pub)
+
+        assert publisher._acquire_lock() is True
+        publisher._release_lock()
+
+        assert [op for _fd, op in fake.calls] == [fake.LOCK_EX | fake.LOCK_NB, fake.LOCK_UN]
+        assert publisher._has_lock is False
+        assert not os.path.exists(pub.LOCK_FILE)
+
+    def test_a_lock_held_elsewhere_is_refused(self, env, fake_fcntl):
+        """flock raising (another worker holds it) means this process does not publish."""
+        publisher = env["publisher"]
+        fake_fcntl(pub, flock=lambda fd, op: (_ for _ in ()).throw(BlockingIOError("held")))
+
+        assert publisher._acquire_lock() is False
+        assert publisher._lock_file is None

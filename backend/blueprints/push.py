@@ -103,7 +103,7 @@ def push_list_subscriptions():
 
             try:
                 host = urlparse(endpoint).hostname or ''
-            except Exception:  # pragma: no cover  # urlparse is robust; can't raise on string input
+            except Exception:
                 host = ''
             if host == 'web.push.apple.com' or host.endswith('.push.apple.com'):
                 return 'apple'

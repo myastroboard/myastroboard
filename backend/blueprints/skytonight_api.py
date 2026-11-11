@@ -276,7 +276,7 @@ def _build_skytonight_reports_payload(catalogue: str | None, user_id: str, usern
         deep_sky_rows = 0
 
         for calc_item in calc.get('deep_sky', []):
-            if deep_sky_rows >= max_deep_sky_rows:  # pragma: no cover
+            if deep_sky_rows >= max_deep_sky_rows:
                 break
 
             # Catalogue filter
@@ -417,7 +417,7 @@ def _build_skytonight_reports_payload(catalogue: str | None, user_id: str, usern
             metadata = {}
 
         if category == 'deep_sky':
-            if deep_sky_rows >= max_deep_sky_rows:  # pragma: no cover
+            if deep_sky_rows >= max_deep_sky_rows:
                 continue
 
             if catalogue:
@@ -928,7 +928,7 @@ def _build_dso_section_payload(
         rows = []
         rows_added = 0
         for calc_item in data.get('deep_sky', []):
-            if rows_added >= max_rows:  # pragma: no cover
+            if rows_added >= max_rows:
                 break
             calc_catalogue_names: dict[str, str] = calc_item.get('catalogue_names', {})
             if catalogue:
@@ -1014,7 +1014,7 @@ def _build_dso_section_payload(
     for target in dataset.get('targets', []) if isinstance(dataset, dict) else []:
         if str(_target_attr(target, 'category', '') or '') != 'deep_sky':
             continue
-        if rows_added >= max_rows:  # pragma: no cover
+        if rows_added >= max_rows:
             break
         catalogue_names = _target_catalogue_names(target)
         preferred_name = str(_target_attr(target, 'preferred_name', '') or '').strip()
