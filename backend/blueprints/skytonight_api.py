@@ -1650,7 +1650,7 @@ def get_skytonight_framing_api():
                     'key': resolved['image_key'],
                     'size_px': sky_framing.IMAGE_SIZE_PX,
                     'fovs_deg': list(sky_framing.FOV_LADDER_DEG),
-                    'credit': 'DSS2 Color / CDS HiPS',
+                    'credit': object_info.DSS2_IMAGE_CREDIT,
                 },
                 'has_combinations': bool(combinations),
                 'frames': frames,
@@ -1669,7 +1669,8 @@ def get_skytonight_framing_image_api(filename):
 
     The filename encodes right ascension, declination and field of view (degrees); the
     field of view must be one of sky_framing.FOV_LADDER_DEG. Downloaded from CDS hips2fits
-    on first request, then served from data/cache/framing_images/.
+    (or rendered from a DSS2 HiPS mirror when CDS is down) on first request, then served
+    from data/cache/framing_images/.
     """
     parsed = sky_framing.parse_image_filename(filename)
     if parsed is None:

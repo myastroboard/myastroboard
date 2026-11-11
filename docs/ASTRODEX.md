@@ -24,7 +24,7 @@ When you add an item by name, Astrodex looks up the name in the SkyTonight catal
 
 The **check duplicate** endpoint (`GET /api/astrodex/check/<name>`) lets the UI warn before adding a name that already exists.
 
-For names the local SkyTonight dataset doesn't know (mostly stars, e.g. "Vega", "HIP 91262"), `GET /api/astrodex/catalogue-lookup` falls back to a SIMBAD TAP query. The resolved name prefers SIMBAD's `NAME …` proper name when the object has one (surfaced as `CommonName`, e.g. "Vega" rather than the obscure Flamsteed designation "* 3 Lyr"), then a Bayer-style designation ("* alf Lyr") over a bare Flamsteed number, then catalogue numbers (HD/HIP/SAO/TYC). The full set of resolved alternate names is captured client-side and submitted as `external_aliases` when the item is created, so the item detail popup's "Catalogue names" section — otherwise sourced live from the DSO dataset via `catalogue_aliases` and empty for any star — has something to show (see `enrich_item_with_catalogue_aliases()`).
+For names the local SkyTonight dataset doesn't know (mostly stars, e.g. "Vega", "HIP 91262"), `GET /api/astrodex/catalogue-lookup` falls back to a SIMBAD TAP query (CDS first, then its CfA Harvard and IDIA mirrors - `object_info.SIMBAD_TAP_ENDPOINTS` - each backed off for a few minutes after a failure). The resolved name prefers SIMBAD's `NAME …` proper name when the object has one (surfaced as `CommonName`, e.g. "Vega" rather than the obscure Flamsteed designation "* 3 Lyr"), then a Bayer-style designation ("* alf Lyr") over a bare Flamsteed number, then catalogue numbers (HD/HIP/SAO/TYC). The full set of resolved alternate names is captured client-side and submitted as `external_aliases` when the item is created, so the item detail popup's "Catalogue names" section — otherwise sourced live from the DSO dataset via `catalogue_aliases` and empty for any star — has something to show (see `enrich_item_with_catalogue_aliases()`).
 
 ---
 
@@ -202,7 +202,8 @@ magnitude.
 | Not captured, solar-system body | Bundled artwork under `static/img/bodies/` — planets have no fixed coordinates, so no sky survey can supply their picture |
 
 DSS2 previews reuse the existing `GET /api/object-image/<filename>` proxy, which fetches
-from CDS hips2fits once and caches the JPEG on disk. Thumbnails load through an
+from CDS hips2fits once (or, when CDS is down, renders it from a mirror of the DSS2 HiPS - see
+[SKYTONIGHT.md](SKYTONIGHT.md#sky-image)) and caches the JPEG on disk. Thumbnails load through an
 `IntersectionObserver` as their card nears the viewport, so browsing a 13 000-object
 catalogue never fires more cold CDS fetches than the objects actually looked at.
 

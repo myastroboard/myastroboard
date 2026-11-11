@@ -229,6 +229,7 @@ def test_ensure_cached_image_fetches_once_with_requested_field(monkeypatch, tmp_
     assert 'fov=4.000' in url
     assert f'width={sky_framing.IMAGE_SIZE_PX}' in url and f'height={sky_framing.IMAGE_SIZE_PX}' in url
     assert 'projection=TAN' in url
+    assert mock_get.call_args.kwargs['timeout'] == (oi.CONNECT_TIMEOUT, 30)
     with open(expected_path, 'rb') as f:
         assert f.read() == b'fake-jpeg-bytes'
 
@@ -258,14 +259,35 @@ def test_ensure_cached_image_returns_none_on_upstream_failure(monkeypatch, tmp_p
 
 
 def test_ensure_cached_image_respects_shared_hips2fits_backoff(monkeypatch, tmp_path):
-    """After one failure, the next image is not requested while CDS is backed off."""
+    """After CDS and every HiPS mirror failed once, the next image makes no request at all."""
     monkeypatch.setattr(sky_framing, 'FRAMING_IMAGE_CACHE_DIR', str(tmp_path))
 
     with patch('observation.object_info.requests.get', side_effect=_req_module.RequestException('down')) as mock_get:
         assert sky_framing.ensure_cached_image(10.0, 20.0, 1.0) is None
+        calls_after_first_image = mock_get.call_count
         assert sky_framing.ensure_cached_image(30.0, 40.0, 2.0) is None
 
-    assert mock_get.call_count == 1
+    assert calls_after_first_image > 0
+    assert mock_get.call_count == calls_after_first_image
+
+
+def test_ensure_cached_image_falls_back_to_hips_mirror(monkeypatch, tmp_path):
+    """When hips2fits fails, the background is rendered from a mirror at the requested field and size."""
+    monkeypatch.setattr(sky_framing, 'FRAMING_IMAGE_CACHE_DIR', str(tmp_path))
+    rendered = []
+
+    def fake_render(base_url, ra, dec, fov, size, timeout=None):
+        rendered.append((base_url, ra, dec, fov, size))
+        return b'mirror-jpeg'
+
+    with patch('observation.object_info.requests.get', side_effect=_req_module.RequestException('down')):
+        with patch('observation.hips_cutout.render_cutout', side_effect=fake_render):
+            result = sky_framing.ensure_cached_image(10.684708, 41.26875, 4.0)
+
+    assert result == os.path.join(str(tmp_path), '10.684708_41.268750_4.00.jpg')
+    assert rendered == [(oi.DSS2_HIPS_MIRRORS[0][1], 10.684708, 41.26875, 4.0, sky_framing.IMAGE_SIZE_PX)]
+    with open(result, 'rb') as f:
+        assert f.read() == b'mirror-jpeg'
 
 
 # ---------------------------------------------------------------------------

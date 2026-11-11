@@ -65,7 +65,7 @@ def get_object_info_api(identifier):
       "coordinates": {"ra": 130.1, "dec": 19.67},
       "description": "...",
       "description_title": "Beehive Cluster",
-      "image": {"url": "...", "credit": "DSS2 / SkyView (NASA GSFC)"}
+      "image": {"url": "...", "credit": "DSS2 Color / CDS HiPS"}
     }
 
     If the object is not found, returns 404 with {"error": "not_found"}.
@@ -101,9 +101,9 @@ def get_object_info_api(identifier):
 def get_object_image_api(filename):
     """Serve a locally cached DSS2 (hips2fits) image, e.g. "10.684000_41.269000.jpg".
 
-    Downloads from CDS hips2fits on first request and caches the JPEG to disk
-    (data/cache/object_images/) so subsequent requests - from any user - are
-    served locally instead of round-tripping to CDS, which is slow.
+    Downloads from CDS hips2fits on first request (or renders it from a mirror of the
+    DSS2 HiPS when CDS is down) and caches the JPEG to disk (data/cache/object_images/)
+    so subsequent requests - from any user - are served locally.
     """
     from observation.object_info import OBJECT_IMAGE_CACHE_DIR, ensure_cached_object_image, parse_object_image_filename
 

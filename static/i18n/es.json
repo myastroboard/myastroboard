@@ -2663,8 +2663,9 @@
     "image_unavailable": "Imagen no disponible",
     "description_unavailable": "Descripción no disponible",
     "source_simbad": "Fuente: SIMBAD (CDS, Estrasburgo)",
+    "source_local": "Fuente: catálogo SkyTonight (OpenNGC y otros)",
     "source_wikipedia": "Descripción: Wikipedia",
-    "source_skyview": "Imagen: DSS2 / SkyView (NASA GSFC)",
+    "source_dss2": "Imagen: DSS2 color / HiPS del CDS",
     "error_loading": "No se pudo cargar la información del objeto."
   },
   "visibility_calendar": {

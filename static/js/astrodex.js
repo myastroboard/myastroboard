@@ -774,10 +774,17 @@ function renderAstrodexGrid(items, isAllowedAstrodex) {
         imageWrap.title = i18n.t('astrodex.click_to_view_photos');
 
         const img = document.createElement('img');
-        img.src = imageUrl;
         img.alt = item.name;
         img.loading = 'lazy';
         img.className = 'card-img-top';
+        if (mainPicture) {
+            // A picture file missing on disk falls back to the generic artwork rather
+            // than a broken-image glyph.
+            img.addEventListener('error', () => {
+                img.src = appUrl('/static/img/default_astro_object.svg');
+            }, { once: true });
+        }
+        img.src = imageUrl;
         imageWrap.appendChild(img);
 
         if (photoCount > 0) {

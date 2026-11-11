@@ -12,7 +12,10 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
-- None.
+- DSS2 sky images (object thumbnails, framing backgrounds) fall back to mirrors of the survey (ESA, MAST, CSIRO,
+  China-VO) when CDS hips2fits is down; cards show a placeholder when no server answers - see docs/SKYTONIGHT.md.
+- Object information falls back to the SIMBAD mirrors (CfA Harvard, IDIA) when CDS SIMBAD is down, and its sources
+  line now says when the data comes from the local catalogue instead of SIMBAD.
 
 ### Breaking changes
 

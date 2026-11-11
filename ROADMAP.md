@@ -388,8 +388,6 @@ Follow-ups:
 
 - Eyepiece field circle for visual observers - the equipment model has no eyepiece yet
 - Save the framing (centre and rotation) on a Plan My Night entry - needs a plan model change
-- The imagery depends on a single service (CDS hips2fits); it was unreachable during development
-  (CDS incident of November 2026), so a fallback source may be worth adding
 
 #### Share cards
 

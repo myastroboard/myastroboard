@@ -117,7 +117,11 @@ function buildObjectInfoCardHtml(data, opts = {}) {
         img.loading = 'lazy';
         img.style.maxHeight = compact ? '160px' : '300px';
         img.style.objectFit = 'cover';
-        img.addEventListener('error', () => { imgRow.style.display = 'none'; });
+        img.addEventListener('error', () => {
+            // No server could deliver the picture: drop it, and its credit in the sources line.
+            imgRow.style.display = 'none';
+            container.querySelector('.object-info-image-source')?.remove();
+        });
         const credit = document.createElement('small');
         credit.className = 'text-muted d-block mt-1';
         DOMUtils.append(credit, DOMUtils.createIcon('bi bi-camera icon-inline'), data.image.credit || '');
@@ -209,9 +213,17 @@ function buildObjectInfoCardHtml(data, opts = {}) {
     }
 
     // ── Sources ──────────────────────────────────────────
-    const srcList = [t('object_info.source_simbad', 'Source: SIMBAD (CDS, Strasbourg)')];
-    if (!noImage && data.image) srcList.push(t('object_info.source_skyview',   'Image: DSS2 / SkyView (NASA GSFC)'));
-    if (data.description)       srcList.push(t('object_info.source_wikipedia', 'Description: Wikipedia'));
+    // Name, type and coordinates come from SIMBAD, or from the local SkyTonight dataset when
+    // SIMBAD (and its mirrors) could not be reached or had no record.
+    const srcList = [{
+        text: data.source === 'local'
+            ? t('object_info.source_local', 'Source: SkyTonight catalogue (OpenNGC and others)')
+            : t('object_info.source_simbad', 'Source: SIMBAD (CDS, Strasbourg)'),
+    }];
+    if (!noImage && data.image) {
+        srcList.push({ text: t('object_info.source_dss2', 'Image: DSS2 Color / CDS HiPS'), className: 'object-info-image-source' });
+    }
+    if (data.description) srcList.push({ text: t('object_info.source_wikipedia', 'Description: Wikipedia') });
     const srcRow = document.createElement('div');
     srcRow.className = 'row mt-3';
     const srcCol = document.createElement('div');
@@ -219,9 +231,12 @@ function buildObjectInfoCardHtml(data, opts = {}) {
     const srcSmall = document.createElement('small');
     srcSmall.className = 'text-muted';
     srcSmall.appendChild(DOMUtils.createIcon('bi bi-c-circle icon-inline'));
-    srcList.forEach((s, i) => {
-        if (i > 0) srcSmall.appendChild(document.createTextNode('  ·  '));
-        srcSmall.appendChild(document.createTextNode(s));
+    srcList.forEach((source, i) => {
+        // The separator lives inside each entry, so removing one entry leaves no dangling dot.
+        const entry = document.createElement('span');
+        if (source.className) entry.className = source.className;
+        entry.textContent = i > 0 ? `\u00a0\u00a0\u00b7\u00a0\u00a0${source.text}` : source.text;
+        srcSmall.appendChild(entry);
     });
     srcCol.appendChild(srcSmall);
     srcRow.appendChild(srcCol);
