@@ -6,5 +6,9 @@
     "python.testing.pytestEnabled": true,
     "python-envs.defaultEnvManager": "ms-python.python:venv",
     "mypy.enabled": false,
-    "ruff.enable": false
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.formatOnSave": true
+    },
+    "ruff.importStrategy": "useBundled"
 }

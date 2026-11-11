@@ -28,7 +28,7 @@ This project and everyone participating in it is governed by our [Code of Conduc
 
 Before you begin, make sure you have:
 - Docker and Docker Compose installed
-- Python 3.14 or higher (for local development)
+- Python 3.15 or higher (for local development)
 - Git for version control
 - A GitHub account
 

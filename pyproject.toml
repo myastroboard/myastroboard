@@ -1,7 +1,7 @@
 [tool.ruff]
 # Organization baseline (E, F, W, I, UP, B), synced from myastroboard/.github.
 extend = ".github/org/ruff.base.toml"
-target-version = "py314"
+target-version = "py315"
 # Wider than the organization's 100: the code base was written for 120.
 line-length = 120
 # backend/ is on sys.path (pyrightconfig.json extraPaths): its modules are first-party imports.
