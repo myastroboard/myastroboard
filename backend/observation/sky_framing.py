@@ -5,8 +5,10 @@ image of the sky around a target. This module owns the two server-side pieces th
 depend on equipment:
 
 * resolving a target identifier to fixed equatorial coordinates and an apparent size;
-* serving the background image: a square DSS2 colour cut-out from CDS hips2fits, fetched
-  once by the server and cached on disk, so the browser never calls CDS itself.
+* serving the background image: a square DSS2 colour cut-out from CDS hips2fits (or,
+  when CDS is down, rendered from a mirror of its HiPS tiles - see
+  ``object_info.download_dss_image``), fetched once by the server and cached on disk, so
+  the browser never calls those servers itself.
 
 The image is north up, east left, in gnomonic (TAN) projection centred on the target. A
 camera sensor at the focal plane is a gnomonic projection too, so a sensor centred on the
@@ -149,16 +151,17 @@ def parse_image_filename(filename: str) -> tuple[float, float, float] | None:
 def ensure_cached_image(ra_deg: float, dec_deg: float, fov_deg: float) -> str | None:
     """Make sure the background image for (ra, dec, fov) is in the on-disk cache.
 
-    Returns the absolute local file path (downloading from hips2fits first when missing),
-    or None when the upstream fetch failed.
+    Returns the absolute local file path (downloading it first when missing), or None
+    when no server could deliver it.
     """
     local_path = os.path.join(FRAMING_IMAGE_CACHE_DIR, image_filename(ra_deg, dec_deg, fov_deg))
     if os.path.isfile(local_path):
         return local_path
 
-    url = object_info._get_dss_image_url(ra_deg, dec_deg, size_deg=fov_deg, size_px=IMAGE_SIZE_PX)
     label = f'framing ra={ra_deg:.4f}, dec={dec_deg:.4f}, fov={fov_deg}'
-    if not object_info.download_hips2fits_image(url, local_path, label, timeout=_IMAGE_REQUEST_TIMEOUT):
+    if not object_info.download_dss_image(
+        ra_deg, dec_deg, fov_deg, IMAGE_SIZE_PX, local_path, label, timeout=_IMAGE_REQUEST_TIMEOUT
+    ):
         return None
     _note_cache_write()
     return local_path

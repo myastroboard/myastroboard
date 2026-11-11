@@ -3,7 +3,7 @@ Deep Sky Object metadata and image integration.
 
 Provides:
   Phase 1 - Object resolution via SIMBAD TAP (identifier → name, type, RA/DEC, aliases)
-  Phase 2 - Image URL construction via SkyView/DSS (no download, link only)
+  Phase 2 - DSS2 colour image: CDS hips2fits, or a cut-out rendered from a HiPS mirror
   Phase 3 - Localized description via Wikipedia REST API with language fallback chain
 """
 
@@ -95,6 +95,23 @@ _WIKIPEDIA_BASES: dict[str, str] = {
 }
 SIMBAD_TAP_URL = 'https://simbad.cds.unistra.fr/simbad/sim-tap/sync'
 HIPS2FITS_URL = 'https://alasky.cds.unistra.fr/hips-image-services/hips2fits'
+
+# Mirrors of the DSS2 colour HiPS (CDS/P/DSS2/color), tried in this order when hips2fits
+# fails. They publish the CDS tiles unchanged; hips_cutout renders the cut-out from them.
+# List published by CDS during its November 2026 incident: https://aladin.cds.unistra.fr/
+DSS2_HIPS_MIRRORS: tuple[tuple[str, str], ...] = (
+    ('esa', 'https://skies.esac.esa.int/DSSColor'),
+    ('mast', 'https://stpubdata.s3.us-east-1.amazonaws.com/mast/skybackgrounds/DSSColor'),
+    ('csiro', 'https://casda.csiro.au/hips/DSS2/color'),
+    ('china-vo', 'https://hips.china-vo.org/m/CDS_P_DSS2_color'),
+)
+
+# Attribution of every DSS2 image, whichever server delivered it: the survey is the
+# STScI/NASA Digitized Sky Survey, coloured and cut into HiPS tiles by CDS.
+DSS2_IMAGE_CREDIT = 'DSS2 Color / CDS HiPS'
+
+# (connect, read) seconds for one mirror tile.
+_HIPS_TILE_TIMEOUT = (5, 15)
 
 # Local on-disk cache for hips2fits imagery, keyed by (ra, dec) — DSS2 survey
 # tiles never change, so once fetched an image is cached indefinitely.
@@ -562,15 +579,64 @@ def parse_object_image_filename(filename: str) -> tuple | None:
 def ensure_cached_object_image(ra: float, dec: float) -> str | None:
     """Make sure the DSS2 image for (ra, dec) exists in the on-disk cache.
 
-    Returns the absolute local file path (downloading from hips2fits first if
-    not already cached), or None if the upstream fetch failed.
+    Returns the absolute local file path (downloading it first if not already cached,
+    see ``download_dss_image``), or None if no server could deliver it.
     """
     local_path = os.path.join(OBJECT_IMAGE_CACHE_DIR, _object_image_filename(ra, dec))
     if os.path.isfile(local_path):
         return local_path
-    if download_hips2fits_image(_get_dss_image_url(ra, dec), local_path, f'ra={ra}, dec={dec}'):
+    if download_dss_image(ra, dec, 0.5, 400, local_path, f'ra={ra}, dec={dec}'):
         return local_path
     return None
+
+
+def download_dss_image(
+    ra: float,
+    dec: float,
+    size_deg: float,
+    size_px: int,
+    local_path: str,
+    label: str,
+    timeout: float | tuple[float, float] = REQUEST_TIMEOUT,
+) -> bool:
+    """Write a DSS2 colour cut-out to *local_path*; return whether any server delivered it.
+
+    CDS hips2fits is asked first. When it fails or is backed off, the same image is
+    rendered from the HiPS tiles of each mirror in ``DSS2_HIPS_MIRRORS`` in turn. Every
+    server has its own backoff, so an unreachable one is skipped at once by the next
+    requests. *timeout* applies to the hips2fits request only.
+    """
+    url = _get_dss_image_url(ra, dec, size_deg=size_deg, size_px=size_px)
+    if download_hips2fits_image(url, local_path, label, timeout=timeout):
+        return True
+    return _render_from_hips_mirrors(ra, dec, size_deg, size_px, local_path, label)
+
+
+def _render_from_hips_mirrors(
+    ra: float, dec: float, size_deg: float, size_px: int, local_path: str, label: str
+) -> bool:
+    """Render the cut-out from the first DSS2 HiPS mirror that answers (atomic write)."""
+    from observation import hips_cutout  # numpy/Pillow work, only needed on this fallback path
+
+    for mirror_id, base_url in DSS2_HIPS_MIRRORS:
+        service = f'hips_mirror:{mirror_id}'
+        if _is_backed_off(service):
+            continue
+        try:
+            data = hips_cutout.render_cutout(base_url, ra, dec, size_deg, size_px, timeout=_HIPS_TILE_TIMEOUT)
+            os.makedirs(os.path.dirname(local_path), exist_ok=True)
+            tmp_path = f'{local_path}.tmp-{os.getpid()}'
+            with open(tmp_path, 'wb') as f:
+                f.write(data)
+            os.replace(tmp_path, local_path)
+        except (requests.RequestException, OSError, ValueError) as exc:
+            logger.warning(f'DSS2 HiPS mirror {mirror_id} failed for {label}: {exc}')
+            _trigger_backoff(service)
+            continue
+        _clear_backoff(service)
+        logger.info(f'DSS2 image for {label} rendered from HiPS mirror {mirror_id} (hips2fits unavailable)')
+        return True
+    return False
 
 
 def download_hips2fits_image(
@@ -822,7 +888,7 @@ def get_object_info(identifier: str, lang: str = 'en') -> dict[str, Any]:
             _dec = float(_local_entry['dec_deg'])
             _local_type = str(_local_entry.get('object_type') or '').strip()
             _preferred = str(_local_entry.get('preferred_name') or identifier).strip()
-            _image = {'url': get_object_image_proxy_url(_ra, _dec), 'credit': 'DSS2 Color / CDS HiPS'}
+            _image = {'url': get_object_image_proxy_url(_ra, _dec), 'credit': DSS2_IMAGE_CREDIT}
             _seen: set = set()
             _search_terms: list[str] = []
             for _t in [identifier, _preferred]:
@@ -873,7 +939,7 @@ def get_object_info(identifier: str, lang: str = 'en') -> dict[str, Any]:
     if ra is not None and dec is not None:
         image = {
             'url': get_object_image_proxy_url(ra, dec),
-            'credit': 'DSS2 Color / CDS HiPS',
+            'credit': DSS2_IMAGE_CREDIT,
         }
 
     # ── Phase 3: Wikipedia description ─────────────

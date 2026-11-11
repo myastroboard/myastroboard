@@ -2664,7 +2664,7 @@
     "description_unavailable": "Keine Beschreibung verfügbar",
     "source_simbad": "Quelle: SIMBAD (CDS, Straßburg)",
     "source_wikipedia": "Beschreibung: Wikipedia",
-    "source_skyview": "Bild: DSS2 / SkyView (NASA GSFC)",
+    "source_dss2": "Bild: DSS2 Farbe / CDS HiPS",
     "error_loading": "Objektinformationen konnten nicht geladen werden."
   },
   "visibility_calendar": {

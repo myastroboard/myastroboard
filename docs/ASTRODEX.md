@@ -202,7 +202,8 @@ magnitude.
 | Not captured, solar-system body | Bundled artwork under `static/img/bodies/` — planets have no fixed coordinates, so no sky survey can supply their picture |
 
 DSS2 previews reuse the existing `GET /api/object-image/<filename>` proxy, which fetches
-from CDS hips2fits once and caches the JPEG on disk. Thumbnails load through an
+from CDS hips2fits once (or, when CDS is down, renders it from a mirror of the DSS2 HiPS - see
+[SKYTONIGHT.md](SKYTONIGHT.md#sky-image)) and caches the JPEG on disk. Thumbnails load through an
 `IntersectionObserver` as their card nears the viewport, so browsing a 13 000-object
 catalogue never fires more cold CDS fetches than the objects actually looked at.
 

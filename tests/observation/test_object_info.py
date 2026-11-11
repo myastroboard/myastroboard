@@ -997,6 +997,91 @@ class TestWikipediaBackoff:
         assert 'wikipedia' not in oi._backoff_until
 
 
+class TestDss2MirrorFallback:
+    """download_dss_image: CDS hips2fits first, then each DSS2 HiPS mirror in turn."""
+
+    MIRROR_IDS = [mirror_id for mirror_id, _ in oi.DSS2_HIPS_MIRRORS]
+
+    def _render_recorder(self, failing=()):
+        calls = []
+
+        def fake_render(base_url, ra, dec, fov, size, timeout=None):
+            calls.append(base_url)
+            if base_url in failing:
+                raise _req_module.ConnectionError('mirror down')
+            return b'mirror-jpeg'
+
+        return calls, fake_render
+
+    def test_hips2fits_success_does_not_touch_mirrors(self, tmp_path):
+        """While CDS answers, no mirror is used."""
+        calls, fake_render = self._render_recorder()
+        with patch.object(oi, 'download_hips2fits_image', return_value=True):
+            with patch('observation.hips_cutout.render_cutout', side_effect=fake_render):
+                assert oi.download_dss_image(1.0, 2.0, 0.5, 400, str(tmp_path / 'a.jpg'), 'test') is True
+        assert calls == []
+
+    def test_falls_back_to_first_mirror_when_hips2fits_fails(self, tmp_path):
+        """A hips2fits failure renders the image from the first mirror and writes it atomically."""
+        calls, fake_render = self._render_recorder()
+        target = tmp_path / 'sub' / 'a.jpg'
+        with patch.object(oi, 'download_hips2fits_image', return_value=False):
+            with patch('observation.hips_cutout.render_cutout', side_effect=fake_render):
+                assert oi.download_dss_image(1.0, 2.0, 0.5, 400, str(target), 'test') is True
+        assert calls == [oi.DSS2_HIPS_MIRRORS[0][1]]
+        assert target.read_bytes() == b'mirror-jpeg'
+        assert [p.name for p in target.parent.iterdir()] == ['a.jpg']
+
+    def test_failing_mirror_is_backed_off_and_next_one_used(self, tmp_path):
+        """A mirror that fails is backed off on its own, and the next mirror delivers."""
+        first, second = oi.DSS2_HIPS_MIRRORS[0][1], oi.DSS2_HIPS_MIRRORS[1][1]
+        calls, fake_render = self._render_recorder(failing={first})
+        with patch.object(oi, 'download_hips2fits_image', return_value=False):
+            with patch('observation.hips_cutout.render_cutout', side_effect=fake_render):
+                assert oi.download_dss_image(1.0, 2.0, 0.5, 400, str(tmp_path / 'a.jpg'), 'test') is True
+                assert calls == [first, second]
+                assert oi._is_backed_off(f'hips_mirror:{self.MIRROR_IDS[0]}')
+                assert not oi._is_backed_off(f'hips_mirror:{self.MIRROR_IDS[1]}')
+
+                calls.clear()
+                assert oi.download_dss_image(3.0, 4.0, 0.5, 400, str(tmp_path / 'b.jpg'), 'test') is True
+        assert calls == [second]
+
+    def test_all_servers_failing_returns_false(self, tmp_path):
+        """With CDS and every mirror down, nothing is written and the call reports failure."""
+        bases = {base for _, base in oi.DSS2_HIPS_MIRRORS}
+        calls, fake_render = self._render_recorder(failing=bases)
+        with patch.object(oi, 'download_hips2fits_image', return_value=False):
+            with patch('observation.hips_cutout.render_cutout', side_effect=fake_render):
+                assert oi.download_dss_image(1.0, 2.0, 0.5, 400, str(tmp_path / 'a.jpg'), 'test') is False
+        assert sorted(calls) == sorted(bases)
+        assert list(tmp_path.iterdir()) == []
+        assert all(oi._is_backed_off(f'hips_mirror:{mirror_id}') for mirror_id in self.MIRROR_IDS)
+
+    def test_mirror_success_clears_its_backoff(self, tmp_path):
+        """A mirror whose backoff expired and that answers again is no longer backed off."""
+        oi._backoff_until[f'hips_mirror:{self.MIRROR_IDS[0]}'] = oi.time.time() - 1
+        _, fake_render = self._render_recorder()
+        with patch.object(oi, 'download_hips2fits_image', return_value=False):
+            with patch('observation.hips_cutout.render_cutout', side_effect=fake_render):
+                oi.download_dss_image(1.0, 2.0, 0.5, 400, str(tmp_path / 'a.jpg'), 'test')
+        assert f'hips_mirror:{self.MIRROR_IDS[0]}' not in oi._backoff_until
+
+    def test_object_image_uses_thumbnail_geometry(self, tmp_path):
+        """Object thumbnails keep the 0.5 degree, 400 px geometry on the mirror path too."""
+        seen = []
+
+        def fake_render(base_url, ra, dec, fov, size, timeout=None):
+            seen.append((ra, dec, fov, size))
+            return b'jpeg'
+
+        with patch.object(oi, 'OBJECT_IMAGE_CACHE_DIR', str(tmp_path)):
+            with patch.object(oi, 'download_hips2fits_image', return_value=False):
+                with patch('observation.hips_cutout.render_cutout', side_effect=fake_render):
+                    assert oi.ensure_cached_object_image(10.684, 41.269) is not None
+        assert seen == [(10.684, 41.269, 0.5, 400)]
+
+
 class TestHips2fitsBackoff:
     def test_failure_triggers_backoff_for_subsequent_calls(self, tmp_path):
         with patch.object(oi, 'OBJECT_IMAGE_CACHE_DIR', str(tmp_path)):

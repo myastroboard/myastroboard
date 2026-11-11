@@ -96,6 +96,7 @@ receives account data, but some receive coordinates or the user's IP address.
 | [OpenStreetMap tile and vector tile servers](https://operations.osmfoundation.org/policies/) (United Kingdom) | The map areas viewed, from the server's IP (never the users' IP); downloaded tiles are cached on the server | Server | Background of the maps (locations, photo map, observation log, orbital stations) |
 | Browser push services (Google FCM, Mozilla, Apple) | An opaque notification payload | Server | Web Push, only for users who enabled notifications |
 | CelesTrak, The Space Devs, NOAA SWPC, JPL, Minor Planet Center, CDS Strasbourg, wheretheiss.at | Nothing personal | Server | Satellites, launches, space weather, ephemerides, object images |
+| DSS2 sky survey mirrors: [ESA ESASky](https://sky.esa.int) (Spain/EU), [MAST](https://archive.stsci.edu) on Amazon S3 (United States), [CSIRO CASDA](https://research.csiro.au/casda/) (Australia), [China-VO](https://nadc.china-vo.org) (China) | Sky coordinates of catalogue objects, from the server's IP; nothing about the users | Server | Object images and framing backgrounds, only while CDS hips2fits is unreachable |
 | GitHub | Nothing personal | Server | Check for new releases and download their changelog |
 | MyMemory | Public spaceflight texts only | Server | On-demand translation of launch descriptions |
 

@@ -357,8 +357,20 @@ The server downloads each image once and keeps it in `data/cache/framing_images/
 200 MiB, oldest first); the browser never calls CDS. To bound that cache, the field of view of a
 background is one of a fixed ladder (0.25 to 45 degrees): the page picks the smallest step that is
 about 2.2 times wider than the widest selected frame. The request carries the target's catalogue
-coordinates and nothing about the user. When CDS cannot be reached the frame is still drawn to
-scale on a dark background, and CDS is not retried for a few minutes.
+coordinates and nothing about the user.
+
+When CDS hips2fits cannot be reached, the server builds the same cut-out itself from the tiles of
+the DSS2 colour HiPS published by mirror sites (ESA ESASky, MAST, CSIRO, China-VO - the list CDS
+published during its November 2026 incident), tried in that order
+(`object_info.DSS2_HIPS_MIRRORS`). `observation/hips_cutout.py` maps each output pixel to the sky,
+finds its HEALPix NESTED pixel at the tile resolution hips2fits would use, and averages a 2x2
+sub-pixel grid; the result matches hips2fits on the same field. The mirrors serve CDS's own tiles,
+so the credit stays "DSS2 Color / CDS HiPS". The same fallback serves the object thumbnails
+(`/api/object-image/<filename>`).
+
+Each server (hips2fits and every mirror) is backed off for a few minutes after a failure, so an
+unreachable one costs a single timeout. When none answers, the frame is still drawn to scale on a
+dark background, and image cards show a neutral placeholder.
 
 ### API
 
