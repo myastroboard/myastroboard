@@ -213,7 +213,13 @@ function buildObjectInfoCardHtml(data, opts = {}) {
     }
 
     // ── Sources ──────────────────────────────────────────
-    const srcList = [{ text: t('object_info.source_simbad', 'Source: SIMBAD (CDS, Strasbourg)') }];
+    // Name, type and coordinates come from SIMBAD, or from the local SkyTonight dataset when
+    // SIMBAD (and its mirrors) could not be reached or had no record.
+    const srcList = [{
+        text: data.source === 'local'
+            ? t('object_info.source_local', 'Source: SkyTonight catalogue (OpenNGC and others)')
+            : t('object_info.source_simbad', 'Source: SIMBAD (CDS, Strasbourg)'),
+    }];
     if (!noImage && data.image) {
         srcList.push({ text: t('object_info.source_dss2', 'Image: DSS2 Color / CDS HiPS'), className: 'object-info-image-source' });
     }

@@ -229,6 +229,7 @@ def test_ensure_cached_image_fetches_once_with_requested_field(monkeypatch, tmp_
     assert 'fov=4.000' in url
     assert f'width={sky_framing.IMAGE_SIZE_PX}' in url and f'height={sky_framing.IMAGE_SIZE_PX}' in url
     assert 'projection=TAN' in url
+    assert mock_get.call_args.kwargs['timeout'] == (oi.CONNECT_TIMEOUT, 30)
     with open(expected_path, 'rb') as f:
         assert f.read() == b'fake-jpeg-bytes'
 

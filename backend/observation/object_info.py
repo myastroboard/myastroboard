@@ -36,6 +36,13 @@ logger = get_logger(__name__)
 
 REQUEST_TIMEOUT = 10  # seconds
 
+# Connect timeout for the CDS services and their mirrors. A healthy server accepts a
+# connection in well under a second; an unreachable one (CDS during its November 2026
+# incident) would otherwise hold the request for the whole REQUEST_TIMEOUT before the
+# next mirror is tried. The read timeout stays generous: hips2fits renders slowly.
+CONNECT_TIMEOUT = 3  # seconds
+UPSTREAM_TIMEOUT: tuple[float, float] = (CONNECT_TIMEOUT, REQUEST_TIMEOUT)
+
 # Whitelist of Wikipedia language codes that the endpoint accepts.
 _ALLOWED_LANGS: frozenset = frozenset(
     [
@@ -93,7 +100,14 @@ _WIKIPEDIA_BASES: dict[str, str] = {
         'da',
     ]
 }
-SIMBAD_TAP_URL = 'https://simbad.cds.unistra.fr/simbad/sim-tap/sync'
+# SIMBAD TAP endpoints, tried in this order: CDS itself, then the mirrors CDS lists at
+# https://cds.unistra.fr/ (CfA Harvard, IDIA South Africa). Each id is also its backoff
+# key; the CDS one keeps the historical 'simbad' key.
+SIMBAD_TAP_ENDPOINTS: tuple[tuple[str, str], ...] = (
+    ('simbad', 'https://simbad.cds.unistra.fr/simbad/sim-tap/sync'),
+    ('simbad:cfa', 'https://simbad.cfa.harvard.edu/simbad/sim-tap/sync'),
+    ('simbad:idia', 'https://simbad.idia.ac.za/simbad/sim-tap/sync'),
+)
 HIPS2FITS_URL = 'https://alasky.cds.unistra.fr/hips-image-services/hips2fits'
 
 # Mirrors of the DSS2 colour HiPS (CDS/P/DSS2/color), tried in this order when hips2fits
@@ -111,7 +125,7 @@ DSS2_HIPS_MIRRORS: tuple[tuple[str, str], ...] = (
 DSS2_IMAGE_CREDIT = 'DSS2 Color / CDS HiPS'
 
 # (connect, read) seconds for one mirror tile.
-_HIPS_TILE_TIMEOUT = (5, 15)
+_HIPS_TILE_TIMEOUT = (CONNECT_TIMEOUT, 15)
 
 # Local on-disk cache for hips2fits imagery, keyed by (ra, dec) — DSS2 survey
 # tiles never change, so once fetched an image is cached indefinitely.
@@ -254,28 +268,36 @@ def _sanitize_lang(lang: str) -> str:
 
 
 def _simbad_query(adql: str) -> dict | None:
-    """Execute an ADQL query against the SIMBAD TAP endpoint and return the JSON payload."""
-    if _is_backed_off('simbad'):
-        return None
-    try:
-        resp = requests.get(
-            SIMBAD_TAP_URL,
-            params={
-                'REQUEST': 'doQuery',
-                'LANG': 'ADQL',
-                'FORMAT': 'json',
-                'QUERY': adql,
-            },
-            timeout=REQUEST_TIMEOUT,
-            headers={'Accept': 'application/json'},
-        )
-        resp.raise_for_status()
-        _clear_backoff('simbad')
-        return resp.json()
-    except requests.RequestException as exc:
-        logger.warning(f'SIMBAD TAP request failed: {exc}')
-        _trigger_backoff('simbad')
-        return None
+    """Execute an ADQL query against SIMBAD TAP and return the JSON payload.
+
+    The endpoints of ``SIMBAD_TAP_ENDPOINTS`` are tried in turn, each with its own
+    backoff, so CDS being down costs one connect timeout and then goes straight to a
+    mirror. Returns None when no endpoint answers.
+    """
+    for service, url in SIMBAD_TAP_ENDPOINTS:
+        if _is_backed_off(service):
+            continue
+        try:
+            resp = requests.get(
+                url,
+                params={
+                    'REQUEST': 'doQuery',
+                    'LANG': 'ADQL',
+                    'FORMAT': 'json',
+                    'QUERY': adql,
+                },
+                timeout=UPSTREAM_TIMEOUT,
+                headers={'Accept': 'application/json'},
+            )
+            resp.raise_for_status()
+            payload = resp.json()
+        except (requests.RequestException, ValueError) as exc:
+            logger.warning(f'SIMBAD TAP request to {service} failed: {exc}')
+            _trigger_backoff(service)
+            continue
+        _clear_backoff(service)
+        return payload
+    return None
 
 
 def _sort_aliases(aliases: list[str]) -> list[str]:
@@ -597,7 +619,7 @@ def download_dss_image(
     size_px: int,
     local_path: str,
     label: str,
-    timeout: float | tuple[float, float] = REQUEST_TIMEOUT,
+    timeout: float | tuple[float, float] = UPSTREAM_TIMEOUT,
 ) -> bool:
     """Write a DSS2 colour cut-out to *local_path*; return whether any server delivered it.
 
@@ -640,7 +662,7 @@ def _render_from_hips_mirrors(
 
 
 def download_hips2fits_image(
-    url: str, local_path: str, label: str, timeout: float | tuple[float, float] = REQUEST_TIMEOUT
+    url: str, local_path: str, label: str, timeout: float | tuple[float, float] = UPSTREAM_TIMEOUT
 ) -> bool:
     """Download one hips2fits image to *local_path* (atomic write); return whether it succeeded.
 
@@ -833,7 +855,7 @@ def get_object_info(identifier: str, lang: str = 'en') -> dict[str, Any]:
     Steps:
       1. Validate *identifier* (safe characters, max 64 chars).
       2. Resolve via SIMBAD → name, type, RA/DEC, aliases.
-      3. Build SkyView image URL from RA/DEC.
+      3. Build the (server-cached) DSS2 image URL from RA/DEC.
       4. Fetch Wikipedia description (requested lang → English fallback).
 
     Returns a dict matching the feature spec:
@@ -845,7 +867,8 @@ def get_object_info(identifier: str, lang: str = 'en') -> dict[str, Any]:
         "coordinates": {"ra": float, "dec": float} | None,
         "description": str | None,
         "description_title": str | None,
-        "image": {"url": str, "credit": str} | None
+        "image": {"url": str, "credit": str} | None,
+        "source": "simbad" | "local"  (where name, type and coordinates come from; absent on error)
     }
     """
     lang = _sanitize_lang(lang)
@@ -906,6 +929,7 @@ def get_object_info(identifier: str, lang: str = 'en') -> dict[str, Any]:
                 'description': _wiki.get('extract') if _wiki else None,
                 'description_title': _wiki.get('title') if _wiki else None,
                 'image': _image,
+                'source': 'local',
             }
         return {
             'id': identifier,
@@ -970,4 +994,5 @@ def get_object_info(identifier: str, lang: str = 'en') -> dict[str, Any]:
         'description': wiki_data.get('extract') if wiki_data else None,
         'description_title': wiki_data.get('title') if wiki_data else None,
         'image': image,
+        'source': 'simbad',
     }

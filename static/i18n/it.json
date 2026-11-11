@@ -2663,6 +2663,7 @@
     "image_unavailable": "Immagine non disponibile",
     "description_unavailable": "Descrizione non disponibile",
     "source_simbad": "Fonte: SIMBAD (CDS, Strasburgo)",
+    "source_local": "Fonte: catalogo SkyTonight (OpenNGC e altri)",
     "source_wikipedia": "Descrizione: Wikipedia",
     "source_dss2": "Immagine: DSS2 a colori / HiPS del CDS",
     "error_loading": "Impossibile caricare le informazioni sull'oggetto."

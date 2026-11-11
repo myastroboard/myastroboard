@@ -45,8 +45,8 @@ FOV_LADDER_DEG: tuple[float, ...] = (0.25, 0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 6.0, 8.
 
 # (connect, read) seconds. A wide cut-out takes CDS noticeably longer to render than the
 # 400 px object thumbnails, hence the long read timeout; the short connect timeout keeps
-# an unreachable CDS from holding a worker for that long.
-_IMAGE_REQUEST_TIMEOUT = (5, 30)
+# an unreachable CDS from holding a worker for that long before the mirrors are tried.
+_IMAGE_REQUEST_TIMEOUT = (object_info.CONNECT_TIMEOUT, 30)
 
 # Solar-system targets move: a background centred on catalogue coordinates is meaningless.
 _MOVING_CATEGORIES = {'bodies', 'comets'}

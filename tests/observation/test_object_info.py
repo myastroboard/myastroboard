@@ -375,6 +375,8 @@ def test_get_object_info_builds_image_url_when_coordinates_present(monkeypatch):
     assert result['id'] == 'NGC 224'
     assert result['image'] is not None
     assert '10.684000' in result['image']['url']
+    assert result['image']['credit'] == oi.DSS2_IMAGE_CREDIT
+    assert result['source'] == 'simbad'
     assert result['description'] is None  # Wikipedia mocked to None
 
 
@@ -466,6 +468,8 @@ def test_get_object_info_local_fallback_when_simbad_fails(monkeypatch):
     assert result['coordinates'] == {'ra': 336.06, 'dec': 68.15}
     assert result['image'] is not None
     assert '336.060000' in result['image']['url']
+    # Name, type and coordinates came from the local dataset, not SIMBAD - the modal says so.
+    assert result['source'] == 'local'
 
 
 def test_get_object_info_variant_lookup_succeeds(monkeypatch):
@@ -971,10 +975,84 @@ class TestSimbadBackoff:
         assert 'simbad' not in oi._backoff_until
 
     def test_active_backoff_short_circuits_resolve(self):
-        oi._backoff_until['simbad'] = oi.time.time() + 300
+        """With CDS and every mirror backed off, resolution makes no request at all."""
+        for service, _ in oi.SIMBAD_TAP_ENDPOINTS:
+            oi._backoff_until[service] = oi.time.time() + 300
         with patch("observation.object_info.requests.get") as mock_get:
             assert oi._resolve_via_simbad("M31") is None
         mock_get.assert_not_called()
+
+
+class TestSimbadMirrors:
+    """_simbad_query: CDS SIMBAD first, then the CfA and IDIA mirrors."""
+
+    PAYLOAD = {"metadata": [], "data": [["M  31", 10.68, 41.27, "AGN"]]}
+
+    @staticmethod
+    def _ok(payload):
+        resp = MagicMock()
+        resp.raise_for_status.return_value = None
+        resp.json.return_value = payload
+        return resp
+
+    def _fake_get(self, failing, bad_json=()):
+        urls = []
+
+        def fake_get(url, **kwargs):
+            urls.append(url)
+            if url in failing:
+                raise _req_module.ConnectionError("down")
+            if url in bad_json:
+                resp = self._ok(None)
+                resp.json.side_effect = ValueError("not JSON")
+                return resp
+            return self._ok(self.PAYLOAD)
+
+        return urls, fake_get
+
+    def test_cds_answers_first(self):
+        """While CDS answers, the mirrors are not used."""
+        urls, fake_get = self._fake_get(failing=())
+        with patch("observation.object_info.requests.get", side_effect=fake_get):
+            assert oi._simbad_query("SELECT 1") == self.PAYLOAD
+        assert urls == [oi.SIMBAD_TAP_ENDPOINTS[0][1]]
+
+    def test_cds_failure_falls_back_to_first_mirror(self):
+        """A CDS failure is backed off and the same query goes to the CfA mirror."""
+        cds, cfa = oi.SIMBAD_TAP_ENDPOINTS[0][1], oi.SIMBAD_TAP_ENDPOINTS[1][1]
+        urls, fake_get = self._fake_get(failing={cds})
+        with patch("observation.object_info.requests.get", side_effect=fake_get):
+            assert oi._simbad_query("SELECT 1") == self.PAYLOAD
+            assert urls == [cds, cfa]
+            urls.clear()
+            assert oi._simbad_query("SELECT 2") == self.PAYLOAD
+        assert urls == [cfa]
+        assert oi._is_backed_off("simbad")
+        assert not oi._is_backed_off("simbad:cfa")
+
+    def test_non_json_answer_moves_to_next_mirror(self):
+        """A 200 that is not JSON (a maintenance page) counts as a failure of that endpoint."""
+        endpoints = [url for _, url in oi.SIMBAD_TAP_ENDPOINTS]
+        urls, fake_get = self._fake_get(failing={endpoints[0]}, bad_json={endpoints[1]})
+        with patch("observation.object_info.requests.get", side_effect=fake_get):
+            assert oi._simbad_query("SELECT 1") == self.PAYLOAD
+        assert urls == endpoints
+        assert oi._is_backed_off("simbad:cfa")
+
+    def test_all_endpoints_failing_returns_none(self):
+        """With CDS and both mirrors down the query yields None and all are backed off."""
+        endpoints = {url for _, url in oi.SIMBAD_TAP_ENDPOINTS}
+        urls, fake_get = self._fake_get(failing=endpoints)
+        with patch("observation.object_info.requests.get", side_effect=fake_get):
+            assert oi._simbad_query("SELECT 1") is None
+        assert set(urls) == endpoints
+        assert all(oi._is_backed_off(service) for service, _ in oi.SIMBAD_TAP_ENDPOINTS)
+
+    def test_requests_use_short_connect_timeout(self):
+        """Every SIMBAD request uses the short connect timeout, so a dead server is left quickly."""
+        with patch("observation.object_info.requests.get", return_value=self._ok(self.PAYLOAD)) as mock_get:
+            oi._simbad_query("SELECT 1")
+        assert mock_get.call_args.kwargs["timeout"] == (oi.CONNECT_TIMEOUT, oi.REQUEST_TIMEOUT)
 
 
 class TestWikipediaBackoff:
@@ -1080,6 +1158,17 @@ class TestDss2MirrorFallback:
                 with patch('observation.hips_cutout.render_cutout', side_effect=fake_render):
                     assert oi.ensure_cached_object_image(10.684, 41.269) is not None
         assert seen == [(10.684, 41.269, 0.5, 400)]
+
+
+def test_object_image_hips2fits_request_uses_short_connect_timeout(tmp_path):
+    """The hips2fits request gives up connecting quickly, so a dead CDS hands over to the mirrors fast."""
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status.return_value = None
+    mock_resp.iter_content.return_value = [b'jpeg']
+    with patch.object(oi, 'OBJECT_IMAGE_CACHE_DIR', str(tmp_path)):
+        with patch('observation.object_info.requests.get', return_value=mock_resp) as mock_get:
+            oi.ensure_cached_object_image(10.684, 41.269)
+    assert mock_get.call_args.kwargs['timeout'] == (oi.CONNECT_TIMEOUT, oi.REQUEST_TIMEOUT)
 
 
 class TestHips2fitsBackoff:
