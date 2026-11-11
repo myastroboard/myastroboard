@@ -8,6 +8,7 @@ import os
 import time
 import zipfile
 from datetime import UTC, datetime
+from urllib.parse import urlsplit
 
 from flask import Blueprint, current_app, jsonify, request, send_file, session
 
@@ -48,6 +49,24 @@ def get_app_settings_api():
     )
 
 
+_LOOPBACK_HOSTS = {'localhost', '127.0.0.1', '::1'}
+
+
+def _request_can_keep_secure_cookies() -> bool:
+    """True when the browser will accept a ``Secure`` cookie from this page.
+
+    That is HTTPS (as seen through ProxyFix when the proxy headers are trusted), or a loopback
+    address, which browsers treat as secure even over plain HTTP.
+    """
+    if request.is_secure:
+        return True
+    try:
+        host = urlsplit(f'//{request.host}').hostname or ''  # lower-cased, port and IPv6 brackets removed
+    except ValueError:  # a malformed Host header is not a secure context
+        return False
+    return host in _LOOPBACK_HOSTS or host.endswith('.localhost')
+
+
 @admin_bp.route('/api/admin/app-settings', methods=['POST'])
 @admin_required
 def update_app_settings_api():
@@ -60,16 +79,35 @@ def update_app_settings_api():
         data.get('external_base_url', old_settings.get('external_base_url', ''))
     )
     if external_base_url is None:
-        return jsonify({'error': 'external_base_url must be an http(s):// address'}), 400
+        return jsonify(
+            {
+                'error': 'external_base_url must be an http(s):// address',
+                'error_key': 'settings.app_settings_external_base_url_invalid',
+            }
+        ), 400
+
+    # Turning on HTTPS-only cookies from a plain-HTTP page would lock the admin out: the browser
+    # drops every Secure cookie the server sends to that page, so signing in (and out) stops
+    # working there. Only the switch from off to on is refused; a value already on is kept.
+    secure_requested = bool(data.get('session_cookie_secure', old_settings.get('session_cookie_secure', False)))
+    if secure_requested and not old_settings.get('session_cookie_secure') and not _request_can_keep_secure_cookies():
+        logger.warning(
+            f"Refused to turn on HTTPS-only session cookies from a plain-HTTP page ({request.host}), "
+            f"requested by {session.get('username', '?')}"
+        )
+        return jsonify(
+            {
+                'error': 'Open this page over HTTPS before turning on HTTPS-only session cookies',
+                'error_key': 'settings.app_settings_session_secure_needs_https',
+            }
+        ), 400
 
     new_settings = {
         'vapid_contact_email': str(
             data.get('vapid_contact_email', old_settings.get('vapid_contact_email', ''))
         ).strip(),
         'trust_proxy_headers': bool(data.get('trust_proxy_headers', old_settings.get('trust_proxy_headers', False))),
-        'session_cookie_secure': bool(
-            data.get('session_cookie_secure', old_settings.get('session_cookie_secure', False))
-        ),
+        'session_cookie_secure': secure_requested,
         'search_engine_indexing': bool(
             data.get('search_engine_indexing', old_settings.get('search_engine_indexing', False))
         ),

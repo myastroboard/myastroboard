@@ -909,6 +909,7 @@
     "app_settings_external_base_url_label": "URL de base externe",
     "app_settings_external_base_url_help": "Adresse utilisée par les autres logiciels pour joindre MyAstroBoard : le flux Astrodex (caméra Home Assistant, carte Lovelace) et le retour des photos MyAstroShine. Laissez vide pour utiliser l'adresse de votre navigateur. Obligatoire si vous utilisez MyAstroBoard depuis la barre latérale de Home Assistant.",
     "app_settings_external_base_url_invalid": "L'URL de base externe doit commencer par http:// ou https://.",
+    "app_settings_session_secure_needs_https": "Ouvrez cette page en HTTPS avant d'activer le cookie de session HTTPS uniquement : en HTTP, votre navigateur refuse ce cookie, et vous ne pourriez plus vous connecter ni vous déconnecter depuis cette adresse.",
     "app_settings_save_btn": "Enregistrer",
     "app_settings_saved": "Paramètres enregistrés.",
     "app_settings_restart_required": "Un redémarrage du conteneur est nécessaire pour appliquer les modifications proxy.",
