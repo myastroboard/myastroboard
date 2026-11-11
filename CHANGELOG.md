@@ -12,6 +12,20 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
+- None.
+
+### Breaking changes
+
+- None.
+
+## 1.8.1 (2026-11-11)
+
+### Features
+
+- None.
+
+### Fixes
+
 - DSS2 sky images (object thumbnails, framing backgrounds) fall back to mirrors of the survey (ESA, MAST, CSIRO,
   China-VO) when CDS hips2fits is down; cards show a placeholder when no server answers. See
   [docs/SKYTONIGHT.md](docs/SKYTONIGHT.md#sky-image).
