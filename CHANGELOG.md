@@ -20,6 +20,10 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   of reading install data. See [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md#sessions).
 - Only admins can clear the Celestrak block of the ISS / CSS trackers, as documented; the button is hidden
   from other accounts.
+- The setup wizard closes as soon as Skip, Skip all, Finish or "Go to SkyTonight" is clicked, instead of
+  staying on screen until its choice was saved (a second click then skipped a step or saved twice).
+- The HTTPS-only session cookie can no longer be turned on from a plain-HTTP page, where the browser would
+  drop it and lock the admin out. Recovery steps in [docs/6.REVERSE_PROXY.md](docs/6.REVERSE_PROXY.md).
 
 ### Breaking changes
 

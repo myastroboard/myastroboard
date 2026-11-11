@@ -889,7 +889,7 @@ def export_my_data():
     """ZIP of everything stored about the signed-in user (any role, read-only included)."""
     try:
         user = get_current_user()
-        if not user:
+        if not user:  # pragma: no cover - login_required already signed out a session without account
             return jsonify({'error': 'Authentication required'}), 401
         return _send_user_export(user, user.username)
     except Exception as e:

@@ -118,9 +118,13 @@ Open `http://<host>:5050` from your local network and:
 3. **Trust the proxy headers** (*Parameters -> Advanced -> Reverse proxy*) when the public address
    goes through a tunnel or reverse proxy. Without it every visitor shares the proxy's IP
    address: one visitor's failed sign-ins would throttle everyone, and if the proxy's address is
-   inside a trusted network, every visitor would count as local. Turn on secure cookies too when
-   the public address is HTTPS. The startup log warns when demo mode runs without trusted proxy
-   headers.
+   inside a trusted network, every visitor would count as local. The startup log warns when demo
+   mode runs without trusted proxy headers.
+
+   Leave *HTTPS-only session cookie* **off** while you reach the instance at `http://<host>:5050`:
+   a browser drops a `Secure` cookie on a plain-HTTP page, so the admin, who signs in from the
+   local network only, could no longer sign in or out. Turn it on only once every address you use
+   is HTTPS, local one included; the setting refuses to turn on from a plain-HTTP page.
 4. Leave *Search engine indexing* (*Parameters -> Advanced -> Privacy*) as you want the demo to
    be found or not.
 

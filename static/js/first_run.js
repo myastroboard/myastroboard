@@ -14,6 +14,7 @@ const _wizard = {
     steps: [],
     stepIndex: 0,
     saving: false,
+    closing: false,
     presets: { telescopes: [], cameras: [] },
     existingTelescopes: [],
     existingCameras: [],
@@ -179,9 +180,25 @@ function _wizardBack() {
     _renderWizardStep();
 }
 
-async function _wizardFinish() {
-    await _wizardPersist({ completed: true, skipped: false });
+/**
+ * Close the wizard at once, then save its state. The save can take a moment on a busy
+ * server, and a wizard still on screen after a click reads as a button that did not work:
+ * people click again, and the second click skipped one more step or saved twice. Repeat
+ * clicks while it closes are ignored.
+ */
+async function _wizardClose(wizardState) {
+    if (_wizard.closing) return;
+    _wizard.closing = true;
     closeModal('#wizard-modal');
+    try {
+        await _wizardPersist(wizardState);
+    } finally {
+        _wizard.closing = false;
+    }
+}
+
+async function _wizardFinish() {
+    await _wizardClose({ completed: true, skipped: false });
     if (typeof SkyWidget !== 'undefined') SkyWidget.refresh();
 }
 
@@ -191,24 +208,19 @@ async function _wizardFinish() {
  * Both display the required "configuration will be done manually" alert.
  */
 async function _wizardSkip(all) {
+    if (_wizard.closing) return;
     if (all && !window.confirm(i18n.t('wizard.confirm_skip_all'))) {
         return;
     }
 
     showMessage('info', i18n.t('wizard.skip_alert'));
 
-    if (all) {
-        await _wizardPersist({ completed: false, skipped: true });
-        closeModal('#wizard-modal');
+    if (all || _wizard.stepIndex >= _wizard.steps.length - 1) {
+        await _wizardClose({ completed: false, skipped: true });
         return;
     }
 
     _wizard.stepIndex += 1;
-    if (_wizard.stepIndex >= _wizard.steps.length) {
-        await _wizardPersist({ completed: false, skipped: true });
-        closeModal('#wizard-modal');
-        return;
-    }
     _renderWizardStep();
 }
 

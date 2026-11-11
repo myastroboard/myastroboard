@@ -83,6 +83,8 @@ async function fetchJSONOnce(endpoint, options = {}) {
         if (!response.ok) {
             const error = new Error(`HTTP ${response.status}: ${response.statusText}`);
             error.status = response.status;
+            // The JSON error body ({error, error_key}) when there is one, so callers can show it
+            error.data = await response.json().catch(() => null);
             throw error;
         }
 

@@ -115,7 +115,12 @@ async function _saveAppSettings(partial, section) {
     } catch (err) {
         console.error('Failed to save app settings:', err);
         if (err.status === 400 && section === 'proxy') {
-            showMessage('error', i18n.t('settings.app_settings_external_base_url_invalid'));
+            const errorKey = err.data?.error_key;
+            showMessage('error', i18n.t(errorKey && i18n.has(errorKey)
+                ? errorKey
+                : 'settings.app_settings_external_base_url_invalid'));
+            // A refused HTTPS-only cookie switch: show the setting as it really is (still off)
+            loadAppSettings();
         }
     }
 }

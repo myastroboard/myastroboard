@@ -578,6 +578,95 @@ class TestAdminEndpoints:
         resp = client_admin.post('/api/admin/app-settings', json={'trust_proxy_headers': False})
         assert resp.status_code == 200
 
+    @pytest.fixture
+    def keep_cookie_config(self, monkeypatch):
+        """The route applies SESSION_COOKIE_SECURE live: put this process's value back afterwards."""
+        monkeypatch.setitem(_app_mod.app.config, 'SESSION_COOKIE_SECURE', _app_mod.app.config['SESSION_COOKIE_SECURE'])
+
+    @pytest.mark.parametrize(
+        'address, keeps',
+        [
+            ('https://demo.example.org', True),
+            ('http://localhost:5000', True),
+            ('http://LOCALHOST', True),
+            ('http://127.0.0.1:5000', True),
+            ('http://[::1]:5000', True),
+            ('http://myastroboard.localhost:5000', True),
+            ('http://192.168.1.10:5050', False),
+            ('http://demo.example.org', False),
+            ('http://[fe80::1]:5000', False),
+        ],
+    )
+    def test_secure_cookie_rule_follows_what_browsers_accept(self, address, keeps):
+        """Browsers keep a Secure cookie over HTTPS and on loopback addresses only."""
+        from blueprints import admin as admin_bp_module
+
+        with _app_mod.app.test_request_context('/', base_url=address):
+            assert admin_bp_module._request_can_keep_secure_cookies() is keeps
+
+    def test_secure_cookie_rule_treats_a_malformed_host_as_insecure(self, monkeypatch):
+        """A Host header that is not a valid address is never a secure context: Werkzeug already
+        empties it, and a host urlsplit still cannot parse is refused too."""
+        from blueprints import admin as admin_bp_module
+
+        with _app_mod.app.test_request_context('/', environ_overrides={'HTTP_HOST': '[::1'}):
+            assert admin_bp_module._request_can_keep_secure_cookies() is False
+
+        def _unparsable(url):
+            raise ValueError('Invalid IPv6 URL')
+
+        monkeypatch.setattr(admin_bp_module, 'urlsplit', _unparsable)
+        with _app_mod.app.test_request_context('/', base_url='http://localhost:5000'):
+            assert admin_bp_module._request_can_keep_secure_cookies() is False
+
+    def test_https_only_cookie_is_refused_from_a_plain_http_page(self, client_admin, keep_cookie_config, monkeypatch):
+        """Turning it on from http://<lan address> would lock the admin out: refused, setting stays off."""
+        from blueprints import admin as admin_bp_module
+
+        monkeypatch.setattr(admin_bp_module, '_request_can_keep_secure_cookies', lambda: False)
+
+        resp = client_admin.post('/api/admin/app-settings', json={'session_cookie_secure': True})
+
+        assert resp.status_code == 400
+        assert resp.get_json()['error_key'] == 'settings.app_settings_session_secure_needs_https'
+        assert client_admin.get('/api/admin/app-settings').get_json()['session_cookie_secure'] is False
+        assert _app_mod.app.config['SESSION_COOKIE_SECURE'] is False
+
+    def test_https_only_cookie_turns_on_where_the_browser_keeps_it(self, client_admin, keep_cookie_config, monkeypatch):
+        """From an HTTPS (or loopback) page the setting turns on and applies at once."""
+        from blueprints import admin as admin_bp_module
+
+        monkeypatch.setattr(admin_bp_module, '_request_can_keep_secure_cookies', lambda: True)
+
+        resp = client_admin.post('/api/admin/app-settings', json={'session_cookie_secure': True})
+
+        assert resp.status_code == 200
+        assert _app_mod.app.config['SESSION_COOKIE_SECURE'] is True
+
+    def test_https_only_cookie_already_on_does_not_block_other_saves_over_http(
+        self, client_admin, keep_cookie_config, monkeypatch
+    ):
+        """Only the switch from off to on is checked: an instance already on still saves its other settings."""
+        from blueprints import admin as admin_bp_module
+
+        monkeypatch.setattr(admin_bp_module, '_request_can_keep_secure_cookies', lambda: True)
+        client_admin.post('/api/admin/app-settings', json={'session_cookie_secure': True})
+        monkeypatch.setattr(admin_bp_module, '_request_can_keep_secure_cookies', lambda: False)
+
+        resp = client_admin.post(
+            '/api/admin/app-settings', json={'session_cookie_secure': True, 'log_retention_days': 30}
+        )
+
+        assert resp.status_code == 200
+        settings = client_admin.get('/api/admin/app-settings').get_json()
+        assert settings['session_cookie_secure'] is True and settings['log_retention_days'] == 30
+
+    def test_invalid_external_base_url_says_why(self, client_admin):
+        """The 400 for a bad external address carries its translation key."""
+        resp = client_admin.post('/api/admin/app-settings', json={'external_base_url': 'ftp://x'})
+        assert resp.status_code == 400
+        assert resp.get_json()['error_key'] == 'settings.app_settings_external_base_url_invalid'
+
     def test_log_retention_is_saved_clamped_and_applied_when_changed(self, client_admin, monkeypatch):
         from blueprints import admin as admin_bp_module
 
