@@ -171,12 +171,14 @@ def client_user():
     app.config['TESTING'] = True
     with tempfile.TemporaryDirectory():
         with app.test_client() as c:
-            # Create a temporary regular user
-            temp_id = str(uuid.uuid4())
+            # A real account: a session whose account does not exist is signed out (login_required)
+            user = user_manager.get_user_by_username('testuser') or user_manager.create_user(
+                'testuser', 'testuser-pw', 'user'
+            )
             with c.session_transaction() as sess:
-                sess['user_id'] = temp_id
-                sess['username'] = 'testuser'
-                sess['role'] = 'user'
+                sess['user_id'] = user.user_id
+                sess['username'] = user.username
+                sess['role'] = user.role
             yield c
 
 
@@ -8497,6 +8499,18 @@ class TestCSSCelestrakRestart:
         monkeypatch.setattr(_app_mod.css_passes, 'clear_css_celestrak_block_flag', _raise)
         resp = client_admin.post('/api/css/celestrak/restart')
         assert resp.status_code == 500
+
+    @pytest.mark.parametrize('station', ['iss', 'css'])
+    def test_celestrak_restart_is_refused_to_non_admins(self, client_user, monkeypatch, station):
+        """Clearing the Celestrak block makes the server call Celestrak again: admins only."""
+        cleared = []
+        monkeypatch.setattr(_app_mod.iss_passes, 'clear_celestrak_block_flag', lambda: cleared.append('iss'))
+        monkeypatch.setattr(_app_mod.css_passes, 'clear_css_celestrak_block_flag', lambda: cleared.append('css'))
+
+        resp = client_user.post(f'/api/{station}/celestrak/restart')
+
+        assert resp.status_code == 403
+        assert cleared == []
 
 
 # ---------------------------------------------------------------------------

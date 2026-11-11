@@ -12,7 +12,7 @@ from flask import Blueprint, jsonify, request, send_from_directory
 
 from cache import cache_store
 from space import css_passes, iss_passes
-from utils.auth import login_required
+from utils.auth import admin_required, login_required
 from utils.constants import (
     CACHE_TTL_CSS_PASSES,
     CACHE_TTL_ISS_PASSES,
@@ -173,7 +173,7 @@ def get_iss_location_api():
 
 
 @tracking_bp.route("/api/iss/celestrak/restart", methods=["POST"])
-@login_required
+@admin_required
 def restart_iss_celestrak_crawl_api():
     """Clear Celestrak block flag after explicit operator confirmation in UI."""
     try:
@@ -245,7 +245,7 @@ def get_css_location_api():
 
 
 @tracking_bp.route("/api/css/celestrak/restart", methods=["POST"])
-@login_required
+@admin_required
 def restart_css_celestrak_crawl_api():
     """Clear CSS Celestrak block flag after explicit operator confirmation in UI."""
     try:
