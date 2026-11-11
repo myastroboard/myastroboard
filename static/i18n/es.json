@@ -3219,5 +3219,12 @@
     "not_found": "Ubicación no encontrada",
     "cannot_delete_default": "No se puede eliminar la ubicación predeterminada de la instalación - promueva primero otra",
     "not_accessible": "Esta ubicación no le está atribuida"
+  },
+  "demo": {
+    "banner_title": "Demo",
+    "banner_text": "Está viendo una demo de solo lectura: el cielo, el tiempo y los objetivos están en directo, pero nada de lo que cambie se guarda.",
+    "banner_install": "Instale la suya",
+    "read_only": "Demo de solo lectura: los cambios no se guardan. Instale su propio MyAstroBoard para conservar sus datos.",
+    "signin_refused": "Esta cuenta no puede iniciar sesión en la demo. Prepare la demo con DEMO_MODE desactivado, vea docs/DEMO_MODE.md."
   }
 }

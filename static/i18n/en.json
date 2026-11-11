@@ -3219,5 +3219,12 @@
     "not_found": "Location not found",
     "cannot_delete_default": "Cannot delete the install default location - promote another preset first",
     "not_accessible": "This location is not attributed to you"
+  },
+  "demo": {
+    "banner_title": "Demo",
+    "banner_text": "You are browsing a read-only demo: the sky, weather and targets are live, but nothing you change is saved.",
+    "banner_install": "Install your own",
+    "read_only": "Read-only demo: changes are not saved. Install your own MyAstroBoard to keep your data.",
+    "signin_refused": "This account cannot sign in on the demo. Prepare the demo with DEMO_MODE off, see docs/DEMO_MODE.md."
   }
 }

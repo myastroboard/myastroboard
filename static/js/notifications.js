@@ -48,7 +48,8 @@ class NotificationManager {
     get isSupported() {
         // Not under a sub-path (HA ingress panel): no service worker there, and the page is
         // a frame inside Home Assistant - see _notifPermissionBannerState() for the message.
-        return typeof Notification !== 'undefined' && !APP_BASE_PATH;
+        // No notifications under the HA sub-path, nor on a public demo (no visitor is ever prompted)
+        return typeof Notification !== 'undefined' && !APP_BASE_PATH && !DEMO_MODE;
     }
 
     get permission() {
@@ -253,7 +254,7 @@ function _urlBase64ToUint8Array(base64String) {
 }
 
 async function _subscribeToPush() {
-    if (APP_BASE_PATH || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    if (APP_BASE_PATH || DEMO_MODE || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
     try {
         const resp = await fetch('/api/push/vapid-public-key', { credentials: 'same-origin' });
         if (!resp.ok) return;

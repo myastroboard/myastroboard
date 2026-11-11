@@ -10,8 +10,16 @@ from threading import Lock
 
 from flask import Blueprint, jsonify, request, send_file, session
 
+from utils import demo_mode as _demo_mode
 from utils import security_settings as _security_settings
-from utils.auth import ALLOWED_ACCOUNT_SCOPES, admin_required, get_current_user, login_required, user_manager
+from utils.auth import (
+    ALLOWED_ACCOUNT_SCOPES,
+    DEFAULT_USER_PREFERENCES,
+    admin_required,
+    get_current_user,
+    login_required,
+    user_manager,
+)
 from utils.logging_config import get_logger
 from utils.rate_limit import SlidingWindowCounter
 from utils.user_data import build_user_export
@@ -214,6 +222,15 @@ def login():
             return jsonify({'error': 'Invalid credentials', 'error_key': 'auth.invalid_credentials'}), 401
 
         _login_failures_by_account.clear(account_key)
+
+        # Public demo: the demo account is only ever signed in automatically, and an
+        # account still on the default password must not be reachable from the internet.
+        if _demo_mode.is_demo_mode() and (
+            _demo_mode.is_demo_username(user.username) or user.is_using_default_password()
+        ):
+            logger.warning(f"Demo mode: password sign-in refused for {username!r} from {client_ip!r}")
+            return jsonify({'error': 'Sign-in disabled on this demo', 'error_key': 'demo.signin_refused'}), 403
+
         settings = _security_settings.get_security_settings()
         configured_networks = settings.get('trusted_networks') or []
         client_is_trusted = _security_settings.is_client_ip_trusted(client_ip, settings)
@@ -354,6 +371,7 @@ def auth_status():
                     'totp_enabled': user.totp_enabled,
                     'totp_confirmed_at': user.totp_confirmed_at,
                     'account_scope': user.account_scope,
+                    'demo_mode': _demo_mode.is_demo_session(),
                 }
             )
         session.clear()  # the account no longer exists (deleted, or replaced by a backup restore)
@@ -610,6 +628,8 @@ def get_own_preferences():
             return jsonify({'error': 'Authentication required', 'error_key': 'auth.authentication_required'}), 401
 
         preferences = user_manager.get_user_preferences(current_user.user_id)
+        if _demo_mode.is_demo_session():
+            preferences = _demo_mode.visitor_preferences(preferences)
         return jsonify({'preferences': preferences})
     except ValueError as e:
         logger.warning(f"Preference fetch rejected for user {session.get('username')}: {e}")
@@ -632,6 +652,18 @@ def update_own_preferences():
         preferences = data.get('preferences')
         if preferences is None:
             return jsonify({'error': 'Preferences are required', 'error_key': 'settings.pref_save_error'}), 400
+
+        if _demo_mode.is_demo_session():
+            # Shared demo account: the visitor's choices stay in their own session cookie
+            if not isinstance(preferences, dict):
+                raise ValueError("Preferences payload must be a dictionary")
+            is_valid, error_msg = user_manager.validate_user_preferences(preferences)
+            if not is_valid:
+                raise ValueError(error_msg)
+            known = {k: v for k, v in preferences.items() if k in DEFAULT_USER_PREFERENCES}
+            _demo_mode.store_session_preferences(known)
+            updated = _demo_mode.visitor_preferences(user_manager.get_user_preferences(current_user.user_id))
+            return jsonify({'status': 'success', 'preferences': updated})
 
         updated = user_manager.update_user_preferences(current_user.user_id, preferences)
         return jsonify({'status': 'success', 'preferences': updated})

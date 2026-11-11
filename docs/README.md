@@ -18,6 +18,7 @@ Welcome to the comprehensive documentation for MyAstroBoard, the integrated astr
 
 ### Deployment & Security
 - [Reverse Proxy & HTTPS Setup](6.REVERSE_PROXY.md) - Deploy behind NGINX Proxy Manager, Traefik, or other reverse proxies with HTTPS
+- [Demo Mode](DEMO_MODE.md) - Run a public, read-only demo instance: automatic sign-in, every write refused
 
 ### Features
 

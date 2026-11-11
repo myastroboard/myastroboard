@@ -3219,5 +3219,12 @@
     "not_found": "Standort nicht gefunden",
     "cannot_delete_default": "Der Installationsstandard-Standort kann nicht gelöscht werden - befördern Sie zuerst einen anderen",
     "not_accessible": "Dieser Standort ist Ihnen nicht zugewiesen"
+  },
+  "demo": {
+    "banner_title": "Demo",
+    "banner_text": "Sie sehen eine schreibgeschützte Demo: Himmel, Wetter und Ziele sind live, aber Ihre Änderungen werden nicht gespeichert.",
+    "banner_install": "Eigene Instanz installieren",
+    "read_only": "Schreibgeschützte Demo: Änderungen werden nicht gespeichert. Installieren Sie Ihr eigenes MyAstroBoard, um Ihre Daten zu behalten.",
+    "signin_refused": "Dieses Konto kann sich in der Demo nicht anmelden. Bereiten Sie die Demo mit deaktiviertem DEMO_MODE vor, siehe docs/DEMO_MODE.md."
   }
 }

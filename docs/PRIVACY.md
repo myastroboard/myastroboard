@@ -81,6 +81,10 @@ MyAstroBoard sets a single cookie: the Flask **session cookie**, which keeps the
 browser closes, or 30 days when *Remember me* is ticked. It is strictly necessary for the service,
 so no consent banner is required (ePrivacy Directive, Art. 5(3)).
 
+On a [demo instance](DEMO_MODE.md) (`DEMO_MODE=true`), the same cookie also carries the visitor's
+UI preferences (theme, language, density), since every visitor shares one demo account. Nothing
+else about the visitor is stored.
+
 ---
 
 ## Third parties

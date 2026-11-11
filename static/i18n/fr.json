@@ -3219,5 +3219,12 @@
     "not_found": "Lieu introuvable",
     "cannot_delete_default": "Impossible de supprimer le lieu par défaut de l'installation - promouvez d'abord un autre lieu",
     "not_accessible": "Ce lieu ne vous est pas attribué"
+  },
+  "demo": {
+    "banner_title": "Démo",
+    "banner_text": "Vous visitez une démo en lecture seule : le ciel, la météo et les cibles sont en direct, mais rien de ce que vous modifiez n'est enregistré.",
+    "banner_install": "Installer la vôtre",
+    "read_only": "Démo en lecture seule : les modifications ne sont pas enregistrées. Installez votre propre MyAstroBoard pour garder vos données.",
+    "signin_refused": "Ce compte ne peut pas se connecter sur la démo. Préparez la démo avec DEMO_MODE désactivé, voir docs/DEMO_MODE.md."
   }
 }

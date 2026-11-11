@@ -36,6 +36,7 @@ function _getWizardFlow(config, user) {
 async function checkFirstRun() {
     if (!currentConfig || !currentUser) return;
     if (currentUser.role === 'read-only') return; // read-only users never see the wizard
+    if (DEMO_MODE) return; // a demo visitor is shown the app, not its setup
 
     const wizardState = currentUserPreferences?.wizard || { completed: false, skipped: false };
     if (wizardState.completed || wizardState.skipped) return;

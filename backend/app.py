@@ -74,6 +74,7 @@ from space import (
     css_passes,  # noqa: F401
     iss_passes,  # noqa: F401
 )
+from utils import demo_mode
 
 # Authentication
 # user_manager is unused directly by this module but kept as a test-patching seam,
@@ -222,6 +223,15 @@ def block_requests_in_maintenance():
 
 
 @app.before_request
+def block_demo_writes():
+    """Public demo (DEMO_MODE=true): refuse every write made from the shared demo account."""
+    if demo_mode.blocked_demo_write(request.method, request.endpoint):
+        logger.debug(f"Demo mode: blocked {request.method} {request.path}")
+        return demo_mode.demo_read_only_response()
+    return None
+
+
+@app.before_request
 def sync_log_levels():
     """Pick up log levels changed in another gunicorn worker (throttled, a file stat at most)."""
     refresh_log_levels()
@@ -257,7 +267,7 @@ def inject_base_path():
     Templates write ``{{ base }}/static/...`` instead of ``/static/...`` and expose it in
     ``<meta name="app-base">``, which static/js/api_helper.js reads into ``APP_BASE_PATH`` (see appUrl()).
     """
-    return {'base': request.script_root}
+    return {'base': request.script_root, 'demo_mode': demo_mode.is_demo_mode()}
 
 
 @app.after_request
@@ -306,7 +316,9 @@ def _session_user():
 def index():
     """Render main dashboard or redirect to login"""
     if not _session_user():
-        return redirect(url_for('login_page'))
+        # Public demo: a visitor lands straight in the app, signed in on the demo account
+        if not (demo_mode.is_demo_mode() and demo_mode.sign_in_demo_visitor(user_manager)):
+            return redirect(url_for('login_page'))
 
     # Get version for cache busting
     version = get_repo_version()
@@ -318,6 +330,10 @@ def index():
 def login_page():
     """Render login page - redirect to dashboard if already authenticated"""
     if _session_user():
+        return redirect(url_for('index'))
+    # Public demo: /login leads into the demo, unless ?signin asks for the real sign-in form
+    # (the maintainer's own account, see docs/DEMO_MODE.md)
+    if demo_mode.is_demo_mode() and 'signin' not in request.args:
         return redirect(url_for('index'))
     # Get version for cache busting
     version = get_repo_version()
@@ -465,6 +481,15 @@ if _AUTOSTART_SCHEDULERS:  # pragma: no cover - never true while imported under 
     except Exception as e:
         logger.error(f'Failed to migrate connector credentials on startup: {e}', exc_info=True)
 
+    # Public demo on a fresh install: the demo location, before the first calculations
+    if demo_mode.is_demo_mode():
+        try:
+            from demo import demo_life as _demo_life
+
+            _demo_life.apply_demo_location()
+        except Exception as e:
+            logger.error(f'Demo mode: failed to set the demo location: {e}', exc_info=True)
+
     # Initialize cache scheduler FIRST so its cache_ready_event can be passed to
     # the SkyTonight scheduler, ensuring DSO calculations run on warm caches.
     try:
@@ -482,13 +507,24 @@ if _AUTOSTART_SCHEDULERS:  # pragma: no cover - never true while imported under 
     except Exception as e:  # pragma: no cover
         logger.error(f'Failed to initialize SkyTonight scheduler on startup: {e}', exc_info=True)
 
-    try:
-        logger.info('Initializing push notification scheduler on application startup...')
-        from utils import push_scheduler as _push_scheduler
+    # Public demo: seed the demo account, then give it tonight's plans every night
+    if demo_mode.is_demo_mode():
+        try:
+            from demo import demo_life as _demo_life
 
-        _push_scheduler.start()
-    except Exception as e:  # pragma: no cover
-        logger.error(f'Failed to initialize push scheduler on startup: {e}', exc_info=True)
+            _demo_life.start()
+        except Exception as e:
+            logger.error(f'Demo mode: failed to start the demo data loop: {e}', exc_info=True)
+
+    # No notifications on a public demo: nobody may subscribe, so nothing to send
+    if not demo_mode.is_demo_mode():
+        try:
+            logger.info('Initializing push notification scheduler on application startup...')
+            from utils import push_scheduler as _push_scheduler
+
+            _push_scheduler.start()
+        except Exception as e:  # pragma: no cover
+            logger.error(f'Failed to initialize push scheduler on startup: {e}', exc_info=True)
 
     try:
         # Idle until the MQTT connector is enabled in Parameters -> Connectors; then it keeps
@@ -528,6 +564,19 @@ try:
     _prime_metrics_cache()
 except Exception as e:  # pragma: no cover
     logger.error(f'Failed to prime metrics disk-usage cache on startup: {e}', exc_info=True)
+
+
+if demo_mode.is_demo_mode():  # pragma: no cover - startup notice only
+    logger.warning(
+        f"DEMO_MODE is on: visitors are signed in automatically on the read-only demo account "
+        f"{demo_mode.demo_username()!r} (see docs/DEMO_MODE.md)"
+    )
+    if not _startup_settings['trust_proxy_headers']:
+        logger.warning(
+            "DEMO_MODE: reverse proxy headers are not trusted - behind a tunnel or proxy every visitor "
+            "then shares the proxy's IP (sign-in throttling, trusted networks). "
+            "Turn on Parameters -> Advanced -> Reverse proxy."
+        )
 
 
 # Ensure schedulers are stopped when the worker exits

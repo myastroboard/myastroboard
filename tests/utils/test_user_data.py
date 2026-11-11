@@ -199,6 +199,7 @@ _SHARED_DIRS = {
 _USER_FILE_MODULES = {
     'blueprints/astrodex.py',
     'blueprints/observation_sessions.py',
+    'demo/demo_life.py',
     'observation/myastroshine_integration.py',
     'utils/user_data.py',
 }
