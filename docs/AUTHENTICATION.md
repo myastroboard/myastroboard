@@ -142,14 +142,14 @@ The **Parameters → Users** panel (admin only) allows:
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `POST` | `/api/auth/login` | Public | Submit `{"username": ..., "password": ...}` → sets session cookie, or returns `{"status": "2fa_required"}` when a second step is needed (see [Two-factor authentication](#two-factor-authentication)), `403` when a local-scoped account signs in from an untrusted network, or `429` after too many failures (see [Security notes](#security-notes)) |
+| `POST` | `/api/auth/login` | Public | Submit `{"username": ..., "password": ...}` → sets session cookie, or returns `{"status": "2fa_required"}` when a second step is needed (see [Two-factor authentication](#two-factor-authentication)), `403` when a local-scoped account signs in from an untrusted network or, on a [demo instance](DEMO_MODE.md), for the demo account and any account on the default password, or `429` after too many failures (see [Security notes](#security-notes)) |
 | `POST` | `/api/auth/login/verify-2fa` | pending session | Second login step: submit `{"code": "123456"}` to complete a login that returned `2fa_required` |
 | `POST` | `/api/auth/logout` | login | Clears session |
-| `GET` | `/api/auth/status` | Public | Returns `{"authenticated": bool, "role": ..., "username": ..., "two_factor_available": bool, "totp_enabled": bool, "account_scope": ...}` |
+| `GET` | `/api/auth/status` | Public | Returns `{"authenticated": bool, "role": ..., "username": ..., "two_factor_available": bool, "totp_enabled": bool, "account_scope": ..., "demo_mode": bool}` (`demo_mode` is true for a visitor of a [demo instance](DEMO_MODE.md)) |
 | `POST` | `/api/auth/change-password` | login | Change own password |
 | `GET` | `/api/users/me/export` | login | ZIP of everything stored about the signed-in user (any role) |
 | `GET` | `/api/auth/preferences` | login | Get current user's preferences |
-| `PUT` | `/api/auth/preferences` | login | Update preferences (partial update supported) |
+| `PUT` | `/api/auth/preferences` | login | Update preferences (partial update supported). On a [demo instance](DEMO_MODE.md) the demo account's changes go to the visitor's session, not the account |
 | `POST` | `/api/auth/2fa/setup` | login | Generate this user's TOTP secret, returns `{"secret": ..., "otpauth_uri": ...}`; `400` if 2FA is already active for this user (disable it first) |
 | `POST` | `/api/auth/2fa/confirm` | login | Submit `{"code": "123456"}` to activate 2FA after setup |
 | `POST` | `/api/auth/2fa/disable` | login | Submit `{"password": ...}` to turn 2FA off (self-service, re-authenticates) |

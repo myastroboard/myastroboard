@@ -8,6 +8,9 @@
 // before any request. No meta tag (offline.html) means no prefix.
 const APP_BASE_PATH = (document.querySelector('meta[name="app-base"]')?.content || '').replace(/\/+$/, '');
 const API_BASE = window.location.origin + APP_BASE_PATH;
+// Public demo instance (DEMO_MODE=true): the page carries <meta name="demo-mode">.
+// Writes are refused server-side; the frontend only uses this to explain why.
+const DEMO_MODE = document.querySelector('meta[name="demo-mode"]') !== null;
 
 /**
  * Prefix a root-relative app path ('/api/...', '/static/...', '/login') with APP_BASE_PATH.

@@ -14,6 +14,7 @@
     <meta name="description" content="MyAstroBoard - Astronomy observation planning dashboard with weather forecasts, SkyTonight targets, lunar and solar events, ISS passes, and equipment management.">
     <meta name="robots" content="noindex, nofollow">
     <meta name="app-base" content="{{ base }}">
+    {% if demo_mode %}<meta name="demo-mode" content="1">{% endif %}
     <script src="{{ base }}/static/js/theme.js?v={{ version }}"></script>
     <title data-i18n="common.title_html">MyAstroBoard - Astronomy Observation Planning Dashboard</title>
     <link rel="icon" type="image/svg+xml" href="{{ base }}/static/favicon.svg">
@@ -138,6 +139,16 @@
 
     <!-- Main Container -->
     <main class="mainContainer mt-3">
+
+        {% if demo_mode %}
+        <!-- Public demo banner (DEMO_MODE=true, see docs/DEMO_MODE.md) -->
+        <div id="demo-banner" class="alert alert-info d-flex flex-wrap align-items-center gap-2 mb-3" role="status">
+            <i class="bi bi-eye icon-inline" aria-hidden="true"></i>
+            <b data-i18n="demo.banner_title">Demo</b>
+            <span class="flex-grow-1" data-i18n="demo.banner_text">You are browsing a read-only demo: everything is live, but nothing you change is saved.</span>
+            <a class="btn btn-sm btn-primary" href="https://github.com/myastroboard/myastroboard/blob/main/docs/1.INSTALLATION.md" target="_blank" rel="noopener noreferrer" data-i18n="demo.banner_install">Install your own</a>
+        </div>
+        {% endif %}
 
         <!-- Default Password Warning Banner -->
         <div id="default-password-warning" class="alert alert-warning alert-dismissible fade show mb-3" role="alert" style="display: none;">
@@ -1217,11 +1228,13 @@
                             <i class="bi bi-geo-alt text-danger icon-inline" aria-hidden="true"></i> <span data-i18n="settings.my_location">Location</span>
                         </a>
                     </li>
+                    {% if not demo_mode %}
                     <li class="nav-item">
                         <a class="nav-link sub-tab-btn" href="#" data-subtab="notifications">
                             <i class="bi bi-bell text-warning icon-inline" aria-hidden="true"></i> <span data-i18n="settings.notifications">Notifications</span>
                         </a>
                     </li>
+                    {% endif %}
                     <li class="nav-item">
                         <a class="nav-link sub-tab-btn" aria-current="page" href="#" data-subtab="security">
                             <i class="bi bi-shield-lock text-danger icon-inline" aria-hidden="true"></i> <span data-i18n="settings.security">Security</span>

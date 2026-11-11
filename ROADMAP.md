@@ -411,10 +411,9 @@ and can be turned off.
 
 - A guided tour on the project website: one short looping clip per key moment, then the one-line
   install
-- A **static demo** is under evaluation: the real interface served as plain files from recorded API
-  responses, at no hosting cost. Server-side filters, searches and calculations would only work for
-  the recorded cases, and the sky shown is the one recorded, not tonight's
-- A hosted, live read-only demo instance is **not planned**: it needs paid infrastructure
+- A **live, read-only demo instance**: visitors land straight in the application on a shared demo
+  account, with tonight's real sky; every save is refused. Any instance becomes one with
+  `DEMO_MODE=true` (see docs/DEMO_MODE.md)
 
 **i18n in 6 languages.**
 

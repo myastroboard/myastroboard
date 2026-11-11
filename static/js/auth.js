@@ -2111,6 +2111,19 @@ async function adminDisableUserTwoFactor(userId, username) {
     }
 }
 
+// Public demo: one "read-only demo" notice per burst of refused writes (a single click
+// can fire several requests, and the calling code may show its own error as well).
+let lastDemoNoticeAt = 0;
+function notifyDemoReadOnly(response) {
+    response.clone().json().then((data) => {
+        if (data?.error !== 'demo_read_only') return;
+        const now = Date.now();
+        if (now - lastDemoNoticeAt < 4000) return;
+        lastDemoNoticeAt = now;
+        showMessage('info', i18n.t('demo.read_only'));
+    }).catch(() => {});
+}
+
 // Error handler - only redirect on authentication failures (401), not authorization (403)
 function setupGlobalErrorHandler() {
     const originalFetch = window.fetch;
@@ -2134,7 +2147,9 @@ function setupGlobalErrorHandler() {
             // Log 403 (Forbidden - insufficient permissions) for debugging
             // Don't redirect - this prevents read-only users from being logged out when they
             // inadvertently trigger admin-only endpoints
-            if (response.status === 403) {
+            if (response.status === 403 && DEMO_MODE) {
+                notifyDemoReadOnly(response);
+            } else if (response.status === 403) {
                 console.warn(
                     `[Auth] 403 Forbidden: ${method} ${url}\n` +
                     `Reason: Insufficient permissions for this endpoint.\n` +
