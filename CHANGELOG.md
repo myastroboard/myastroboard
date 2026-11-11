@@ -8,6 +8,20 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Features
 
+- None.
+
+### Fixes
+
+- None.
+
+### Breaking changes
+
+- None.
+
+## 1.8.2 (2026-11-11)
+
+### Features
+
 - Demo mode (`DEMO_MODE=true`): a public, read-only instance that fills itself with demo data and plans
   every night from SkyTonight. Installation guide in [docs/DEMO_MODE.md](docs/DEMO_MODE.md).
 - Docker image now runs Python 3.15 (up from 3.14).
