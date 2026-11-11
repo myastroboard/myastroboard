@@ -16,21 +16,20 @@ PNG = map_tiles._PNG_SIGNATURE + b'tile-body'
 MVT = b'\x1a\x05layer-body'
 
 
-class _FakeRaw:
-    def __init__(self, content):
-        self._content = content
-
-    def read(self, amount, decode_content=False):
-        if isinstance(self._content, Exception):
-            raise self._content
-        return self._content[:amount]
-
-
 class _FakeResponse:
+    """A streamed response; it has no ``raw`` so a regression to ``resp.raw.read()`` fails loudly."""
+
     def __init__(self, status_code=200, content=PNG):
         self.status_code = status_code
-        self.raw = _FakeRaw(content)
+        self._content = content
         self.closed = False
+
+    def iter_content(self, chunk_size=1):
+        if isinstance(self._content, Exception):
+            raise self._content
+        # Small chunks, so the size cap is checked across chunk boundaries
+        for start in range(0, len(self._content), 4):
+            yield self._content[start : start + 4]
 
     def close(self):
         self.closed = True
