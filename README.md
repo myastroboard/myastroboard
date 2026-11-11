@@ -1,5 +1,5 @@
 # MyAstroBoard
-![GitHub Release](https://img.shields.io/github/v/release/worldofgz/myastroboard)
+[![GitHub Release](https://img.shields.io/github/v/release/myastroboard/myastroboard)](https://github.com/myastroboard/myastroboard/releases)
 [![astropy](https://img.shields.io/badge/powered%20by-AstroPy-orange.svg?style=flat)](https://www.astropy.org/)
 [![Docker Pulls](https://img.shields.io/docker/pulls/myastroboard/myastroboard)](https://hub.docker.com/r/myastroboard/myastroboard)
 [![Docker Image Size](https://img.shields.io/docker/image-size/myastroboard/myastroboard/latest)](https://hub.docker.com/r/myastroboard/myastroboard)
@@ -98,12 +98,15 @@ See it in the [visual tour](docs/VISUAL_TOUR.md#your-sky), or read the details i
 
 ## SkyTonight Data Model
 
-Execution is done 2 times by day:
-- 1 hour after last astronic night
-- 1 hour previous next astronimic night
+SkyTonight runs twice a day:
+- 1 hour after nautical dawn
+- 1 hour before nautical dusk
 
-Data generated (table of objects, altitude vs time graph, interactive plot, ...) are based on user location and constrainst.
-Deep-sky data is produced from the current SkyTonight/PyOngc pipeline.
+When the system clock or timezone cannot be trusted, it falls back to a run every 6 hours.
+
+The generated data (target tables, altitude-vs-time charts, interactive sky map, ...) is based on
+your location and observing constraints. Deep-sky data comes from the SkyTonight/PyOngc pipeline
+([details](docs/SKYTONIGHT.md)).
 
 ## Requirements
 

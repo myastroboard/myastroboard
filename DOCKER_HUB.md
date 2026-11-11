@@ -12,7 +12,7 @@ MyAstroBoard combines weather analysis, automated sky calculations, and planning
 
 ## ✨ Features
 
-- **SkyTonight** - Automated deep-sky object calculations based on your location and constraints, running twice daily (after astronomical dusk and before astronomical dawn)
+- **SkyTonight** - Automated deep-sky object calculations based on your location and constraints, running twice daily (1 hour after nautical dawn and 1 hour before nautical dusk)
 - **Beginner-friendly** - Guided setup wizard, skill-aware "Tonight for you" recommendations, difficulty ratings, and a curated Beginner Catalog
 - **Weather & Conditions** - Observing condition analysis powered by Open-Meteo
 - **Astronomy Events** - Moon, sun, eclipses, aurora forecasts, ISS passes
