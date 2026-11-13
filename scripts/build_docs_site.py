@@ -2,7 +2,7 @@
 
 The Markdown files stay written for GitHub; this script adapts a copy of them for the site:
 
-1. copies docs/ and docs-site/SUMMARY.md into docs-site/build/src/;
+1. copies docs/ and docs-site/SUMMARY.md into docs-site/build/docs/;
 2. turns links that leave docs/ (../CHANGELOG.md, ../backend/...) into GitHub URLs;
 3. moves every $...$ and $$...$$ formula into a data-tex attribute, rendered in the browser by the
    bundled KaTeX, so that Markdown never reads the underscores or backslashes of a formula;
@@ -143,7 +143,8 @@ def prepare(katex_tgz):
     """Assemble docs-site/build/ (book.toml, theme, src) from docs/ and docs-site/."""
     if BUILD.exists():
         shutil.rmtree(BUILD)
-    src = BUILD / 'src'
+    # Named like the repository folder, so that mdBook's {path} in edit links is docs/<page>.md.
+    src = BUILD / 'docs'
     shutil.copytree(DOCS, src)
     for page in src.glob('*.md'):
         original = DOCS / page.name

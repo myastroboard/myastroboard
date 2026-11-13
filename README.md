@@ -4,6 +4,7 @@
 [![Docker Pulls](https://img.shields.io/docker/pulls/myastroboard/myastroboard)](https://hub.docker.com/r/myastroboard/myastroboard)
 [![Docker Image Size](https://img.shields.io/docker/image-size/myastroboard/myastroboard/latest)](https://hub.docker.com/r/myastroboard/myastroboard)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0--or--later-blue.svg)](LICENSE)
+[![Documentation](https://img.shields.io/badge/docs-docs.myastroboard.org-blue)](https://docs.myastroboard.org/)
 [![Live demo](https://img.shields.io/badge/live%20demo-demo.myastroboard.org-brightgreen)](https://demo.myastroboard.org/)
 
 MyAstroBoard is a self-hosted astronomy dashboard with Docker-first deployment, also available as a
@@ -20,25 +21,25 @@ Now MyAstroBoard has removed its dependency on UpTonight to better meet its need
 instance with no sign-in. Everything is live (tonight's sky, the weather, SkyTonight targets), but
 nothing you change is saved.
 
-If you want see more, maybe look at the [visual tour](docs/VISUAL_TOUR.md).
+**Documentation: [docs.myastroboard.org](https://docs.myastroboard.org/)** - start with the [visual tour](https://docs.myastroboard.org/VISUAL_TOUR.html).
 
 ## Features
 
 - SkyTonight integration with automated runs and report/log browsing
-- Beginner-friendly: guided setup wizard, skill-aware "Tonight for you" recommendations, difficulty ratings, and a curated Beginner Catalog ([details](docs/BEGINNER_EXPERIENCE.md))
+- Beginner-friendly: guided setup wizard, skill-aware "Tonight for you" recommendations, difficulty ratings, and a curated Beginner Catalog ([details](https://docs.myastroboard.org/BEGINNER_EXPERIENCE.html))
 - Weather and observing-condition analysis (Open-Meteo)
 - Moon, sun, eclipses, aurora, ISS passes, and astronomy event endpoints
 - Astrodex: personal astrophotography catalog and image management
-- Observation Log, Your Sky and Wishlist: a private observing logbook, what it adds up to, and what is still on your list ([details](docs/OBSERVATION_LOG.md))
+- Observation Log, Your Sky and Wishlist: a private observing logbook, what it adds up to, and what is still on your list ([details](https://docs.myastroboard.org/OBSERVATION_LOG.html))
 - Plan My Night timeline builder with CSV/PDF export
 - Equipment profiles and field-of-view calculator
-- Framing simulator: what your sensor sees on a target, over a real image of the sky ([details](docs/SKYTONIGHT.md#framing-simulator))
-- Share cards: a picture with its acquisition details, a session, tonight's sky or an event as a ready-to-post image ([details](docs/SHARE_CARDS.md))
+- Framing simulator: what your sensor sees on a target, over a real image of the sky ([details](https://docs.myastroboard.org/SKYTONIGHT.html#framing-simulator))
+- Share cards: a picture with its acquisition details, a session, tonight's sky or an event as a ready-to-post image ([details](https://docs.myastroboard.org/SHARE_CARDS.html))
 - Observatory: live dashboard fed by external connectors
 - Connectors: AllSky all-sky camera integration (live image, keogram, startrails, timelapse, sensor data)
-- Home Assistant: publish sky conditions, weather, tonight's targets and your activity to an MQTT broker with automatic discovery ([details](docs/HOME_ASSISTANT.md))
+- Home Assistant: publish sky conditions, weather, tonight's targets and your activity to an MQTT broker with automatic discovery ([details](https://docs.myastroboard.org/HOME_ASSISTANT.html))
 - Multi-user auth system with admin/user roles
-- Multi-location profiles: up to 5 admin-managed observing sites with per-user attribution, one-tap switching, and per-location caches ([details](docs/LOCATIONS.md))
+- Multi-location profiles: up to 5 admin-managed observing sites with per-user attribution, one-tap switching, and per-location caches ([details](https://docs.myastroboard.org/LOCATIONS.html))
 - i18n support (English/French plus community translations)
 
 ### A real observing logbook
@@ -73,9 +74,8 @@ instance where the Astrodex gallery is shared between users. Each session export
 print-friendly PDF, and the log, the gallery and the wishlist all travel in the admin backup
 archive.
 
-See it in the [visual tour](docs/VISUAL_TOUR.md#your-sky), or read the details in
-[docs/OBSERVATION_LOG.md](docs/OBSERVATION_LOG.md) and
-[docs/SESSION_ANALYTICS.md](docs/SESSION_ANALYTICS.md).
+See it in the [visual tour](https://docs.myastroboard.org/VISUAL_TOUR.html#your-sky), or read the details in
+the [Observation Log](https://docs.myastroboard.org/OBSERVATION_LOG.html) and [Your Sky and Wishlist](https://docs.myastroboard.org/SESSION_ANALYTICS.html) pages.
 
 ### Also for space enthusiasts
 
@@ -86,15 +86,19 @@ See it in the [visual tour](docs/VISUAL_TOUR.md#your-sky), or read the details i
 
 ## Quick Start
 
-- Installation: [docs/1.INSTALLATION.md](docs/1.INSTALLATION.md) - Docker Compose, or as a
-  [Home Assistant app](docs/1.INSTALLATION.md#option-2-home-assistant-app)
-- Quick Start: [docs/2.QUICKSTART.md](docs/2.QUICKSTART.md)
-- Update Guide: [docs/3.UPDATE.md](docs/3.UPDATE.md)
-- Reverse Proxy: [docs/6.REVERSE_PROXY.md](docs/6.REVERSE_PROXY.md)
-- Connectors: [docs/CONNECTORS.md](docs/CONNECTORS.md)
-- Home Assistant / MQTT: [docs/HOME_ASSISTANT.md](docs/HOME_ASSISTANT.md)
-- API Endpoints: [docs/API_ENDPOINTS.md](docs/API_ENDPOINTS.md)
-- Visual Tour: [docs/VISUAL_TOUR.md](docs/VISUAL_TOUR.md)
+The full documentation is at **[docs.myastroboard.org](https://docs.myastroboard.org/)**. To get started:
+
+- [Installation](https://docs.myastroboard.org/1.INSTALLATION.html) - Docker Compose, or as a
+  [Home Assistant app](https://docs.myastroboard.org/1.INSTALLATION.html#option-2-home-assistant-app)
+- [Quick Start](https://docs.myastroboard.org/2.QUICKSTART.html) - from a fresh install to your first night plan
+- [Updating](https://docs.myastroboard.org/3.UPDATE.html)
+- [Reverse Proxy & HTTPS](https://docs.myastroboard.org/6.REVERSE_PROXY.html)
+- [Troubleshooting](https://docs.myastroboard.org/TROUBLESHOOTING.html)
+- [Connectors](https://docs.myastroboard.org/CONNECTORS.html) and [Home Assistant / MQTT](https://docs.myastroboard.org/HOME_ASSISTANT.html)
+- [API Endpoints](https://docs.myastroboard.org/API_ENDPOINTS.html)
+
+The pages are written in the [`docs/`](docs/) folder of this repository; the site is rebuilt from it
+each time a change is merged.
 
 ## SkyTonight Data Model
 
@@ -106,16 +110,16 @@ When the system clock or timezone cannot be trusted, it falls back to a run ever
 
 The generated data (target tables, altitude-vs-time charts, interactive sky map, ...) is based on
 your location and observing constraints. Deep-sky data comes from the SkyTonight/PyOngc pipeline
-([details](docs/SKYTONIGHT.md)).
+([details](https://docs.myastroboard.org/SKYTONIGHT.html)).
 
 ## Requirements
 
 - Docker and Docker Compose
 - Linux host or compatible Docker environment
-- At least 1 GB of memory and 1 CPU core for the container ([system requirements](docs/1.INSTALLATION.md#system-requirements))
+- At least 1 GB of memory and 1 CPU core for the container ([system requirements](https://docs.myastroboard.org/1.INSTALLATION.html#system-requirements))
 
 Or, without Docker: Home Assistant OS or Supervised on a 64-bit system (amd64 / aarch64), using the
-[Home Assistant app](docs/1.INSTALLATION.md#option-2-home-assistant-app).
+[Home Assistant app](https://docs.myastroboard.org/1.INSTALLATION.html#option-2-home-assistant-app).
 
 Python dependencies are listed in `requirements.txt`.
 
