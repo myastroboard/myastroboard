@@ -1937,6 +1937,8 @@
   "metrics": {
     "system_metrics": "Metriche di sistema",
     "info_title": "Monitoraggio delle prestazioni del sistema e delle risorse. I dati si aggiornano automaticamente ogni 30 secondi.",
+    "low_memory_warning": "Solo {available} di memoria sono disponibili per MyAstroBoard, meno dei {recommended} consigliati. Un worker può essere terminato durante i calcoli: un'azione segnala allora un errore anche se è andata a buon fine, oppure compare la pagina offline. Assegna più memoria al container (vedi i requisiti di sistema nella guida di installazione).",
+    "load_failed": "Impossibile raccogliere le metriche di sistema. La causa è indicata nel log dell'applicazione (Impostazioni dell'app -> Registri).",
     "cpu": "CPU",
     "cpu_usage": "CPU Utilizzo:",
     "cpu_info": "CPU Informazioni",

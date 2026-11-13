@@ -112,6 +112,7 @@ your location and observing constraints. Deep-sky data comes from the SkyTonight
 
 - Docker and Docker Compose
 - Linux host or compatible Docker environment
+- At least 1 GB of memory and 1 CPU core for the container ([system requirements](docs/1.INSTALLATION.md#system-requirements))
 
 Or, without Docker: Home Assistant OS or Supervised on a 64-bit system (amd64 / aarch64), using the
 [Home Assistant app](docs/1.INSTALLATION.md#option-2-home-assistant-app).

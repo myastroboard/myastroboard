@@ -605,11 +605,20 @@ class UserManager:
         except Exception:
             return []
 
-    @_serialized_users_write
     def create_user(self, username, password, role, account_scope=None):
-        """Create a new user"""
-        self._reload_users_if_changed()
+        """Create a new user.
 
+        The password is hashed before the users write transaction opens: scrypt is the
+        slow step, and holding the database write lock through it stalls every other
+        worker's writes on a small CPU. The username is checked again under the lock.
+        """
+        self._reload_users_if_changed()
+        self._check_new_user(username, role, account_scope)
+        password_hash = generate_password_hash(password)
+        return self._insert_new_user(username, password_hash, role, account_scope)
+
+    def _check_new_user(self, username, role, account_scope):
+        """Raise ValueError when an account cannot be created with these values."""
         if self._username_taken(username):
             raise ValueError(f"User {username} already exists")
 
@@ -619,9 +628,16 @@ class UserManager:
         if account_scope is not None and account_scope not in ALLOWED_ACCOUNT_SCOPES:
             raise ValueError(f"Invalid account scope: {account_scope}")
 
+    @_serialized_users_write
+    def _insert_new_user(self, username, password_hash, role, account_scope):
+        """Store a new account whose password is already hashed (inside the users write transaction)."""
+        # Another worker may have taken the name since create_user() checked it
+        self._reload_users_if_changed()
+        self._check_new_user(username, role, account_scope)
+
         user = User(
             username=username,
-            password_hash=generate_password_hash(password),
+            password_hash=password_hash,
             role=role,
             account_scope=account_scope,
         )

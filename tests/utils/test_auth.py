@@ -2093,6 +2093,44 @@ def test_nested_users_writes_share_one_transaction(isolated_user_manager):
     assert isolated_user_manager.get_user_by_username("inner") is None
 
 
+def test_create_user_hashes_the_password_outside_the_write_transaction(isolated_user_manager, monkeypatch):
+    """scrypt runs before the database write lock is taken, so a slow CPU does not stall other writers."""
+    from db import engine
+
+    open_transaction_while_hashing = []
+    real_hash = auth.generate_password_hash
+
+    def recording_hash(password):
+        open_transaction_while_hashing.append(engine._current_connection() is not None)
+        return real_hash(password)
+
+    monkeypatch.setattr(auth, "generate_password_hash", recording_hash)
+    user = isolated_user_manager.create_user("hashed-early", "pw-123456", auth.ROLE_USER)
+
+    assert open_transaction_while_hashing == [False]
+    assert check_password_hash(user.password_hash, "pw-123456")
+
+
+def test_create_user_refuses_a_name_taken_while_the_password_was_hashed(isolated_user_manager, monkeypatch):
+    """Another worker creating the same name during the hash wins; the second creation is refused."""
+    from db import users_store
+
+    real_hash = auth.generate_password_hash
+    raced = []
+
+    def hash_while_another_worker_creates(password):
+        if not raced:
+            raced.append(True)
+            auth.UserManager().create_user("raced", "other-pw-1", auth.ROLE_USER)
+        return real_hash(password)
+
+    monkeypatch.setattr(auth, "generate_password_hash", hash_while_another_worker_creates)
+    with pytest.raises(ValueError, match="already exists"):
+        isolated_user_manager.create_user("raced", "pw-123456", auth.ROLE_USER)
+
+    assert [u["username"] for u in users_store.get_all_users().values()].count("raced") == 1
+
+
 class TestUsernamesIgnoreCase:
     """One name, whatever its case: no "Emeric" next to "emeric", and either spelling signs in."""
 

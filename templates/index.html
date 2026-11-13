@@ -2452,6 +2452,14 @@
                     <div class="alert alert-info" role="alert" data-i18n="metrics.info_title">
                         System performance and resource monitoring. Data refreshes automatically every 5 seconds.
                     </div>
+                    <div id="metrics-load-error" class="alert alert-danger" role="alert" style="display: none;">
+                        <i class="bi bi-exclamation-octagon icon-inline" aria-hidden="true"></i>
+                        <span data-i18n="metrics.load_failed">System metrics could not be collected. The cause is in the application log (App settings -> Logs).</span>
+                    </div>
+                    <div id="metrics-low-memory-warning" class="alert alert-warning" role="alert" style="display: none;">
+                        <i class="bi bi-exclamation-triangle icon-inline" aria-hidden="true"></i>
+                        <span id="metrics-low-memory-text"></span>
+                    </div>
 
                     <div class="row g-3">
                         <div class="col-6 col-lg-3">
