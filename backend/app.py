@@ -458,6 +458,13 @@ except Exception as e:  # pragma: no cover
 _AUTOSTART_SCHEDULERS = 'pytest' not in sys.modules
 
 if _AUTOSTART_SCHEDULERS:  # pragma: no cover - never true while imported under pytest
+    # CPU / memory / file system this worker really has, for issue reports from small hosts
+    from utils.constants import DATA_DIR as _HOST_DATA_PATH
+    from utils.system_info import log_host_summary
+    from utils.txtconf_loader import get_repo_version as _get_repo_version
+
+    log_host_summary(_HOST_DATA_PATH, _get_repo_version().strip())
+
     # Connector credentials moved out of config.json (v1.6): move any that a previous
     # version stored there into the sidecar before the next backup can ship them.
     # A one-shot config rewrite; guarded like the schedulers so the test suite's shared

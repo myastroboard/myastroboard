@@ -284,6 +284,12 @@ class TestCollectMetrics:
         if "error" not in result:
             assert "network" in result
 
+    def test_collect_metrics_has_resources_block(self):
+        """The low-memory banner reads the container limits and flag from the resources block."""
+        result = collect_metrics()
+        if "error" not in result:
+            assert {"low_memory", "effective_memory", "recommended_memory"} <= set(result["resources"])
+
     def test_collect_metrics_has_uptime_key(self):
         result = collect_metrics()
         if "error" not in result:

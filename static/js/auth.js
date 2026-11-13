@@ -979,9 +979,36 @@ function setupCreateUserForm() {
             }
         } catch (error) {
             console.error('Error creating user:', error);
+            // A timed-out request may still have created the account on a slow server:
+            // check before reporting a failure the admin would retry into "already exists".
+            if (await userWasCreated(username)) {
+                showMessage('success', i18n.t('users.success_create'));
+                form.reset();
+                loadUsers();
+                return;
+            }
             showMessage('error', i18n.t('users.error_create'));
         }
     });
+}
+
+// True when the account list now holds `username` (same case-insensitive match as the server)
+async function userWasCreated(username) {
+    try {
+        const response = await fetchWithRetry('/api/users', {
+            credentials: 'include'
+        }, {
+            maxAttempts: 3,
+            timeoutMs: 10000
+        });
+        if (!response.ok) return false;
+        const users = await response.json();
+        const wanted = String(username).toLowerCase();
+        return Array.isArray(users) && users.some(user => String(user.username).toLowerCase() === wanted);
+    } catch (error) {
+        console.error('Error checking whether the user was created:', error);
+        return false;
+    }
 }
 
 // Edit username using modal dialog

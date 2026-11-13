@@ -1937,6 +1937,7 @@
   "metrics": {
     "system_metrics": "Métricas do sistema",
     "info_title": "Desempenho do sistema e monitoramento de recursos. Os dados são atualizados automaticamente a cada 30 segundos.",
+    "low_memory_warning": "Apenas {available} de memória estão disponíveis para o MyAstroBoard, abaixo dos {recommended} recomendados. Um worker pode ser encerrado durante os cálculos: uma ação mostra então um erro embora tenha sido concluída, ou aparece a página offline. Atribua mais memória ao container (veja os requisitos do sistema no guia de instalação).",
     "cpu": "CPU",
     "cpu_usage": "CPU Uso:",
     "cpu_info": "CPU Informações",

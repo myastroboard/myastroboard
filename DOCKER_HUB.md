@@ -71,6 +71,7 @@ For complete installation instructions, see the [Installation Guide](https://git
 
 - Docker and Docker Compose
 - Linux host or compatible Docker environment
+- At least 1 GB of memory and 1 CPU core for the container ([system requirements](https://github.com/myastroboard/myastroboard/blob/main/docs/1.INSTALLATION.md#system-requirements))
 
 ---
 

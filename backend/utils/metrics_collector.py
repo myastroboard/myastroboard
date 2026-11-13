@@ -22,6 +22,7 @@ from utils.constants import (
     SKYTONIGHT_RUNTIME_DIR,
 )
 from utils.logging_config import get_logger
+from utils.system_info import resource_status
 
 logger = get_logger(__name__)
 
@@ -437,6 +438,7 @@ def collect_metrics():
             },
             'platform': platform_info,
             'database': _database_status(),
+            'resources': resource_status(memory.total),
         }
         # Don't pin the 30s cache to a result whose disk details aren't ready
         # yet - let the next poll re-run so folder sizes appear as soon as the

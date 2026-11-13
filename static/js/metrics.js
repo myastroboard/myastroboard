@@ -85,6 +85,7 @@ async function loadSystemMetrics() {
         console.debug('Process data:', data.process);
         
         updateDatabaseMetrics(data.database);
+        updateLowMemoryWarning(data.resources);
 
         // Update Container/VM detection
         if (data.environment) {
@@ -670,6 +671,23 @@ function updateProgressBar(elementId, percent) {
     } else {
         bar.classList.add('bg-success');
     }
+}
+
+// Banner when the memory MyAstroBoard can use (container limit or host RAM) is below the
+// recommendation: workers then get killed mid-request, which looks like a bug, not a resource issue.
+function updateLowMemoryWarning(resources) {
+    const banner = document.getElementById('metrics-low-memory-warning');
+    const text = document.getElementById('metrics-low-memory-text');
+    if (!banner || !text) return;
+    if (!resources || !resources.low_memory) {
+        banner.style.display = 'none';
+        return;
+    }
+    text.textContent = i18n.t('metrics.low_memory_warning', {
+        available: formatBytes(resources.effective_memory),
+        recommended: formatBytes(resources.recommended_memory)
+    });
+    banner.style.display = '';
 }
 
 // Database block: schema version, size, journal mode (from /api/metrics)
