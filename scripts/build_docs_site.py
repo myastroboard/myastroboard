@@ -8,8 +8,14 @@ The Markdown files stay written for GitHub; this script adapts a copy of them fo
    bundled KaTeX, so that Markdown never reads the underscores or backslashes of a formula;
 4. downloads KaTeX at a pinned version (checked against its npm integrity hash) into the site:
    no asset is loaded from a third party at runtime;
-5. runs mdBook, then checks the generated HTML: every internal link and #anchor resolves, and no
-   page loads a script, stylesheet, font or image from another host.
+5. builds the landing page (docs-site/landing.html, then docs/README.md without its title), adds a
+   "last updated" line to each page from its last commit, converts the screenshots to WebP, and
+   bundles the logo and the Bootstrap Icons font the application already vendors;
+6. runs mdBook, writes sitemap.xml and robots.txt, then checks the generated HTML: every internal
+   link and #anchor resolves, and no page loads a script, stylesheet, font or image from another
+   host.
+
+The "last updated" dates need the git history: in CI, check out with fetch-depth 0.
 
 Usage:
     python scripts/build_docs_site.py [--mdbook PATH] [--katex-tgz PATH]
@@ -35,6 +41,10 @@ DOCS = ROOT / 'docs'
 SITE_SRC = ROOT / 'docs-site'
 BUILD = SITE_SRC / 'build'
 GITHUB_BLOB = 'https://github.com/myastroboard/myastroboard/blob/main/'
+SITE_URL = 'https://docs.myastroboard.org/'
+ICONS = ROOT / 'static' / 'vendor' / 'bootstrap-icons' / 'font'
+# Kept as PNG: the link preview image (og:image) of every page.
+KEEP_ORIGINAL_IMAGES = {'banner.png'}
 
 KATEX_VERSION = '0.19.1'
 KATEX_URL = f'https://registry.npmjs.org/katex/-/katex-{KATEX_VERSION}.tgz'
@@ -139,25 +149,106 @@ def install_katex(dest, local_tgz):
                 target.write_bytes(source.read())
 
 
+def landing_page(readme_text, version):
+    """Site home page: the landing template, then the docs index without its own title."""
+    template = (SITE_SRC / 'landing.html').read_text(encoding='utf-8').replace('{{VERSION}}', version)
+    body = re.sub(r'\A\s*# [^\n]*\n', '', readme_text, count=1)
+    return template.rstrip() + '\n\n' + body.lstrip()
+
+
+def rewrite_images(text, converted):
+    """Point img/<name>.png|gif references to the WebP copy made for the site."""
+    return re.sub(
+        r'(img/)([\w.-]+?)\.(png|gif)\b',
+        lambda m: f'{m.group(1)}{m.group(2)}.webp' if f'{m.group(2)}.{m.group(3)}' in converted else m.group(0),
+        text,
+    )
+
+
+def convert_images(img_dir):
+    """Replace the PNG / GIF screenshots by WebP (animated for a GIF); return the converted names."""
+    try:
+        from PIL import Image
+    except ImportError:
+        sys.exit('Pillow is required to build the site (pip install Pillow)')
+    converted = set()
+    for path in sorted(img_dir.iterdir()):
+        if path.suffix.lower() not in ('.png', '.gif') or path.name in KEEP_ORIGINAL_IMAGES:
+            continue
+        with Image.open(path) as image:
+            target = path.with_suffix('.webp')
+            if getattr(image, 'is_animated', False):
+                image.save(target, 'WEBP', save_all=True, quality=70, method=4)
+            else:
+                image.save(target, 'WEBP', quality=85, method=6)
+        path.unlink()
+        converted.add(path.name)
+    return converted
+
+
+def last_updated(page):
+    """Date (YYYY-MM-DD) of the last commit that changed a docs page, or None outside a git checkout."""
+    result = subprocess.run(
+        ['git', 'log', '-1', '--format=%cs', '--', page.relative_to(ROOT).as_posix()],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result.stdout.strip() or None
+
+
 def prepare(katex_tgz):
-    """Assemble docs-site/build/ (book.toml, theme, src) from docs/ and docs-site/."""
+    """Assemble docs-site/build/ (book.toml, theme, pages, assets) from docs/ and docs-site/."""
     if BUILD.exists():
         shutil.rmtree(BUILD)
     # Named like the repository folder, so that mdBook's {path} in edit links is docs/<page>.md.
     src = BUILD / 'docs'
     shutil.copytree(DOCS, src)
+    converted = convert_images(src / 'img')
+    version = (ROOT / 'VERSION').read_text(encoding='utf-8').strip()
     for page in src.glob('*.md'):
         original = DOCS / page.name
-        page.write_text(convert_page(original.read_text(encoding='utf-8'), original), encoding='utf-8', newline='\n')
+        text = original.read_text(encoding='utf-8')
+        if page.name == 'README.md':
+            text = landing_page(text, version)
+        else:
+            updated = last_updated(original)
+            if updated:
+                text = text.rstrip() + f'\n\n<p class="mab-updated">Last updated {updated}</p>\n'
+        page.write_text(rewrite_images(convert_page(text, original), converted), encoding='utf-8', newline='\n')
     shutil.copy2(SITE_SRC / 'SUMMARY.md', src / 'SUMMARY.md')
+    shutil.copy2(SITE_SRC / '404.md', src / '404.md')
     shutil.copy2(SITE_SRC / 'book.toml', BUILD / 'book.toml')
-    (BUILD / 'theme').mkdir()
-    shutil.copy2(SITE_SRC / 'theme' / 'head.hbs', BUILD / 'theme' / 'head.hbs')
+    theme = BUILD / 'theme'
+    theme.mkdir()
+    shutil.copy2(SITE_SRC / 'theme' / 'head.hbs', theme / 'head.hbs')
+    shutil.copy2(ROOT / 'static' / 'favicon.svg', theme / 'favicon.svg')
+    shutil.copy2(ROOT / 'static' / 'ico' / 'android' / 'launchericon-96x96.png', theme / 'favicon.png')
     assets = src / 'assets'
     assets.mkdir()
-    for name in ('math.js', 'site.css'):
+    for name in ('math.js', 'site.js', 'site.css'):
         shutil.copy2(SITE_SRC / 'theme' / name, assets / name)
+    shutil.copy2(ROOT / 'static' / 'favicon.svg', assets / 'logo.svg')
+    icons = assets / 'bootstrap-icons'
+    (icons / 'fonts').mkdir(parents=True)
+    shutil.copy2(ICONS / 'bootstrap-icons.min.css', icons / 'bootstrap-icons.min.css')
+    for font in (ICONS / 'fonts').glob('bootstrap-icons.woff*'):
+        shutil.copy2(font, icons / 'fonts' / font.name)
     install_katex(assets / 'katex', katex_tgz)
+
+
+def write_crawler_files(site):
+    """sitemap.xml with every page, and a robots.txt pointing to it."""
+    skipped = {'404.html', 'print.html', 'toc.html'}
+    pages = sorted(p.name for p in site.glob('*.html') if p.name not in skipped)
+    urls = ''.join(f'  <url><loc>{SITE_URL}{"" if page == "index.html" else page}</loc></url>\n' for page in pages)
+    sitemap = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + urls + '</urlset>\n'
+    )
+    (site / 'sitemap.xml').write_text(sitemap, encoding='utf-8')
+    (site / 'robots.txt').write_text(f'User-agent: *\nAllow: /\nSitemap: {SITE_URL}sitemap.xml\n', encoding='utf-8')
 
 
 _ATTR_RE = re.compile(r'\b(href|src)="([^"]*)"')
@@ -202,6 +293,7 @@ def main():
     prepare(args.katex_tgz)
     site = BUILD / 'site'
     subprocess.run([args.mdbook, 'build', str(BUILD), '--dest-dir', str(site)], check=True)
+    write_crawler_files(site)
     problems = check_site(site.resolve())
     if problems:
         print('\n'.join(problems), file=sys.stderr)

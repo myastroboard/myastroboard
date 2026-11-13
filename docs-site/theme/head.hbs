@@ -1,4 +1,17 @@
+<script>
+    // A heading such as "Exports" gets id="exports", which browsers expose as window.exports; mdBook's
+    // search library then believes it runs under Node and fails. Real (empty) globals win over that.
+    var exports, module;
+</script>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="MyAstroBoard Documentation">
+<meta property="og:title" content="{{ title }}">
+<meta property="og:description" content="Documentation of MyAstroBoard, the self-hosted astronomy dashboard: install it, plan your nights, log what you image.">
+<meta property="og:image" content="https://docs.myastroboard.org/img/banner.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="{{ path_to_root }}assets/bootstrap-icons/bootstrap-icons.min.css">
 <link rel="stylesheet" href="{{ path_to_root }}assets/katex/katex.min.css">
 <link rel="stylesheet" href="{{ path_to_root }}assets/site.css">
 <script defer src="{{ path_to_root }}assets/katex/katex.min.js"></script>
 <script defer src="{{ path_to_root }}assets/math.js"></script>
+<script defer src="{{ path_to_root }}assets/site.js"></script>
