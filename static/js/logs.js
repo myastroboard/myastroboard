@@ -170,15 +170,17 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function clearLogsDisplay() {
+    if (!window.confirm(i18n.t('settings.clear_logs_confirm'))) return;
+
     await fetchJSON('/api/logs/clear', { method: 'POST' });
-    showMessage('success', 'Logs cleared');
+    showMessage('success', i18n.t('settings.logs_cleared'));
 
     const logsDisplay = document.getElementById('logs-display');
     if (logsDisplay) {
         DOMUtils.clear(logsDisplay);
         const empty = document.createElement('div');
         empty.className = 'log-empty';
-        empty.textContent = 'Logs cleared (refresh to reload)';
+        empty.textContent = i18n.t('settings.logs_cleared_hint');
         logsDisplay.appendChild(empty);
     }
 

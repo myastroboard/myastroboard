@@ -16,6 +16,7 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Demo mode: logged nights older than 60 days are removed with the Astrodex items they added, so the demo no longer grows on disk ([docs/DEMO_MODE.md](docs/DEMO_MODE.md)).
 - Sky images: the fallback used when CDS hips2fits is down now renders in bands, using about 110 MB instead of 1.3 GB for a large picture, so small servers no longer kill the worker mid-download.
 - Observation Log: an entry's object type and constellation are now translated.
+- Parameters -> Logs: the Delete logs button now asks for confirmation, and its messages are translated.
 - Demo mode: Astrodex pictures that could not be downloaded are retried on later checks, and constellations are stored as full names so they are translated (Astrodex, Plan My Night, Observation Log).
 
 ### Breaking changes
