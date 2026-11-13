@@ -786,3 +786,47 @@ def test_logged_picture_needs_a_known_combination_and_coordinates():
     assert picture['setup']['key'] == 'smart'
     assert demo_life._logged_picture(({**session, 'combination_id': 'gone'}, entry), combinations) is None
     assert demo_life._logged_picture((session, {**entry, 'ra': None}), combinations) is None
+
+
+def test_history_older_than_the_window_is_removed_but_the_seed_stays(demo_env):
+    """Old logged nights and the items they added go; the seed and recent nights stay."""
+    demo_life.run_once()
+    user = _demo_user()
+    later = date.today() + timedelta(days=demo_life.DEMO_HISTORY_DAYS + 1)
+    old_item = astrodex.create_astrodex_item(
+        user.user_id, {'name': 'NGC 891', 'type': 'Galaxy'}, username=user.username
+    )
+    picture = astrodex.add_picture_to_item(user.user_id, old_item['id'], {'filename': f'{user.user_id}_old.jpg'})
+    picture_path = os.path.join(astrodex.ASTRODEX_IMAGES_DIR, picture['filename'])
+    with open(picture_path, 'wb') as handle:
+        handle.write(b'jpeg')
+    old_session = observation_sessions.create_session(user.user_id, user.username, {'date': '2026-01-01'})
+    recent_session = observation_sessions.create_session(
+        user.user_id, user.username, {'date': (later - timedelta(days=5)).isoformat()}
+    )
+
+    demo_life.run_once(today=later)
+
+    names = {item['name'] for item in astrodex.load_user_astrodex(user.user_id, user.username)['items']}
+    assert names == {name for name, _ in demo_life.DEMO_ASTRODEX_SEED}
+    assert not os.path.exists(picture_path)
+    session_ids = {session['id'] for session in observation_sessions.get_user_sessions(user.user_id)}
+    assert old_session['id'] not in session_ids
+    assert recent_session['id'] in session_ids
+
+
+def test_history_pruning_keeps_records_without_a_date(demo_env, monkeypatch):
+    """An item or a session with no date is never taken for an old one."""
+    demo_life.run_once()
+    user = _demo_user()
+    item = astrodex.create_astrodex_item(user.user_id, {'name': 'NGC 891', 'type': 'Galaxy'}, username=user.username)
+    astrodex_data = astrodex.load_user_astrodex(user.user_id, user.username)
+    next(entry for entry in astrodex_data['items'] if entry['id'] == item['id'])['created_at'] = ''
+    astrodex.save_user_astrodex(user.user_id, astrodex_data, username=user.username)
+    monkeypatch.setattr(demo_life.observation_sessions, 'session_date_range', lambda session: ('', ''))
+    session = observation_sessions.create_session(user.user_id, user.username, {'date': '2020-01-01'})
+
+    demo_life.run_once(today=date.today() + timedelta(days=demo_life.DEMO_HISTORY_DAYS + 1))
+
+    assert astrodex.get_astrodex_item(user.user_id, item['id']) is not None
+    assert session['id'] in {entry['id'] for entry in observation_sessions.get_user_sessions(user.user_id)}

@@ -21,12 +21,12 @@ has to draw. The sensor geometry itself lives in ``equipment/framing.py``.
 
 import os
 import re
-import threading
 from typing import Any
 
 from observation import object_info
 from skytonight import skytonight_targets
 from utils.constants import DATA_DIR_CACHE
+from utils.file_cache import WritePruner, prune_oldest_files
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -57,8 +57,6 @@ _MOVING_OTYPE_TOKENS = ('planet', 'comet', 'asteroid', 'moon', 'minor')
 _IMAGE_FILENAME_RE = re.compile(r'^(-?\d{1,3}\.\d{6})_(-?\d{1,2}\.\d{6})_(\d{1,2}\.\d{2})\.jpg$')
 
 _PRUNE_EVERY_WRITES = 20
-_prune_lock = threading.Lock()
-_writes_since_prune = 0
 
 
 def resolve_target(identifier: str) -> dict[str, Any]:
@@ -169,45 +167,12 @@ def ensure_cached_image(ra_deg: float, dec_deg: float, fov_deg: float) -> str | 
 
 def _note_cache_write() -> None:
     """Trim the cache every few writes instead of walking the directory on each one."""
-    global _writes_since_prune
-    with _prune_lock:
-        _writes_since_prune += 1
-        due = _writes_since_prune >= _PRUNE_EVERY_WRITES
-        if due:
-            _writes_since_prune = 0
-    if due:
-        prune_cache()
+    _pruner.note_write()
 
 
 def prune_cache(max_bytes: int = FRAMING_IMAGE_CACHE_MAX_BYTES) -> int:
     """Delete the oldest cached images once the cache outgrows *max_bytes*; return how many."""
-    entries = []
-    total = 0
-    try:
-        names = os.listdir(FRAMING_IMAGE_CACHE_DIR)
-    except OSError:
-        return 0
-    for name in names:
-        path = os.path.join(FRAMING_IMAGE_CACHE_DIR, name)
-        try:
-            stat = os.stat(path)
-        except OSError:
-            continue
-        entries.append((stat.st_mtime, stat.st_size, path))
-        total += stat.st_size
-    if total <= max_bytes:
-        return 0
+    return prune_oldest_files(FRAMING_IMAGE_CACHE_DIR, max_bytes, 'Framing image cache')
 
-    target = int(max_bytes * 0.8)
-    removed = 0
-    for _mtime, size, path in sorted(entries):
-        if total <= target:
-            break
-        try:
-            os.remove(path)
-        except OSError:
-            continue
-        total -= size
-        removed += 1
-    logger.info(f'Framing image cache trimmed: {removed} files removed, {total // (1024 * 1024)} MiB kept')
-    return removed
+
+_pruner = WritePruner(lambda: prune_cache(), _PRUNE_EVERY_WRITES)

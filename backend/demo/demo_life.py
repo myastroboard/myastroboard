@@ -14,7 +14,9 @@ demo account the life of a real observer, built from the application's own data:
   SkyTonight results (the best-scoring targets that fit the combination's field), then
   ordered by the plan optimizer.
 - **Every check**: an Astrodex item still without its picture (no survey server answered
-  when it was added) gets another try, a few items per check.
+  when it was added) gets another try, a few items per check; logged nights older than
+  ``DEMO_HISTORY_DAYS`` are deleted with the Astrodex items they added, so the demo
+  data keeps the same size however long the demo runs.
 
 Every picture is a DSS2 colour survey cut-out (CDS / STScI) framed to the combination's
 field, and says so in its notes: no amateur photo is ever passed off as a real capture.
@@ -129,6 +131,9 @@ DEMO_SESSION_NOTE = 'Demo night: logged automatically from the plan, acquisition
 _PICTURE_SIZE_PX = 1200
 # Missing pictures retried per check: an outage of every survey server costs a few requests.
 _PICTURE_RETRIES_PER_CHECK = 3
+# Logged nights kept. Older sessions, and the Astrodex items the nights added (with their
+# pictures), are deleted: about 120 items and 40 MB at most. The seed is kept for good.
+DEMO_HISTORY_DAYS = 60
 _MOVING_TYPES = ('planet', 'comet', 'moon', 'asteroid', 'minor')
 _MIN_OBSERVABLE_HOURS = 2.0
 # How often the background loop checks whether a new night has come.
@@ -514,13 +519,46 @@ def _log_plan(user, plan: dict, setup: dict, combination: dict, in_astrodex: set
 def repair_demo_data(user, combinations: dict[str, dict], today: date) -> None:
     """Finish what an earlier check could not, and bring older records to today's shape.
 
+    - Logged nights older than ``DEMO_HISTORY_DAYS`` go, with the items they added.
     - Constellations stored as IAU abbreviations ("And") become the full names the UI
       translates.
     - An Astrodex item without its picture (no survey server answered when it was
       added) gets another try.
     """
+    _prune_history(user, today)
     _expand_constellations(user)
     _retry_missing_pictures(user, combinations, today)
+
+
+def _seed_names() -> set[str]:
+    names = set()
+    for name, _setup_key in DEMO_ASTRODEX_SEED:
+        target = skytonight_targets.find_target(name)
+        names.add(_normalize(target.preferred_name if target else name))
+    return names
+
+
+def _prune_history(user, today: date) -> None:
+    """Delete the logged nights older than DEMO_HISTORY_DAYS and the items they added."""
+    cutoff = (today - timedelta(days=DEMO_HISTORY_DAYS)).isoformat()
+    seed = _seed_names()
+    removed_items = 0
+    for item in astrodex.load_user_astrodex(user.user_id, user.username).get('items', []):
+        if not isinstance(item, dict) or _normalize(item.get('name')) in seed:
+            continue
+        created = str(item.get('created_at') or '')[:10]
+        if created and created < cutoff:
+            removed_items += int(astrodex.delete_astrodex_item(user.user_id, item['id']))
+    removed_sessions = 0
+    for session in observation_sessions.load_user_sessions(user.user_id, user.username).get('sessions', []):
+        last_night = observation_sessions.session_date_range(session)[1] if isinstance(session, dict) else ''
+        if last_night and last_night < cutoff:
+            removed_sessions += int(observation_sessions.delete_session(user.user_id, session['id']))
+    if removed_items or removed_sessions:
+        logger.info(
+            f"Demo mode: removed {removed_sessions} logged nights and {removed_items} Astrodex items "
+            f"older than {DEMO_HISTORY_DAYS} days"
+        )
 
 
 def _expand_constellations(user) -> None:

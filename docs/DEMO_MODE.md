@@ -47,6 +47,9 @@ moving (`backend/demo/demo_life.py`, a background check every 10 minutes):
   survey server answered when it was added, gets another try (three items per check, stopping at
   the first failure). Constellations stored as IAU abbreviations by older versions are expanded to
   the full names the UI translates.
+- **History window**: logged nights older than 60 days are deleted, with the Astrodex items they
+  added and their pictures (the seed stays). However long the demo runs, it holds about 120
+  Astrodex items and 40 MB of pictures at most.
 
 **The pictures are not amateur photos.** Each is a DSS2 colour survey cut-out (CDS / STScI),
 framed to the combination's field, and its notes say so. The acquisition figures (frames,

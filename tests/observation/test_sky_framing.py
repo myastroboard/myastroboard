@@ -14,6 +14,7 @@ if 'psutil' not in sys.modules:
 from observation import object_info as oi  # type: ignore[import-not-found]
 from observation import sky_framing  # type: ignore[import-not-found]
 from skytonight.skytonight_models import SkyTonightCoordinates, SkyTonightTarget  # type: ignore[import-not-found]
+from utils.file_cache import WritePruner  # type: ignore[import-not-found]
 
 
 def _target(target_id, ra_hours, dec_degrees, category='deep_sky', object_type='Galaxy', name=None, size=None):
@@ -295,79 +296,23 @@ def test_ensure_cached_image_falls_back_to_hips_mirror(monkeypatch, tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_prune_cache_removes_oldest_files_down_to_eighty_percent(monkeypatch, tmp_path):
-    """Once over the limit, the oldest images go until the cache is back under 80% of it."""
+def test_prune_cache_trims_the_framing_directory(monkeypatch, tmp_path):
+    """prune_cache applies the shared size cap to the framing image directory."""
     monkeypatch.setattr(sky_framing, 'FRAMING_IMAGE_CACHE_DIR', str(tmp_path))
-    for index in range(5):
+    for index in range(3):
         path = tmp_path / f'{index}.jpg'
         path.write_bytes(b'x' * 100)
         os.utime(path, (1000 + index, 1000 + index))
 
-    removed = sky_framing.prune_cache(max_bytes=450)
-
-    assert removed == 2
-    assert sorted(os.listdir(str(tmp_path))) == ['2.jpg', '3.jpg', '4.jpg']
-
-
-def test_prune_cache_keeps_everything_under_the_limit(monkeypatch, tmp_path):
-    """A cache under its limit is left untouched."""
-    monkeypatch.setattr(sky_framing, 'FRAMING_IMAGE_CACHE_DIR', str(tmp_path))
-    (tmp_path / 'a.jpg').write_bytes(b'x' * 100)
-
-    assert sky_framing.prune_cache(max_bytes=1000) == 0
-    assert os.listdir(str(tmp_path)) == ['a.jpg']
-
-
-def test_prune_cache_skips_files_it_cannot_stat(monkeypatch, tmp_path):
-    """A file that vanishes between the listing and the stat is left out of the size count."""
-    monkeypatch.setattr(sky_framing, 'FRAMING_IMAGE_CACHE_DIR', str(tmp_path))
-    gone = tmp_path / 'gone.jpg'
-    gone.write_bytes(b'x' * 5000)
-    real_stat = os.stat
-    monkeypatch.setattr(
-        sky_framing.os,
-        'stat',
-        lambda path: (_ for _ in ()).throw(FileNotFoundError(path)) if path == str(gone) else real_stat(path),
-    )
-
-    assert sky_framing.prune_cache(max_bytes=1000) == 0
-    assert gone.exists()
-
-
-def test_prune_cache_keeps_files_it_cannot_remove(monkeypatch, tmp_path):
-    """A file the OS refuses to delete stays, the next ones go, and pruning ends without raising."""
-    monkeypatch.setattr(sky_framing, 'FRAMING_IMAGE_CACHE_DIR', str(tmp_path))
-    locked = tmp_path / 'locked.jpg'
-    other = tmp_path / 'other.jpg'
-    for index, path in enumerate((locked, other)):
-        path.write_bytes(b'x' * 600)
-        os.utime(path, (1000 + index, 1000 + index))
-    real_remove = os.remove
-    monkeypatch.setattr(
-        sky_framing.os,
-        'remove',
-        lambda path: (_ for _ in ()).throw(PermissionError(path)) if path == str(locked) else real_remove(path),
-    )
-
-    assert sky_framing.prune_cache(max_bytes=1000) == 1
-    assert locked.exists()
-    assert not other.exists()
-
-
-def test_prune_cache_without_directory_is_a_no_op(monkeypatch, tmp_path):
-    """A cache directory that does not exist yet is not an error."""
-    monkeypatch.setattr(sky_framing, 'FRAMING_IMAGE_CACHE_DIR', str(tmp_path / 'missing'))
-
-    assert sky_framing.prune_cache() == 0
+    assert sky_framing.prune_cache(max_bytes=250) == 1
+    assert sorted(os.listdir(str(tmp_path))) == ['1.jpg', '2.jpg']
 
 
 def test_cache_is_pruned_every_few_writes(monkeypatch, tmp_path):
     """The size check runs once every few downloads, not on each one."""
     monkeypatch.setattr(sky_framing, 'FRAMING_IMAGE_CACHE_DIR', str(tmp_path))
-    monkeypatch.setattr(sky_framing, '_PRUNE_EVERY_WRITES', 2)
-    monkeypatch.setattr(sky_framing, '_writes_since_prune', 0)
     calls = []
-    monkeypatch.setattr(sky_framing, 'prune_cache', lambda *a, **k: calls.append(1) or 0)
+    monkeypatch.setattr(sky_framing, '_pruner', WritePruner(lambda: calls.append(1), 2))
     mock_resp = MagicMock()
     mock_resp.raise_for_status.return_value = None
     mock_resp.iter_content.return_value = [b'bytes']

@@ -287,6 +287,35 @@ def test_ensure_cached_object_image_returns_none_on_request_failure(monkeypatch,
     assert result is None
 
 
+def test_object_image_cache_is_pruned_every_few_downloads(monkeypatch, tmp_path):
+    """A downloaded thumbnail counts towards the cache cap; a failed download does not."""
+    monkeypatch.setattr(oi, 'OBJECT_IMAGE_CACHE_DIR', str(tmp_path))
+    calls = []
+    monkeypatch.setattr(oi, '_pruner', oi.WritePruner(lambda: calls.append(1), 2))
+    monkeypatch.setattr(oi, 'download_dss_image', lambda *args, **kwargs: True)
+    oi.ensure_cached_object_image(ra=1.0, dec=1.0)
+    assert calls == []
+    oi.ensure_cached_object_image(ra=2.0, dec=2.0)
+    assert calls == [1]
+
+    monkeypatch.setattr(oi, 'download_dss_image', lambda *args, **kwargs: False)
+    oi.ensure_cached_object_image(ra=3.0, dec=3.0)
+    oi.ensure_cached_object_image(ra=4.0, dec=4.0)
+    assert calls == [1]
+
+
+def test_prune_object_image_cache_trims_the_object_image_directory(monkeypatch, tmp_path):
+    """The thumbnail cache keeps its newest files under the cap."""
+    monkeypatch.setattr(oi, 'OBJECT_IMAGE_CACHE_DIR', str(tmp_path))
+    for index in range(3):
+        path = tmp_path / f'{index}.jpg'
+        path.write_bytes(b'x' * 100)
+        os.utime(path, (1000 + index, 1000 + index))
+
+    assert oi.prune_object_image_cache(max_bytes=250) == 1
+    assert sorted(os.listdir(str(tmp_path))) == ['1.jpg', '2.jpg']
+
+
 def test_ensure_cached_object_image_fetches_and_writes_cache(monkeypatch, tmp_path):
     monkeypatch.setattr(oi, 'OBJECT_IMAGE_CACHE_DIR', str(tmp_path))
     mock_resp = MagicMock()
