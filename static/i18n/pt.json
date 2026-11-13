@@ -2736,6 +2736,7 @@
     "theme_light": "Claro",
     "include": "Mostrar no cartão",
     "brand": "Assinatura MyAstroBoard",
+    "brand_hint": "Mantê-la também apoia o projeto: é assim que outros astrônomos descobrem o MyAstroBoard.",
     "privacy_note": "O cartão é criado no seu navegador e nunca contém a sua localização. Nada é enviado para lado nenhum até o partilhar.",
     "download": "Descarregar",
     "share": "Partilhar",

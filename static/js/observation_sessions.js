@@ -1028,6 +1028,15 @@ function _obsCollectSessionPictures(session) {
     return pictures;
 }
 
+/**
+ * The translated object type of an entry, as the Astrodex card shows it (raw value otherwise).
+ */
+function _observationTypeLabel(type) {
+    if (!type) return '';
+    const key = 'type_' + strToTranslateKey(type);
+    return i18n.has(`skytonight.${key}`) ? tSkyTonightCompat(key) : type;
+}
+
 function _obsBuildEntryRow(session, entry) {
     const row = document.createElement('div');
     row.className = 'observation-log-entry-row p-2 mb-2';
@@ -1059,7 +1068,11 @@ function _obsBuildEntryRow(session, entry) {
     name.textContent = entry.name || '';
     identity.appendChild(name);
 
-    const subtitleParts = [entry.type, entry.constellation, entry.catalogue].filter(Boolean);
+    const subtitleParts = [
+        _observationTypeLabel(entry.type),
+        entry.constellation ? getConstellationDisplayName(entry.constellation) : '',
+        entry.catalogue,
+    ].filter(Boolean);
     if (subtitleParts.length) {
         const subtitle = document.createElement('div');
         subtitle.className = 'observation-log-meta';

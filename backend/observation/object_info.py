@@ -20,6 +20,7 @@ import requests
 
 from utils import fix_astropy_constellation_name
 from utils.constants import DATA_DIR_CACHE
+from utils.file_cache import WritePruner, prune_oldest_files
 from utils.logging_config import get_logger
 
 # Windows-compatible file locking (mirrors cache_store.py's cross-platform pattern).
@@ -128,8 +129,12 @@ DSS2_IMAGE_CREDIT = 'DSS2 Color / CDS HiPS'
 _HIPS_TILE_TIMEOUT = (CONNECT_TIMEOUT, 15)
 
 # Local on-disk cache for hips2fits imagery, keyed by (ra, dec) — DSS2 survey
-# tiles never change, so once fetched an image is cached indefinitely.
+# tiles never change, so an image is kept until the cache outgrows its cap; the
+# oldest are then deleted, and fetched again on demand by the image route.
 OBJECT_IMAGE_CACHE_DIR = os.path.join(DATA_DIR_CACHE, 'object_images')
+# About 7000 of the 400 px thumbnails: the catalogues hold close to 18000 objects.
+OBJECT_IMAGE_CACHE_MAX_BYTES = 200 * 1024 * 1024
+_PRUNE_EVERY_WRITES = 20
 
 
 # ──────────────────────────────────────────────
@@ -608,8 +613,17 @@ def ensure_cached_object_image(ra: float, dec: float) -> str | None:
     if os.path.isfile(local_path):
         return local_path
     if download_dss_image(ra, dec, 0.5, 400, local_path, f'ra={ra}, dec={dec}'):
+        _pruner.note_write()
         return local_path
     return None
+
+
+def prune_object_image_cache(max_bytes: int = OBJECT_IMAGE_CACHE_MAX_BYTES) -> int:
+    """Delete the oldest cached object images once the cache outgrows *max_bytes*; return how many."""
+    return prune_oldest_files(OBJECT_IMAGE_CACHE_DIR, max_bytes, 'Object image cache')
+
+
+_pruner = WritePruner(lambda: prune_object_image_cache(), _PRUNE_EVERY_WRITES)
 
 
 def download_dss_image(

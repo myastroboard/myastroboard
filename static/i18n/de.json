@@ -2736,6 +2736,7 @@
     "theme_light": "Hell",
     "include": "Auf der Karte anzeigen",
     "brand": "MyAstroBoard-Signatur",
+    "brand_hint": "Sie zu behalten unterstützt auch das Projekt: So entdecken andere Astronomen MyAstroBoard.",
     "privacy_note": "Die Karte wird in deinem Browser erstellt und enthält nie deinen Standort. Es wird nichts gesendet, bis du sie selbst teilst.",
     "download": "Herunterladen",
     "share": "Teilen",

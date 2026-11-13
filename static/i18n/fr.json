@@ -2736,6 +2736,7 @@
     "theme_light": "Clair",
     "include": "Afficher sur la carte",
     "brand": "Signature MyAstroBoard",
+    "brand_hint": "La garder, c'est aussi soutenir le projet : c'est ainsi que d'autres astronomes découvrent MyAstroBoard.",
     "privacy_note": "La carte est fabriquée dans votre navigateur et ne contient jamais votre lieu. Rien n'est envoyé nulle part tant que vous ne la partagez pas vous-même.",
     "download": "Télécharger",
     "share": "Partager",

@@ -2736,6 +2736,7 @@
     "theme_light": "Claro",
     "include": "Mostrar en la tarjeta",
     "brand": "Firma MyAstroBoard",
+    "brand_hint": "Mantenerla también apoya el proyecto: así es como otros astrónomos descubren MyAstroBoard.",
     "privacy_note": "La tarjeta se crea en tu navegador y nunca contiene tu ubicación. No se envía nada a ningún sitio hasta que la compartas tú mismo.",
     "download": "Descargar",
     "share": "Compartir",

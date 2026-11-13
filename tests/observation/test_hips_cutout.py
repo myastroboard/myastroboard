@@ -203,3 +203,32 @@ def test_render_cutout_raises_on_undecodable_tile():
     with patch.object(hc.requests, 'get', return_value=_tile_response(content=b'<html>maintenance</html>')):
         with pytest.raises(requests.RequestException):
             hc.render_cutout(MIRROR, 10.0, 20.0, 1.0, 32)
+
+
+def test_tan_grid_band_is_the_same_rows_of_the_whole_grid():
+    """A band of rows has exactly the coordinates of those rows in the full grid."""
+    ra, dec = hc.tan_grid(120.0, -40.0, 3.0, 50)
+    band_ra, band_dec = hc.tan_grid(120.0, -40.0, 3.0, 50, 10, 24)
+    assert band_ra.shape == (14, 50)
+    np.testing.assert_array_equal(band_ra, ra[10:24])
+    np.testing.assert_array_equal(band_dec, dec[10:24])
+
+
+def test_render_cutout_in_bands_matches_a_single_pass(monkeypatch):
+    """Rendering band by band (to bound memory) gives the image a single pass gives.
+
+    The tiles differ from one another, so a band that read the wrong tile, or wrote its
+    rows at the wrong height, would change the picture.
+    """
+
+    def fake_tile(base_url, order, npix, timeout):
+        if npix % 5 == 1:
+            return None
+        return np.random.default_rng(npix).integers(0, 255, (hc.TILE_WIDTH, hc.TILE_WIDTH, 3), dtype=np.uint8)
+
+    monkeypatch.setattr(hc, '_fetch_tile', fake_tile)
+    monkeypatch.setattr(hc, '_BAND_ROWS', 10_000)
+    single = hc.render_cutout(MIRROR, 10.0, 20.0, 8.0, 150)
+    monkeypatch.setattr(hc, '_BAND_ROWS', 6)
+    banded = hc.render_cutout(MIRROR, 10.0, 20.0, 8.0, 150)
+    assert banded == single
