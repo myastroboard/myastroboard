@@ -8,6 +8,20 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Features
 
+- None.
+
+### Fixes
+
+- None.
+
+### Breaking changes
+
+- None.
+
+## 1.8.3 (2026-11-13)
+
+### Features
+
 - Share card: a short note under the MyAstroBoard signature option explains that keeping it helps others discover the project.
 
 ### Fixes
