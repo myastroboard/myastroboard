@@ -19,7 +19,7 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Parameters -> Logs: the Delete logs button now asks for confirmation, and its messages are translated.
 - Demo mode: Astrodex pictures that could not be downloaded are retried on later checks, and constellations are stored as full names so they are translated (Astrodex, Plan My Night, Observation Log).
 - Parameters -> Users: creating an account on a slow server no longer reports a failure when the account was in fact created, and the password is hashed before the database write lock is taken.
-- Low memory: the startup log records the host's CPUs, memory and container limits, and Parameters -> Metrics warns below 1 GB; minimum requirements are documented ([docs/1.INSTALLATION.md](docs/1.INSTALLATION.md#system-requirements)).
+- Low memory: the startup log records the host's CPUs, memory and container limits, and Parameters -> Metrics warns below 1 GB (and says so when the metrics cannot be collected, instead of freezing); minimum requirements are documented ([docs/1.INSTALLATION.md](docs/1.INSTALLATION.md#system-requirements)).
 
 ### Breaking changes
 

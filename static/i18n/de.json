@@ -1938,6 +1938,7 @@
     "system_metrics": "Systemmetriken",
     "info_title": "Systemleistung und Ressourcenüberwachung. Die Daten werden alle 30 Sekunden automatisch aktualisiert.",
     "low_memory_warning": "Nur {available} Arbeitsspeicher stehen MyAstroBoard zur Verfügung, weniger als die empfohlenen {recommended}. Ein Worker kann während der Berechnungen beendet werden: Eine Aktion meldet dann einen Fehler, obwohl sie ausgeführt wurde, oder die Offline-Seite erscheint. Weisen Sie dem Container mehr Speicher zu (siehe Systemanforderungen in der Installationsanleitung).",
+    "load_failed": "Die Systemmetriken konnten nicht erfasst werden. Die Ursache steht im Anwendungsprotokoll (App-Einstellungen -> Protokolle).",
     "cpu": "CPU",
     "cpu_usage": "CPU Verwendung:",
     "cpu_info": "CPU Info",

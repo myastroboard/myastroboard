@@ -1938,6 +1938,7 @@
     "system_metrics": "Métriques du système",
     "info_title": "Surveillance des performances et des ressources du système. Les données se mettent à jour automatiquement toutes les 30 secondes.",
     "low_memory_warning": "Seulement {available} de mémoire sont disponibles pour MyAstroBoard, sous les {recommended} recommandés. Un worker peut être arrêté pendant les calculs : une action affiche alors une erreur alors qu'elle a abouti, ou la page hors ligne apparaît. Donnez plus de mémoire au conteneur (voir la configuration requise dans le guide d'installation).",
+    "load_failed": "Les métriques système n'ont pas pu être collectées. La cause est indiquée dans le journal de l'application (Paramètres app -> Journaux).",
     "cpu": "CPU",
     "cpu_usage": "Utilisation du CPU : ",
     "cpu_info": "Informations sur le CPU",

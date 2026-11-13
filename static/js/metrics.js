@@ -21,12 +21,13 @@ async function loadSystemMetrics() {
     metricsLoading = true;
     try {
         const data = await fetchJSONOnce('/api/metrics', { timeoutMs: METRICS_FETCH_TIMEOUT_MS });
-        
-        if (!data) {
-            console.warn('No metrics data received');
-            return;
+
+        // The server answers {error} when collecting failed: say so instead of
+        // crashing on the missing blocks (the cause is in the application log)
+        if (!data || data.error || !data.cpu || !data.memory || !data.swap) {
+            throw new Error(data?.error || 'No metrics data received');
         }
-        
+
         console.debug('Metrics data received:', data);
         
         // Update CPU metrics
@@ -99,9 +100,10 @@ async function loadSystemMetrics() {
             console.warn('No process list data available');
             updateProcessesTable({ processes: [] });
         }
-        
+        setMetricsLoadError(false);
     } catch (error) {
         console.error('Error loading system metrics:', error);
+        setMetricsLoadError(true);
     } finally {
         metricsLoading = false;
     }
@@ -671,6 +673,12 @@ function updateProgressBar(elementId, percent) {
     } else {
         bar.classList.add('bg-success');
     }
+}
+
+// Banner when /api/metrics failed; the scheduler and cache blocks keep refreshing
+function setMetricsLoadError(failed) {
+    const banner = document.getElementById('metrics-load-error');
+    if (banner) banner.style.display = failed ? '' : 'none';
 }
 
 // Banner when the memory MyAstroBoard can use (container limit or host RAM) is below the
