@@ -6,13 +6,14 @@
 title = "MyAstroBoard Documentation"
 authors = ["MyAstroBoard contributors"]
 language = "en"
-src = "src"
+src = "docs"
 
 [output.html]
 default-theme = "light"
 preferred-dark-theme = "navy"
 git-repository-url = "https://github.com/myastroboard/myastroboard"
-edit-url-template = "https://github.com/myastroboard/myastroboard/edit/main/docs/{path}"
+# {path} is relative to the book root, so the build keeps the pages in a "docs" folder.
+edit-url-template = "https://github.com/myastroboard/myastroboard/edit/main/{path}"
 site-url = "/"
 no-section-label = true
 

@@ -43,7 +43,7 @@ services:
     restart: unless-stopped
 ```
 
-For complete installation instructions, see the [Installation Guide](https://github.com/myastroboard/myastroboard/blob/main/docs/1.INSTALLATION.md).
+For complete installation instructions, see the [Installation Guide](https://docs.myastroboard.org/1.INSTALLATION.html).
 
 ---
 
@@ -71,19 +71,22 @@ For complete installation instructions, see the [Installation Guide](https://git
 
 - Docker and Docker Compose
 - Linux host or compatible Docker environment
-- At least 1 GB of memory and 1 CPU core for the container ([system requirements](https://github.com/myastroboard/myastroboard/blob/main/docs/1.INSTALLATION.md#system-requirements))
+- At least 1 GB of memory and 1 CPU core for the container ([system requirements](https://docs.myastroboard.org/1.INSTALLATION.html#system-requirements))
 
 ---
 
 ## 📚 Documentation
 
-- [Installation Guide](https://github.com/myastroboard/myastroboard/blob/main/docs/1.INSTALLATION.md)
-- [Quick Start](https://github.com/myastroboard/myastroboard/blob/main/docs/2.QUICKSTART.md)
-- [Update Guide](https://github.com/myastroboard/myastroboard/blob/main/docs/3.UPDATE.md)
-- [Reverse Proxy Setup](https://github.com/myastroboard/myastroboard/blob/main/docs/6.REVERSE_PROXY.md)
-- [API Endpoints](https://github.com/myastroboard/myastroboard/blob/main/docs/API_ENDPOINTS.md)
-- [Visual Tour](https://github.com/myastroboard/myastroboard/blob/main/docs/VISUAL_TOUR.md)
-- [Beginner Experience](https://github.com/myastroboard/myastroboard/blob/main/docs/BEGINNER_EXPERIENCE.md)
+Everything is at **[docs.myastroboard.org](https://docs.myastroboard.org/)**. To get started:
+
+- [Installation Guide](https://docs.myastroboard.org/1.INSTALLATION.html)
+- [Quick Start](https://docs.myastroboard.org/2.QUICKSTART.html)
+- [Update Guide](https://docs.myastroboard.org/3.UPDATE.html)
+- [Reverse Proxy Setup](https://docs.myastroboard.org/6.REVERSE_PROXY.html)
+- [API Endpoints](https://docs.myastroboard.org/API_ENDPOINTS.html)
+- [Visual Tour](https://docs.myastroboard.org/VISUAL_TOUR.html)
+- [Beginner Experience](https://docs.myastroboard.org/BEGINNER_EXPERIENCE.html)
+- [Troubleshooting](https://docs.myastroboard.org/TROUBLESHOOTING.html)
 
 ---
 

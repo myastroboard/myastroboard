@@ -618,6 +618,9 @@ Contributors will be acknowledged in:
   browser - see [docs/EQUIPMENT.md#presets](docs/EQUIPMENT.md#presets) before adding or editing entries
 
 ### Documentation (`docs/`)
+- The pages are published at [docs.myastroboard.org](https://docs.myastroboard.org/) by the
+  *Documentation site* workflow; see [docs-site/README.md](docs-site/README.md). A new page must
+  also be added to `docs-site/SUMMARY.md`, the site menu (a test checks it).
 - **Every page is listed in [docs/README.md](docs/README.md)**, under the audience that reads it
   (using, running, contributing), and new tabs or sub-tabs go in its *Where is it?* table.
 - **One subject, one page.** Link to the page that owns a subject instead of copying it: the file
