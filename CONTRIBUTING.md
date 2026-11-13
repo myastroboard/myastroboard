@@ -314,11 +314,11 @@ async function fetchCatalogueData(catalogueName, options = {}) {
 #### Modals
 
 Open and close every Bootstrap modal with `openModal()` / `closeModal()` from
-`static/js/utils.js` — never `new bootstrap.Modal(...)` or `instance.hide()` directly, and
+`static/js/utils.js` - never `new bootstrap.Modal(...)` or `instance.hide()` directly, and
 never strip `.modal-backdrop` / `body.modal-open` by hand. The helper handles the
 close-before-open rule (Bootstrap 5.3 can't stack modals), instance disposal on the shared
 shells, the mid-transition `hide()` no-op, and Back-button dismissal. See
-`.github/instructions/copilot.instructions.md` (Frontend → Modals).
+`.github/instructions/copilot.instructions.md` (Frontend -> Modals).
 
 ### CSS Style Guide
 
@@ -333,7 +333,7 @@ Templates are in `templates/` (Jinja2/Flask) and `static/offline.html`. They are
 
 #### Running the linter
 
-`djlint` is included in `requirements-dev.txt` — no separate install needed if you already set up the dev environment.
+`djlint` is included in `requirements-dev.txt` - no separate install needed if you already set up the dev environment.
 
 ```bash
 djlint templates/ static/offline.html --profile jinja --lint --ignore H021,H023,H030,H031,J004,J018
@@ -345,7 +345,7 @@ djlint templates/ static/offline.html --profile jinja --lint --ignore H021,H023,
 |------|--------|
 | H021 | Inline styles are used intentionally for JS-driven show/hide (`style="display: none;"`) |
 | H023 | HTML entity references (`&deg;`, `&amp;`) are valid and preferred over raw Unicode in content |
-| H030 | `offline.html` is a PWA fallback page, not a public web page — meta description is irrelevant |
+| H030 | `offline.html` is a PWA fallback page, not a public web page - meta description is irrelevant |
 | H031 | Meta keywords are obsolete and ignored by all modern search engines |
 | J004 | Static assets use versioned URLs (`/static/file.css?v={{ version }}`) for cache-busting instead of `url_for('static', ...)` |
 | J018 | Form actions target explicit API routes (e.g. `/api/auth/login`), not Flask view functions |
@@ -364,13 +364,13 @@ djlint templates/ static/offline.html --profile jinja --lint --ignore H021,H023,
 
 #### Inline `style` attribute
 
-**NEVER** add a `style="..."` attribute (in templates, or via `element.style.x = ...` / `setAttribute('style', ...)` in JS) to express *static* presentation — colors, sizes, spacing, font-size, etc. Put it in a CSS class in the relevant `static/css/bs_*.css` file instead, even if it means adding a small one-off utility class. A `<div>` that already carries a `class` and *also* carries a hardcoded `style` is the smell to avoid — the static declaration belongs in CSS, not duplicated inline.
+**NEVER** add a `style="..."` attribute (in templates, or via `element.style.x = ...` / `setAttribute('style', ...)` in JS) to express *static* presentation - colors, sizes, spacing, font-size, etc. Put it in a CSS class in the relevant `static/css/bs_*.css` file instead, even if it means adding a small one-off utility class. A `<div>` that already carries a `class` and *also* carries a hardcoded `style` is the smell to avoid - the static declaration belongs in CSS, not duplicated inline.
 
 Two narrow exceptions, both allowed:
-- **JS-driven show/hide**: `style="display: none;"` in markup, or `el.style.display = 'none'` in JS, to toggle visibility at runtime. This is intentional (see djlint H021 above) — don't rewrite these to `classList.toggle('d-none')` unless you're already touching that code for another reason.
+- **JS-driven show/hide**: `style="display: none;"` in markup, or `el.style.display = 'none'` in JS, to toggle visibility at runtime. This is intentional (see djlint H021 above) - don't rewrite these to `classList.toggle('d-none')` unless you're already touching that code for another reason.
 - **Genuinely per-instance dynamic values that can't be a static class**: e.g. Bootstrap's own documented progress-bar pattern (`<div class="progress-bar" style="width: 25%">`), or a computed pixel offset/color/width set at runtime from data. These are fine as direct `.style.x` writes; don't invent a CSS class per possible value.
 
-If you're unsure whether a given `style` is "static" or "dynamic", check whether the value ever changes after initial render without a full class swap — if it doesn't, it's static and belongs in CSS.
+If you're unsure whether a given `style` is "static" or "dynamic", check whether the value ever changes after initial render without a full class swap - if it doesn't, it's static and belongs in CSS.
 
 ### Git Commit Messages
 
@@ -438,7 +438,7 @@ docker-compose -f docker-compose-dev.yml run myastroboard pytest
 
 ### Writing Tests
 
-- Place tests in the `tests/` directory, mirroring the `backend/` package layout (e.g. `backend/skytonight/foo.py` → `tests/skytonight/test_foo.py`)
+- Place tests in the `tests/` directory, mirroring the `backend/` package layout (e.g. `backend/skytonight/foo.py` -> `tests/skytonight/test_foo.py`)
 - Name test files `test_*.py`
 - Name test functions `test_*`
 - Use descriptive test names
@@ -528,11 +528,11 @@ The failure output lists exactly which routes are unexpected or missing, so you 
    `ruff` covers the whole repository (`backend/`, `tests/`, `scripts/`). `pyright` stays scoped to
    `backend/` - test code leans heavily on `monkeypatch`, `MagicMock` and other dynamic
    attributes that would drown real findings in false positives.
-   `pyright` is the CLI equivalent of the Pylance errors VSCode shows inline — both come from
+   `pyright` is the CLI equivalent of the Pylance errors VSCode shows inline - both come from
    `requirements-dev.txt` and read the same `pyrightconfig.json` at the repo root, so a clean
    `pyright backend/` run means Pylance should show no problems either. If VSCode still shows
    stale errors after a config change, run "Python: Restart Language Server" from the command palette.
-   For JavaScript, open the file in VSCode — formatting is applied on save automatically.
+   For JavaScript, open the file in VSCode - formatting is applied on save automatically.
    No separate JS lint step is required.
 
 3. **Update documentation** if needed
@@ -598,7 +598,7 @@ Contributors will be acknowledged in:
 - Add type hints to function signatures
 - Follow existing patterns for API endpoints
 - Update relevant tests in `tests/`
-- If you add or modify user-facing text, update the translation files — see [docs/7.TRANSLATIONS.md](docs/7.TRANSLATIONS.md)
+- If you add or modify user-facing text, update the translation files - see [docs/7.TRANSLATIONS.md](docs/7.TRANSLATIONS.md)
 - **No new cross-feature import cycles.** The per-domain packages (`skytonight/`, `observation/`,
   `equipment/`, `weather/`, `astroweather/`, `space/`, `cache/`) must not gain a new module-level
   `import` that closes a dependency loop between two of them. A shared helper goes in `utils/`; a
@@ -615,13 +615,28 @@ Contributors will be acknowledged in:
 - Ensure mobile responsiveness
 - Test in multiple browsers
 - Equipment presets (`static/data/equipment_presets.json`) are a static asset consumed directly by the
-  browser — see [docs/EQUIPMENT.md#presets](docs/EQUIPMENT.md#presets) before adding or editing entries
+  browser - see [docs/EQUIPMENT.md#presets](docs/EQUIPMENT.md#presets) before adding or editing entries
 
 ### Documentation (`docs/`)
-- Use clear, concise language
-- Include code examples
-- Add screenshots for visual features
-- Keep table of contents updated
+- **Every page is listed in [docs/README.md](docs/README.md)**, under the audience that reads it
+  (using, running, contributing), and new tabs or sub-tabs go in its *Where is it?* table.
+- **One subject, one page.** Link to the page that owns a subject instead of copying it: the file
+  tree lives in `docs/5.ORGANIZATION.md`, cache TTLs in `docs/CACHE_SYSTEM.md`, routes in
+  `docs/API_ENDPOINTS.md`, and the AI instructions point to them.
+- **Feature pages read top-down**: what you see and do, then how it works, then the technical
+  reference (routes, files, data model) at the end. Apply it to new pages and to sections you
+  rewrite.
+- **Name screens as the UI does** (`App settings -> Configuration`, `My settings -> Customize`), with
+  `->` between levels.
+- **No version tags in headings** ("(v1.2)"): they age, and they change the anchor when removed. Say
+  "since 1.2" in the text when it matters.
+- **Never describe a feature that does not exist**, and never state a time-bound fact ("has not
+  changed since...") that will silently go wrong.
+- **English, ASCII punctuation** (org standards): `-` not an en or em dash, `'` not a curly
+  apostrophe, `->` not an arrow character, `...` not an ellipsis character.
+- Add screenshots for visual features, in `docs/img/`, with no real location or personal data.
+- `tests/test_docs.py` checks internal links and anchors, that every route is in
+  `docs/API_ENDPOINTS.md`, and the punctuation: run it after any docs change.
 
 ### Tests (`tests/`)
 - Mirror backend structure

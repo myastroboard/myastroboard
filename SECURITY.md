@@ -21,17 +21,23 @@ MyAstroBoard is designed as a **self-hosted application** intended to run on:
 ### Architecture Security Considerations
 
 #### Authentication
-- Built-in user authentication system with password hashing
-- User credentials stored in `data/users.json` with bcrypt hashed passwords
-- Session management via Flask sessions
-- Default admin user requires password change on first login
+- Built-in accounts with three roles (`admin`, `user`, `read-only`); passwords hashed with Werkzeug
+  (scrypt), never stored in plain text
+- Optional two-factor authentication (TOTP), trusted networks, and accounts restricted to the local
+  network ([docs/AUTHENTICATION.md](docs/AUTHENTICATION.md))
+- Sign-in throttle: 5 failures per account and 20 per IP address within 15 minutes
+- Flask session cookie (`HttpOnly`, `SameSite=Lax`, `Secure` when the HTTPS-only option is on); the
+  signing key is generated on first start and stored in the database
+- The default `admin` / `admin` account shows a warning until its password is changed
 
 #### Data Storage
-- User configurations stored in `data/config.json`
-- Equipment profiles stored in `data/equipments/`
-- Cached astronomy data in `data/cache/`
-- Application logs in `data/myastroboard.log`
-- All data persisted in Docker volumes
+- Accounts, configuration and every per-user record live in the SQLite database
+  `data/myastroboard.db` ([docs/DATABASE.md](docs/DATABASE.md))
+- Uploaded pictures and attachments in `data/astrodex/` and `data/observation_sessions/`, with their
+  EXIF metadata (GPS position, camera serial numbers) stripped on upload
+- Cached astronomy data in `data/cache/`, application log in `data/myastroboard.log`
+- Everything lives in the `data/` volume; the personal data inventory is in
+  [docs/PRIVACY.md](docs/PRIVACY.md)
 
 ## Reporting a Vulnerability
 
@@ -48,9 +54,7 @@ Instead, please report security vulnerabilities by:
    - Click "Report a vulnerability"
    - Fill out the advisory form with details
 
-2. **Or contact the maintainers directly**:
-   - Create a private issue and tag maintainers
-   - Use encrypted communication if possible
+   This is the only private channel: GitHub issues are always public.
 
 ### What to Include
 
@@ -67,7 +71,7 @@ When reporting a vulnerability, please include:
 
 ### What to Expect
 
-- **Initial Response**: Within 48 hours acknowledging receipt
+- **Initial Response**: Within 72 hours acknowledging receipt
 - **Assessment**: Within 5 business days with initial assessment
 - **Updates**: Regular updates on progress (at least weekly)
 - **Fix Timeline**: Depends on severity
@@ -107,27 +111,24 @@ When reporting a vulnerability, please include:
 
 #### Docker Security
 - **Keep Docker updated** to latest stable version
-- **Review Docker socket permissions** carefully
+- **Never mount the Docker socket** into the container: MyAstroBoard does not need it
 - **Use Docker networks** for container isolation
 - **Regularly update base images**
 - **Scan images** for vulnerabilities
 
 #### File Permissions
 - **Secure data directory** (`data/`) with appropriate permissions
-- **Protect users.json** (contains hashed passwords)
-- **Protect config.json** (contains location and settings)
+- **Protect `myastroboard.db`** (password hashes, two-factor secrets, connector credentials,
+  your observing locations) and the backup ZIPs, which hold the same data
 - **Review log files** for suspicious activity
 
 ### Maintenance
 
 #### Keep Updated
 ```bash
-# Pull latest image
-docker-compose pull
-
-# Restart with latest version
-docker-compose down
-docker-compose up -d
+# Pull the latest image and restart with it
+docker compose pull
+docker compose up -d
 ```
 
 #### Regular Monitoring
@@ -142,37 +143,27 @@ docker-compose up -d
 - **Test restoration** procedures
 - **Keep multiple backup versions**
 
-### Environment Variables
+### Secrets
 
-Sensitive configuration should use environment variables:
-
-```yaml
-# docker-compose.yml
-environment:
-  - SECRET_KEY=${SECRET_KEY}  # Flask secret key
-  - LOG_LEVEL=INFO
-  - CONSOLE_LOG_LEVEL=WARNING
-```
-
-Generate strong secret keys:
-```bash
-python -c "import secrets; print(secrets.token_hex(32))"
-```
+No secret has to be set in `docker-compose.yml`: the session signing key and the Web Push keys are
+generated on first start and stored in the database. Connector credentials (MQTT, MyAstroShine) are
+entered in App settings and kept out of the backup ZIP.
 
 ## Known Security Considerations
 
 ### Intentional Design Choices
 
 #### 1. Session Management
-- **Risk**: Flask session-based authentication
-- **Mitigation**: Use HTTPS, secure secret keys, short session timeouts
-- **Enhancement**: Consider adding 2FA for sensitive deployments
+- **Risk**: Flask session-based authentication; a "Remember me" session lasts 30 days
+- **Mitigation**: Use HTTPS with the HTTPS-only session cookie option, and two-factor
+  authentication for accounts reachable from the internet
 
 ### External Dependencies
 
 MyAstroBoard relies on:
 - **Python packages** (see `requirements.txt`)
-- **External APIs** (Open-Meteo for weather)
+- **External services** (Open-Meteo, 7Timer, CDS / SIMBAD, Celestrak, Launch Library, OpenStreetMap
+  and others; the full list, with what each one receives, is in [docs/PRIVACY.md](docs/PRIVACY.md))
 
 Security considerations:
 - **Dependency updates**: Regularly update dependencies
@@ -183,16 +174,20 @@ Security considerations:
 
 ### Current Protections
 
-✅ **Password Hashing**: Bcrypt for password storage  
-✅ **Input Validation**: Sanitization of user inputs  
-✅ **Session Management**: Flask-Session with secure cookies  
+✅ **Password Hashing**: Werkzeug scrypt hashes  
+✅ **Two-factor authentication**: TOTP, with trusted networks and local-only accounts  
+✅ **Sign-in throttle**: failed sign-ins limited per account and per IP address  
+✅ **Input Validation**: server-side validation of every write  
+✅ **No HTML string sinks** in the frontend: user and API text is rendered as text  
+✅ **Outbound URL checks**: connector probes refuse loopback, link-local and multicast addresses  
+✅ **Image privacy**: EXIF metadata stripped from uploads  
 ✅ **Error Handling**: No sensitive info in error messages  
-✅ **Logging**: Comprehensive activity logging  
-✅ **File Isolation**: Containerized environment  
+✅ **Log retention**: log lines (usernames, IP addresses) removed after a configurable delay  
+✅ **File Isolation**: Containerized environment, no privileged mode  
 
 ### Planned Enhancements
 
-🔄 **Rate Limiting**: API rate limiting to prevent abuse  
+🔄 **Rate Limiting**: API-wide rate limiting (only sign-in and a few public routes are limited today)  
 🔄 **CSRF Protection**: Enhanced CSRF token management  
 🔄 **Content Security Policy**: CSP headers for XSS protection  
 🔄 **Security Headers**: Additional HTTP security headers  
@@ -222,7 +217,7 @@ The following are out of scope:
 - **Physical security** of the host system
 - **Social engineering** attacks
 - **Vulnerabilities in third-party services** (Open-Meteo API, Docker Hub)
-- **Brute force attacks** (mitigate with firewall/fail2ban)
+- **Brute force attacks** beyond the built-in sign-in throttle (mitigate with firewall/fail2ban)
 
 ## Security Resources
 

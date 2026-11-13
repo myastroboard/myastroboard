@@ -6,7 +6,7 @@ The cache system is managed **entirely server-side** with per-job TTL-based expi
 
 The key design principle is **selective refresh**: the background scheduler polls every 5 minutes, but each job only executes when *its own TTL* has expired. Heavy computations (eclipses, planetary events) run at most once a day, while time-sensitive data (aurora, sidereal) refreshes hourly. This dramatically reduces CPU and memory pressure on low-resource machines.
 
-## Multi-location model (v1.2)
+## Multi-location model
 
 Caches are split into two buckets (full details: [docs/LOCATIONS.md](LOCATIONS.md)):
 
@@ -14,7 +14,7 @@ Caches are split into two buckets (full details: [docs/LOCATIONS.md](LOCATIONS.m
   immutable `id`. On-disk keys in `astro_cache.json` are `"<name>:<location_id>"`.
   Access goes through `cache_store.get_location_cache_entry(name, location_id)`,
   `load_location_cache(...)` and `update_location_cache(...)` - the pre-v1.2
-  module-level singletons (`_sun_report_cache`, …) no longer exist for these.
+  module-level singletons (`_sun_report_cache`, ...) no longer exist for these.
   Scoped names: `moon_report`, `dark_window`, `moon_planner`, `sun_report`,
   `best_window_strict/practical/illumination`, `solar_eclipse`, `lunar_eclipse`,
   `horizon_graph`, `aurora`, `iss_passes`, `css_passes`, `planetary_events`,
@@ -58,8 +58,8 @@ Each cache job has an individual TTL defined in `backend/utils/constants.py`:
 | `iss_passes` | 6 hours | 20-day prediction window, stable |
 | `css_passes` | 6 hours | 20-day prediction window, stable (CSS NORAD 48274) |
 | `planetary_events` | 24 hours | 365-day planetary forecast |
-| `special_phenomena` | 24 hours | Annual events (equinoxes, solstices…) |
-| `solar_system_events` | 24 hours | Annual events (meteor showers, comets…) |
+| `special_phenomena` | 24 hours | Annual events (equinoxes, solstices...) |
+| `solar_system_events` | 24 hours | Annual events (meteor showers, comets...) |
 | `sidereal_time` | 1 hour | Hourly precision is sufficient |
 | `seeing_forecast` | 6 hours | 7Timer API update frequency |
 | `weather_forecast` | 1 hour | Suitable for UI display |
@@ -153,7 +153,7 @@ App Startup
   ↓
 Cache Scheduler starts
   ↓
-Initial cache population (all timestamps = 0 → all jobs run)
+Initial cache population (all timestamps = 0 -> all jobs run)
   ├─ Check location config
   ├─ Run all registered jobs
   └─ Record timing per job, set timestamps
@@ -163,8 +163,8 @@ Wait 300s (5 min)
 Periodic poll
   ├─ Sync in-memory timestamps from shared JSON file
   ├─ For each job: check if TTL elapsed
-  │   ├─ TTL not elapsed → skip job
-  │   └─ TTL elapsed → run job, record duration, update timestamp
+  │   ├─ TTL not elapsed -> skip job
+  │   └─ TTL elapsed -> run job, record duration, update timestamp
   └─ Log: "X/N jobs ran, Y/X succeeded in Z.Zs"
   ↓
 Next poll (300s later)...
@@ -333,7 +333,7 @@ third-party map server, and the map servers only see the server's address.
 1. Check cache scheduler is running: `GET /api/skytonight/scheduler/status`
 2. Check server logs for errors in cache calculations
 3. Verify location configuration is complete
-4. Check Metrics → Cache Jobs for failed jobs
+4. Check Metrics -> Cache Jobs for failed jobs
 
 ### Cache Not Updating After Location Change
 1. Verify location parameters actually changed
@@ -382,7 +382,7 @@ Per-job metrics are stored under the `_cache_metrics` key in `data/cache/astro_c
 ```python
 # Signature-based comparison
 new_signature = {"latitude": 45.5, "longitude": -73.5, "elevation": 100, "timezone": "America/Montreal"}
-# If any value differs → reset_all_caches() → all timestamps zeroed
+# If any value differs -> reset_all_caches() -> all timestamps zeroed
 ```
 
 ### Adding a New Cache Job

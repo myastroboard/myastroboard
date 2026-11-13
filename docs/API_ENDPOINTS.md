@@ -61,7 +61,7 @@ This page lists the HTTP routes currently declared across `backend/blueprints/*.
 - `GET /api/config/export`
 - `GET /api/skyquality`
 
-## Locations (multi-location profiles, v1.2 - see docs/LOCATIONS.md)
+## Locations (multi-location profiles, see docs/LOCATIONS.md)
 
 - `GET /api/locations` (admin)
 - `POST /api/locations` (admin, capped at MAX_LOCATIONS)
@@ -162,6 +162,7 @@ This page lists the HTTP routes currently declared across `backend/blueprints/*.
 - `GET /api/astro/sidereal-time`
 - `GET /api/astro/horizon-graph`
 - `GET /api/tonight/best-window`
+- `GET /api/sky-widget` - Current sky status for the sky status widget in the header: period of the night, sky score, active location name
 
 ## Spaceflight
 
@@ -173,12 +174,13 @@ This page lists the HTTP routes currently declared across `backend/blueprints/*.
 
 ## Connectors
 
-- `GET /api/connectors` — List all registered connectors with installed/enabled state, module config, `target_modules` (app tabs the connector surfaces in), and a config block whose `SECRET_FIELDS` are masked (`****` + last 4, plus a `has_<field>` boolean). A connector on a shared MQTT connection also carries `connection_field` and `connection_options` (`[{id, name}]`)
-- `POST /api/connectors/<name>/config` (admin) — Save one connector's config; merged server-side, `int` / `bool` fields coerced to their declared type, and a blank or still-masked secret means "keep current". Secrets are written to the connector secrets store, never to the configuration. A connector on a shared MQTT connection: 400 for an unknown connection id, or for a `client_id` another connector already uses on the same connection
-- `GET /api/connectors/allsky/status` — AllSky sensor data: the variables of the last MQTT message from AllSky's Publish Data module, plus `_received_at` (when the board received it); `{}` while none arrived or the last one is older than 15 min. Requires the `sensor_data` module enabled
-- `GET /api/connectors/allsky/health` — Run a per-module health check against the AllSky instance; accepts `?fresh=1` to bypass cache
-- `GET /api/connectors/allsky/urls` — Return proxy URLs for all enabled AllSky modules; accepts `?date=YYYYMMDD`
-- `GET /api/connectors/allsky/proxy` — Proxy an AllSky resource through the backend; params: `module=<slug>` and optional `date=YYYYMMDD`
+- `GET /api/connectors` - List all registered connectors with installed/enabled state, module config, `target_modules` (app tabs the connector surfaces in), and a config block whose `SECRET_FIELDS` are masked (`****` + last 4, plus a `has_<field>` boolean). A connector on a shared MQTT connection also carries `connection_field` and `connection_options` (`[{id, name}]`)
+- `POST /api/connectors/<name>/config` (admin) - Save one connector's config; merged server-side, `int` / `bool` fields coerced to their declared type, and a blank or still-masked secret means "keep current". Secrets are written to the connector secrets store, never to the configuration. A connector on a shared MQTT connection: 400 for an unknown connection id, or for a `client_id` another connector already uses on the same connection
+- `GET /api/connectors/allsky/status` - AllSky sensor data: the variables of the last MQTT message from AllSky's Publish Data module, plus `_received_at` (when the board received it); `{}` while none arrived or the last one is older than 15 min. Requires the `sensor_data` module enabled
+- `GET /api/connectors/allsky/health` - Run a per-module health check against the AllSky instance with the saved configuration (cached 2 minutes); accepts `?fresh=1` to bypass the cache
+- `POST /api/connectors/allsky/health` - Quick reachability probe of `{"url": "..."}` before saving (the card's test button); http(s) only
+- `GET /api/connectors/allsky/urls` - Return proxy URLs for all enabled AllSky modules; accepts `?date=YYYYMMDD`
+- `GET /api/connectors/allsky/proxy` - Proxy an AllSky resource through the backend; params: `module=<slug>` and optional `date=YYYYMMDD`
 - `GET /api/connectors/mqtt/health` (admin) - One real MQTT connect against the saved connector's connection, with the module toggles (a connection picked on the card is tested through `POST /api/mqtt-connections/health`). A failed probe is a 200 with `reachable: false` and an `error` string
 - `GET /api/connectors/mqtt/status` - What the publisher thread is doing: `enabled`, `connected`, `broker`, `last_publish_at`, `last_error`, `devices[]`, `messages_total` (read from the status file the thread writes, so any worker can answer)
 - `POST /api/connectors/mqtt/publish` (admin) - Ask the publisher for a full republish (discovery + every state) on its next tick
@@ -186,7 +188,7 @@ This page lists the HTTP routes currently declared across `backend/blueprints/*.
 
 ## MQTT connections
 
-Brokers shared by the MQTT connectors (Parameters -> Configuration). All admin-only; the password is never returned, not even in part: a fixed `********` mask and a `has_password` flag.
+Brokers shared by the MQTT connectors (App settings -> Configuration). All admin-only; the password is never returned, not even in part: a fixed `********` mask and a `has_password` flag.
 
 - `GET /api/mqtt-connections` (admin) - Every connection: `id`, `name`, `url`, `username`, `tls_insecure`, `password` (`********` when one is stored, nothing of it revealed), `has_password`, `used_by` (connector names)
 - `POST /api/mqtt-connections` (admin) - Create from `{name, url, username?, password?, tls_insecure?}`; 201, or 400 with the reason (name required or taken, invalid URL...)
@@ -197,6 +199,7 @@ Brokers shared by the MQTT connectors (Parameters -> Configuration). All admin-o
 ## Object Lookup
 
 - `GET /api/object/<path:identifier>`
+- `GET /api/object-image/<filename>` - Serve a locally cached DSS2 sky image (object thumbnails, framing backgrounds), e.g. `10.684000_41.269000.jpg`; see [SKYTONIGHT.md](SKYTONIGHT.md#sky-image)
 
 ## Beginner Catalog
 
@@ -223,6 +226,13 @@ Brokers shared by the MQTT connectors (Parameters -> Configuration). All admin-o
 - `GET /api/astrodex/collection/catalogues`
 - `GET /api/astrodex/collection`
 
+## Astrodex Stream (see docs/ASTRODEX_STREAM.md)
+
+- `GET /api/astrodex/stream/urls` - The caller's personal stream URL and, unless the Astrodex is private, the shared one; `external_base_url_required: true` under Home Assistant ingress with no external base URL set
+- `GET /api/astrodex/stream/<user_id>/<token>/current.jpg` - **No session cookie.** Current frame of one user's slideshow; the signed token is the credential. 404 when the connector is off or the token is wrong, 429 when rate limited
+- `GET /api/astrodex/stream/shared/<token>/current.jpg` - **No session cookie.** Current frame of the slideshow of every user's pictures; 404 while the Astrodex is private
+- `POST /api/connectors/astrodex_stream/rotate` (admin) - Rotate the signing secret: every stream URL handed out so far stops working
+
 ## MyAstroShine integration (see docs/MYASTROSHINE.md)
 
 Astrodex <-> MyAstroShine image round-trip. Not a `BaseConnector` - config lives under `config.connectors.myastroshine` but the routes and UI are Astrodex-side.
@@ -248,8 +258,10 @@ Astrodex <-> MyAstroShine image round-trip. Not a `BaseConnector` - config lives
 - `POST /api/plan-my-night/targets/<entry_id>/add-to-astrodex`
 - `GET /api/plan-my-night/export.csv`
 - `GET /api/plan-my-night/export.pdf`
+- `GET /api/plan-my-night/optimize` - Preview a reordering and initial delay that maximize each target's overlap with its real visibility window for the night
+- `POST /api/plan-my-night/optimize/apply` - Apply a previewed optimized order and initial delay to the plan
 
-## Observation Log (v1.3 - see docs/OBSERVATION_LOG.md)
+## Observation Log (see docs/OBSERVATION_LOG.md)
 
 - `GET /api/observation-sessions` - Own sessions (newest observation date first) + minimal stats
 - `POST /api/observation-sessions`
@@ -271,7 +283,7 @@ Astrodex <-> MyAstroShine image round-trip. Not a `BaseConnector` - config lives
 - `GET /api/observation-sessions/<session_id>/export.pdf` - One session as a PDF (common info + every logged target, with its attached photo when there is one)
 - `GET /api/observation-sessions/export.pdf` - Every own session as one PDF (cover + summary + per-session pages); optional `from_date`/`to_date`/`order` (`asc`/`desc`, default `asc`)
 
-## Session Analytics and Wishlist (v1.5 - see docs/SESSION_ANALYTICS.md)
+## Session Analytics and Wishlist (see docs/SESSION_ANALYTICS.md)
 
 All self-scoped: a user only ever sees aggregates of their own Observation Log and Astrodex.
 

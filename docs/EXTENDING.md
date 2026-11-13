@@ -85,7 +85,7 @@ note and in the PR description.
 A connector is a Python class extending `BaseConnector`
 (`backend/connectors/base_connector.py`), registered in `backend/connectors/__init__.py`,
 exposing one or more independently-toggleable modules. Its data appears in the app tabs it
-names in `target_modules` — `["observatory"]` for AllSky, and legitimately `[]` for a
+names in `target_modules` - `["observatory"]` for AllSky, and legitimately `[]` for a
 self-contained connector that feeds no existing tab.
 Full recipe: [CONNECTORS.md - Adding a new connector](CONNECTORS.md#adding-a-new-connector).
 

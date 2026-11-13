@@ -4,13 +4,57 @@ Browser and push notification system for time-critical astrophotography events.
 
 ---
 
+## Using notifications
+
+1. Open **My settings -> Notifications** and click **Enable notifications**; the browser asks for
+   permission.
+2. Turn on the alerts you want, with how long before the event each one fires (and the Kp
+   threshold for aurorae). The [triggers](#trigger-ids) cover your Plan My Night session, ISS and
+   CSS transits, eclipses, nightfall, aurorae and multi-day events such as meteor showers.
+3. With several locations, alerts can be muted per location.
+4. **Test** sends a real push through the server.
+
+Each browser or device subscribes on its own and keeps receiving alerts when the tab is closed.
+Notifications need a secure address (HTTPS or `localhost`) and do not work in the Home Assistant
+sidebar panel; see [Where notifications are available](#where-notifications-are-available), and
+[MOBILE.md](MOBILE.md) for phones and iOS.
+
+---
+
+## Trigger IDs
+
+| ID | Event | Default lead | Module (`_check_*` fn) |
+|----|-------|-------------|----------------------|
+| `N1` | Plan My Night session starts | 15 min | `plan_my_night.js` / `utils/push_scheduler.py` |
+| `N2` | Plan My Night: next target | 5 min | `plan_my_night.js` / `utils/push_scheduler.py` |
+| `N3` | ISS solar or lunar transit | 10 min | `orbital_stations.js` / `utils/push_scheduler.py` |
+| `N4` | Lunar eclipse totality | 30 min | `events_alerts.js` / `utils/push_scheduler.py` |
+| `N5` | Solar eclipse maximum | 30 min | `events_alerts.js` / `utils/push_scheduler.py` |
+| `N6` | Astronomical darkness begins | 20 min | `sun.js` / `utils/push_scheduler.py` |
+| `N7` | Aurora: Kp index ≥ threshold | immediate | `aurora.js` / `utils/push_scheduler.py` |
+| `N8` | CSS (China Space Station) solar or lunar transit | 10 min | `orbital_stations.js` / `utils/push_scheduler.py` |
+| `N9` | Solar-system event peak (meteor shower, comet visibility window) | 2 days | `events_alerts.js` / `utils/push_scheduler.py` |
+
+IDs are defined as `NOTIF_TRIGGERS` constants in `static/js/notifications.js` and referenced by string in `utils/push_scheduler.py`. (`N8` mirrors `N3` for the CSS station.)
+
+`N9` is unlike every other trigger: its source events (from `solar_system_events` cache) carry a `start_time`..`end_time` span of several days around `peak_time`, rather than being a single instant. It still follows the same "notify N before peak" shape as N1-N8, just with a day-granularity lead time (stored in the same `lead_minutes` preference field, as day-equivalent minutes - e.g. 2 days = 2880) instead of a minutes one. Events whose window is ≤36h (eclipses, transits - already covered by their own dedicated triggers) are skipped by `_N9_MIN_WINDOW_SECONDS` so N9 only fires for genuinely multi-day events.
+
+The countdown in the body is a **calendar-day** difference computed in the observing site's timezone (`_n9_days_until`, mirroring `EventsAggregator.days_until_event`), not a rounded duration - a peak 11h away that lands after local midnight reads *tomorrow*, not *in 0 days*. Days 0 and 1 use their own i18n keys (`push_n9_body_today` / `push_n9_body_tomorrow`, and `notifications.n9_body_today` / `_tomorrow` client-side); `push_n9_body` with `{days}` covers 2+, which keeps the plural correct in every language.
+
+### Multi-location behavior
+
+- Location-scoped triggers (N3-N8) are evaluated **once per (user, attributed location)** pair, reading each location's own cache slots. Plan triggers (N1/N2) stay per-plan - a plan is pinned to its own location.
+- When a user has **more than one** attributed location, the message body carries the location name (i18n key `push_location_suffix`, e.g. *"... at Dark Sky Site"*). Single-location users see messages exactly as before.
+- Per-location mute: `preferences.notifications.disabled_location_ids` (edited in My settings -> Notifications, only visible with >1 attributed location) removes a location from all trigger evaluation for that user.
+- Deduplication keys are per location (`<trigger>@<location_id>`), so the same event at two sites notifies once per site.
+
+See [LOCATIONS.md](LOCATIONS.md) for the full multi-location model.
+
+---
+
 ## Architecture overview
 
-```
-Phase A - NotificationManager + background poller    ✅ Done
-Phase B - Settings UI (My Settings → Notifications)  ✅ Done
-Phase C - Web Push / background (tab may be closed)  ✅ Done
-```
+Three layers, each built on the previous one:
 
 ### Phase A - Browser Notification API
 - `notifications.js` - `NotificationManager` singleton + `startNotificationPoller()` (5 min interval)
@@ -23,7 +67,7 @@ Phase C - Web Push / background (tab may be closed)  ✅ Done
   endpoint purged server-side).
 
 ### Phase B - Settings UI
-- My Settings → Notifications sub-tab (N1–N9 toggles, lead times, Kp threshold, test button)
+- My settings -> Notifications sub-tab (N1-N9 toggles, lead times, Kp threshold, test button)
 - Preferences stored server-side on the account under `preferences.notifications`
 
 ### Phase C - Web Push
@@ -51,47 +95,127 @@ Phase C - Web Push / background (tab may be closed)  ✅ Done
 
 ---
 
-## Trigger IDs
+## Background poller (Phase A)
 
-| ID | Event | Default lead | Module (`_check_*` fn) |
-|----|-------|-------------|----------------------|
-| `N1` | Plan My Night session starts | 15 min | `plan_my_night.js` / `utils/push_scheduler.py` |
-| `N2` | Plan My Night: next target | 5 min | `plan_my_night.js` / `utils/push_scheduler.py` |
-| `N3` | ISS solar or lunar transit | 10 min | `iss.js` / `utils/push_scheduler.py` |
-| `N4` | Lunar eclipse totality | 30 min | `events_alerts.js` / `utils/push_scheduler.py` |
-| `N5` | Solar eclipse maximum | 30 min | `events_alerts.js` / `utils/push_scheduler.py` |
-| `N6` | Astronomical darkness begins | 20 min | `sun.js` / `utils/push_scheduler.py` |
-| `N7` | Aurora: Kp index ≥ threshold | immediate | `aurora.js` / `utils/push_scheduler.py` |
-| `N9` | Solar-system event peak (meteor shower, comet visibility window) | 2 days | `events_alerts.js` / `utils/push_scheduler.py` |
+`startNotificationPoller()` starts a `setInterval` every 5 minutes after app init (`app.js -> initializeApp()`). It fetches minimal API data for each enabled trigger and calls the same `_check*` functions defined in each feature module.
 
-IDs are defined as `NOTIF_TRIGGERS` constants in `static/js/notifications.js` and referenced by string in `utils/push_scheduler.py`. (`N8` mirrors `N3` for the CSS station.)
+```javascript
+// Called automatically - no manual invocation needed
+startNotificationPoller();  // wired in app.js initializeApp()
+stopNotificationPoller();   // available but not normally called
+```
 
-`N9` is unlike every other trigger: its source events (from `solar_system_events` cache) carry a `start_time`..`end_time` span of several days around `peak_time`, rather than being a single instant. It still follows the same "notify N before peak" shape as N1–N8, just with a day-granularity lead time (stored in the same `lead_minutes` preference field, as day-equivalent minutes — e.g. 2 days = 2880) instead of a minutes one. Events whose window is ≤36h (eclipses, transits — already covered by their own dedicated triggers) are skipped by `_N9_MIN_WINDOW_SECONDS` so N9 only fires for genuinely multi-day events.
-
-The countdown in the body is a **calendar-day** difference computed in the observing site's timezone (`_n9_days_until`, mirroring `EventsAggregator.days_until_event`), not a rounded duration — a peak 11h away that lands after local midnight reads *tomorrow*, not *in 0 days*. Days 0 and 1 use their own i18n keys (`push_n9_body_today` / `push_n9_body_tomorrow`, and `notifications.n9_body_today` / `_tomorrow` client-side); `push_n9_body` with `{days}` covers 2+, which keeps the plural correct in every language.
-
-### Multi-location behavior (v1.2)
-
-- Location-scoped triggers (N3–N8) are evaluated **once per (user, attributed location)** pair, reading each location's own cache slots. Plan triggers (N1/N2) stay per-plan — a plan is pinned to its own location.
-- When a user has **more than one** attributed location, the message body carries the location name (i18n key `push_location_suffix`, e.g. *"… at Dark Sky Site"*). Single-location users see messages exactly as before.
-- Per-location mute: `preferences.notifications.disabled_location_ids` (edited in My Settings → Notifications, only visible with >1 attributed location) removes a location from all trigger evaluation for that user.
-- Deduplication keys are per location (`<trigger>@<location_id>`), so the same event at two sites notifies once per site.
-
-See [LOCATIONS.md](LOCATIONS.md) for the full multi-location model.
+The `_check*` functions are defined at the bottom of their respective feature modules and are global-scope functions callable from anywhere.
 
 ---
 
-## Files
+## Web Push (Phase C)
 
-| File | Role |
-|------|------|
-| `static/js/notifications.js` | `NotificationManager`, settings UI, background poller, Web Push subscription |
-| `backend/utils/push_manager.py` | VAPID key generation/persistence, `send_push()` wrapper around pywebpush |
-| `backend/utils/push_scheduler.py` | Background thread; evaluates N1–N9 server-side every 5 min; sends push |
-| `templates/index.html` | Notifications sub-tab (My Settings → Notifications) |
-| `static/sw.js` | `push` + `notificationclick` event listeners |
-| `static/i18n/*.json` | `notifications.*` namespace (N1–N9 titles/bodies) + `settings.notifications_*` |
-| database setting `vapid` | Generated VAPID key pair - **never delete or regenerate** (invalidates all subscriptions) |
+### iOS requirements
+
+Web Push on iOS requires **Safari 16.4+** and the app must be **installed as a PWA** (Add to Home Screen). Push is not delivered to a regular Safari browser tab.
+
+The VAPID contact email must be set to a real email address. Apple APNs silently rejects pushes when the VAPID `sub` claim contains an invalid domain (e.g. `.local`). Set it in **App settings -> Configuration -> Notifications** in the admin UI.
+
+The in-app **Test** button calls `POST /api/push/test`, which sends a real server-side push through the full VAPID -> push service -> service worker pipeline. On iOS, background the app immediately after tapping to see the notification appear.
+
+### VAPID keys
+
+Generated once on first startup by `push_manager.load_or_generate_vapid_keys()` and saved in the database (setting `vapid`):
+
+```json
+{ "private_key": "<43-char base64url raw EC scalar>", "public_key": "<87-char base64url uncompressed point>" }
+```
+
+The private key is stored as a raw base64url-encoded 32-byte EC scalar (the format expected by `py_vapid.Vapid.from_string()`). PEM format is **not** used - older keys containing `-----BEGIN ... KEY-----` are automatically migrated to the correct format on startup.
+
+**Never delete or regenerate the VAPID keys** - doing so invalidates all existing push subscriptions. `_subscribeToPush()` detects VAPID key rotation via `PushSubscription.options.applicationServerKey` comparison and forces a transparent re-subscribe if the key changed.
+
+### Push subscription flow
+
+1. User clicks "Enable notifications" -> `requestPermission()` granted
+2. `_subscribeToPush()` fetches `GET /api/push/vapid-public-key`
+3. Browser calls `pushManager.subscribe({ applicationServerKey: publicKey })`
+4. Subscription POSTed to `POST /api/push/subscribe`
+5. Stored under the user's `push_subscriptions[]` on their account
+
+### API routes
+
+| Method | Route | Auth | Description |
+|--------|-------|------|-------------|
+| `GET` | `/api/push/vapid-public-key` | Public | Returns base64url public key for `applicationServerKey` |
+| `GET` | `/api/push/vapid-config-status` | Public | Returns whether the VAPID contact email (set in admin UI) is correctly configured |
+| `POST` | `/api/push/subscribe` | `@login_required` | Stores subscription (deduplicates by endpoint) |
+| `DELETE` | `/api/push/unsubscribe` | `@login_required` | Removes subscription by endpoint |
+| `GET`  | `/api/push/subscriptions` | `@login_required` | Lists subscriptions for the current user. Returns `{"subscriptions": [{index, provider, created_at, endpoint_tail}]}`. `provider` is one of `apple`, `google`, `mozilla`, `other`. Full endpoints are not exposed - only the last 20 chars as `endpoint_tail`. |
+| `DELETE` | `/api/push/subscriptions` | `@login_required` | Removes **all** server-side subscriptions for the current user. The UI also calls `pushManager.getSubscription().unsubscribe()` to clean the browser side. Returns `{"removed": N}`. |
+| `POST` | `/api/push/test` | `@login_required` | Sends a generic test push to all subscriptions; removes dead endpoints. Returns `{"delivered": N, "total": N, "cleaned": N}` |
+| `POST` | `/api/push/test/<trigger_id>` | `@login_required` | Fires a realistic test push for a specific trigger (`N1`-`N9`) with hardcoded sample data, bypassing all condition/cooldown checks. Useful for end-to-end validation. Returns `{"trigger", "delivered", "total", "title", "body"}`. Fire all from console: `['N1','N2','N3','N4','N5','N6','N7','N8','N9'].forEach((n,i) => setTimeout(() => fetch('/api/push/test/'+n,{method:'POST'}).then(r=>r.json()).then(d=>console.log(n,d)), i*2000))` |
+
+### User model
+
+`push_subscriptions` is a top-level field on the user object (not inside `preferences`):
+
+```json
+{
+  "user_id": "...",
+  "preferences": { ... },
+  "push_subscriptions": [
+    { "endpoint": "https://fcm.googleapis.com/...", "keys": { "p256dh": "...", "auth": "..." }, "created_at": "..." }
+  ]
+}
+```
+
+### Push scheduler (`utils/push_scheduler.py`)
+
+Daemon thread started at app startup. Polls every 5 minutes:
+
+- Loads cached data once per cycle (aurora, sun, ISS, CSS, solar/lunar eclipse, solar system events)
+- Loads per-user plan data via `get_plan_with_timeline()`
+- Skips users with no push subscriptions or notifications disabled
+- Notification title/body are translated using the user's `preferences.language` field via `i18n_utils.get_translated_message()` (keys: `settings.push_n*`)
+- Sends push via `push_manager.send_push()` (pywebpush)
+- Dead subscriptions (delivery failure) are automatically removed
+- In-memory cooldowns reset on server restart (acceptable: worst case one duplicate per restart)
+
+### sw.js handlers
+
+```javascript
+// push - fires when server sends a push
+self.addEventListener('push', event => { ... showNotification() ... });
+
+// notificationclick - focuses app window and navigates to data.url
+self.addEventListener('notificationclick', event => { ... });
+```
+
+### Push payload shape
+
+```json
+{
+  "title": "Plan My Night",
+  "body": "Your session starts in 14 min",
+  "icon": "/static/ico/android/launchericon-192x192.png",
+  "badge": "/static/ico/android/launchericon-72x72.png",
+  "tag": "N1-20260529",
+  "data": { "url": "/#astrodex/plan-my-night" }
+}
+```
+
+---
+
+## Settings UI elements
+
+| ID | Type | Role |
+|----|------|------|
+| `#notif-permission-banner` | `div.alert` | Permission state + push status (two lines when granted) |
+| `#notif-enable-btn` | `button.btn-warning` | Calls `requestPermission()` + `_subscribeToPush()`; hidden when granted/denied |
+| `#notif-master-toggle` | `input[checkbox]` | Master enable/disable |
+| `#notif-trigger-N1` ... `#notif-trigger-N9` | `input[checkbox]` | Per-trigger toggle |
+| `#notif-lead-N1` ... `#notif-lead-N6`, `#notif-lead-N8`, `#notif-lead-N9` | `select` | Lead time (minutes for N1-N6/N8; day-equivalent minutes for N9) |
+| `#notif-kp-threshold` | `select` | Kp threshold (N7 only) |
+| `#notif-save-btn` | `button.btn-primary` | Async save to server |
+| `#notif-test-btn` | `button.btn-outline-secondary` | Fires a sample notification |
+| `#notif-save-message` | `div.alert` | Feedback (auto-hides after 3 s) |
 
 ---
 
@@ -159,127 +283,17 @@ subscription - the server-side scheduler owns delivery in that case (see Phase A
 
 ---
 
-## Background poller (Phase A)
+## Files
 
-`startNotificationPoller()` starts a `setInterval` every 5 minutes after app init (`app.js → initializeApp()`). It fetches minimal API data for each enabled trigger and calls the same `_check*` functions defined in each feature module.
-
-```javascript
-// Called automatically - no manual invocation needed
-startNotificationPoller();  // wired in app.js initializeApp()
-stopNotificationPoller();   // available but not normally called
-```
-
-The `_check*` functions are defined at the bottom of their respective feature modules and are global-scope functions callable from anywhere.
-
----
-
-## Web Push (Phase C)
-
-### iOS requirements
-
-Web Push on iOS requires **Safari 16.4+** and the app must be **installed as a PWA** (Add to Home Screen). Push is not delivered to a regular Safari browser tab.
-
-The VAPID contact email must be set to a real email address. Apple APNs silently rejects pushes when the VAPID `sub` claim contains an invalid domain (e.g. `.local`). Set it in **Parameters → Advanced → Notifications** in the admin UI.
-
-The in-app **Test** button calls `POST /api/push/test`, which sends a real server-side push through the full VAPID → push service → service worker pipeline. On iOS, background the app immediately after tapping to see the notification appear.
-
-### VAPID keys
-
-Generated once on first startup by `push_manager.load_or_generate_vapid_keys()` and saved in the database (setting `vapid`):
-
-```json
-{ "private_key": "<43-char base64url raw EC scalar>", "public_key": "<87-char base64url uncompressed point>" }
-```
-
-The private key is stored as a raw base64url-encoded 32-byte EC scalar (the format expected by `py_vapid.Vapid.from_string()`). PEM format is **not** used - older keys containing `-----BEGIN ... KEY-----` are automatically migrated to the correct format on startup.
-
-**Never delete or regenerate the VAPID keys** - doing so invalidates all existing push subscriptions. `_subscribeToPush()` detects VAPID key rotation via `PushSubscription.options.applicationServerKey` comparison and forces a transparent re-subscribe if the key changed.
-
-### Push subscription flow
-
-1. User clicks "Enable notifications" → `requestPermission()` granted
-2. `_subscribeToPush()` fetches `GET /api/push/vapid-public-key`
-3. Browser calls `pushManager.subscribe({ applicationServerKey: publicKey })`
-4. Subscription POSTed to `POST /api/push/subscribe`
-5. Stored under the user's `push_subscriptions[]` on their account
-
-### API routes
-
-| Method | Route | Auth | Description |
-|--------|-------|------|-------------|
-| `GET` | `/api/push/vapid-public-key` | Public | Returns base64url public key for `applicationServerKey` |
-| `GET` | `/api/push/vapid-config-status` | Public | Returns whether the VAPID contact email (set in admin UI) is correctly configured |
-| `POST` | `/api/push/subscribe` | `@login_required` | Stores subscription (deduplicates by endpoint) |
-| `DELETE` | `/api/push/unsubscribe` | `@login_required` | Removes subscription by endpoint |
-| `GET`  | `/api/push/subscriptions` | `@login_required` | Lists subscriptions for the current user. Returns `{"subscriptions": [{index, provider, created_at, endpoint_tail}]}`. `provider` is one of `apple`, `google`, `mozilla`, `other`. Full endpoints are not exposed - only the last 20 chars as `endpoint_tail`. |
-| `DELETE` | `/api/push/subscriptions` | `@login_required` | Removes **all** server-side subscriptions for the current user. The UI also calls `pushManager.getSubscription().unsubscribe()` to clean the browser side. Returns `{"removed": N}`. |
-| `POST` | `/api/push/test` | `@login_required` | Sends a generic test push to all subscriptions; removes dead endpoints. Returns `{"delivered": N, "total": N, "cleaned": N}` |
-| `POST` | `/api/push/test/<trigger_id>` | `@login_required` | Fires a realistic test push for a specific trigger (`N1`–`N7`, `N9`) with hardcoded sample data, bypassing all condition/cooldown checks. Useful for end-to-end validation. Returns `{"trigger", "delivered", "total", "title", "body"}`. Fire all from console: `['N1','N2','N3','N4','N5','N6','N7','N9'].forEach((n,i) => setTimeout(() => fetch('/api/push/test/'+n,{method:'POST'}).then(r=>r.json()).then(d=>console.log(n,d)), i*2000))` |
-
-### User model
-
-`push_subscriptions` is a top-level field on the user object (not inside `preferences`):
-
-```json
-{
-  "user_id": "...",
-  "preferences": { ... },
-  "push_subscriptions": [
-    { "endpoint": "https://fcm.googleapis.com/...", "keys": { "p256dh": "...", "auth": "..." }, "created_at": "..." }
-  ]
-}
-```
-
-### Push scheduler (`utils/push_scheduler.py`)
-
-Daemon thread started at app startup. Polls every 5 minutes:
-
-- Loads cached data once per cycle (aurora, sun, ISS, CSS, solar/lunar eclipse, solar system events)
-- Loads per-user plan data via `get_plan_with_timeline()`
-- Skips users with no push subscriptions or notifications disabled
-- Notification title/body are translated using the user's `preferences.language` field via `i18n_utils.get_translated_message()` (keys: `settings.push_n*`)
-- Sends push via `push_manager.send_push()` (pywebpush)
-- Dead subscriptions (delivery failure) are automatically removed
-- In-memory cooldowns reset on server restart (acceptable: worst case one duplicate per restart)
-
-### sw.js handlers
-
-```javascript
-// push - fires when server sends a push
-self.addEventListener('push', event => { ... showNotification() ... });
-
-// notificationclick - focuses app window and navigates to data.url
-self.addEventListener('notificationclick', event => { ... });
-```
-
-### Push payload shape
-
-```json
-{
-  "title": "Plan My Night",
-  "body": "Your session starts in 14 min",
-  "icon": "/static/ico/android/launchericon-192x192.png",
-  "badge": "/static/ico/android/launchericon-72x72.png",
-  "tag": "N1-20260529",
-  "data": { "url": "/#astrodex/plan-my-night" }
-}
-```
-
----
-
-## Settings UI elements
-
-| ID | Type | Role |
-|----|------|------|
-| `#notif-permission-banner` | `div.alert` | Permission state + push status (two lines when granted) |
-| `#notif-enable-btn` | `button.btn-warning` | Calls `requestPermission()` + `_subscribeToPush()`; hidden when granted/denied |
-| `#notif-master-toggle` | `input[checkbox]` | Master enable/disable |
-| `#notif-trigger-N1` … `#notif-trigger-N9` | `input[checkbox]` | Per-trigger toggle |
-| `#notif-lead-N1` … `#notif-lead-N6`, `#notif-lead-N8`, `#notif-lead-N9` | `select` | Lead time (minutes for N1–N6/N8; day-equivalent minutes for N9) |
-| `#notif-kp-threshold` | `select` | Kp threshold (N7 only) |
-| `#notif-save-btn` | `button.btn-primary` | Async save to server |
-| `#notif-test-btn` | `button.btn-outline-secondary` | Fires a sample notification |
-| `#notif-save-message` | `div.alert` | Feedback (auto-hides after 3 s) |
+| File | Role |
+|------|------|
+| `static/js/notifications.js` | `NotificationManager`, settings UI, background poller, Web Push subscription |
+| `backend/utils/push_manager.py` | VAPID key generation/persistence, `send_push()` wrapper around pywebpush |
+| `backend/utils/push_scheduler.py` | Background thread; evaluates N1-N9 server-side every 5 min; sends push |
+| `templates/index.html` | Notifications sub-tab (My settings -> Notifications) |
+| `static/sw.js` | `push` + `notificationclick` event listeners |
+| `static/i18n/*.json` | `notifications.*` namespace (N1-N9 titles/bodies) + `settings.notifications_*` |
+| database setting `vapid` | Generated VAPID key pair - **never delete or regenerate** (invalidates all subscriptions) |
 
 ---
 
@@ -303,4 +317,4 @@ self.addEventListener('notificationclick', event => { ... });
 | `settings.notifications_*` | UI strings: banner text, button labels, toggle labels, trigger labels |
 | `notifications.nX_title` / `notifications.nX_body` | Notification payload strings (title + body with `{placeholder}`) |
 
-Keys in `notifications` namespace are ordered N1→N7 per trigger, `_title` before `_body`.
+Keys in `notifications` namespace are ordered N1->N7 per trigger, `_title` before `_body`.

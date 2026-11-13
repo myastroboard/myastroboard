@@ -15,9 +15,27 @@ The Weather tab provides atmospheric conditions specifically analysed for astron
 
 ---
 
+## Weather alerts
+
+**Module**: `backend/weather/weather_astro.py` (alert generation)
+
+Alerts are generated from the Open-Meteo data and include:
+
+| Alert | Trigger condition |
+|-------|-----------------|
+| High cloud cover | Cloud cover > 50 % during the observing window |
+| Dew risk | Dew point within 2 °C of ambient temperature |
+| Strong wind | Wind speed > 30 km/h |
+| High humidity | Relative humidity > 85 % |
+| Rain risk | Precipitation probability > 30 % |
+
+Alerts are translated using the i18n system and displayed in the **Alerts** sub-tab.
+
+---
+
 ## Open-Meteo weather forecast
 
-**Source**: [Open-Meteo](https://open-meteo.com/) — free, no API key required.
+**Source**: [Open-Meteo](https://open-meteo.com/) - free, no API key required.
 
 **Cache TTL**: 1 hour (`WEATHER_CACHE_TTL` in `utils/constants.py`).
 
@@ -29,11 +47,11 @@ The Weather tab provides atmospheric conditions specifically analysed for astron
 |----------|-----|
 | `temperature_2m` | Temperature at 2 m (°C / °F) |
 | `relative_humidity_2m` | Relative humidity (%) |
-| `dew_point_2m` | Dew point — distance from ambient drives fog/dew warning |
+| `dew_point_2m` | Dew point - distance from ambient drives fog/dew warning |
 | `precipitation_probability` | Rain/snow probability (%) |
 | `cloud_cover` | Total cloud cover (%) |
-| `cloud_cover_low` | Low-altitude clouds (0–3 km) |
-| `cloud_cover_mid` | Mid-altitude clouds (3–8 km) |
+| `cloud_cover_low` | Low-altitude clouds (0-3 km) |
+| `cloud_cover_mid` | Mid-altitude clouds (3-8 km) |
 | `cloud_cover_high` | High-altitude clouds (cirrus, 8+ km) |
 | `wind_speed_10m` | Surface wind speed |
 | `wind_direction_10m` | Surface wind direction |
@@ -44,9 +62,9 @@ The Weather tab provides atmospheric conditions specifically analysed for astron
 ### Cloud layer discrimination
 
 The three cloud-cover layers help astrophotographers distinguish:
-- **Low clouds** (fog, stratus) — completely block imaging.
-- **Mid clouds** (altocumulus) — usually opaque, block imaging.
-- **High clouds** (cirrus) — thin and sometimes transparent; imaging may still be possible.
+- **Low clouds** (fog, stratus) - completely block imaging.
+- **Mid clouds** (altocumulus) - usually opaque, block imaging.
+- **High clouds** (cirrus) - thin and sometimes transparent; imaging may still be possible.
 
 Total cloud cover is shown as the primary go/no-go indicator.
 
@@ -90,10 +108,10 @@ The seeing estimate is derived from wind speed at multiple altitudes and atmosph
 
 | Pickering | Quality | Conditions |
 |-----------|---------|------------|
-| 1–3 | Poor | Strong winds, turbulent atmosphere |
-| 4–5 | Fair | Moderate conditions |
-| 6–7 | Good | Suitable for deep-sky imaging |
-| 8–9 | Very good | Suitable for planetary imaging |
+| 1-3 | Poor | Strong winds, turbulent atmosphere |
+| 4-5 | Fair | Moderate conditions |
+| 6-7 | Good | Suitable for deep-sky imaging |
+| 8-9 | Very good | Suitable for planetary imaging |
 | 10 | Perfect | Exceptional stability |
 
 > **Note**: This is a *model-derived* estimate. For high-resolution planetary imaging, cross-check with the 7Timer seeing forecast below.
@@ -107,8 +125,8 @@ $$m_\text{lim} = m_{\text{lim,zenith}} - \Delta(\text{cloud},\, \text{humidity},
 | mag/arcsec² | Sky quality |
 |-------------|-------------|
 | ≥ 7.5 | Excellent dark sky |
-| 6.5 – 7.4 | Good |
-| 5.5 – 6.4 | Average suburban |
+| 6.5 - 7.4 | Good |
+| 5.5 - 6.4 | Average suburban |
 | ≤ 5.0 | Light-polluted / cloudy |
 
 ### Dew point warning
@@ -154,37 +172,37 @@ single composite `quality_score` (0-10) per timeslot.
 | Value | Label | FWHM | Notes |
 |-------|-------|------|-------|
 | 1 | Excellent | < 0.5 arcsec | Perfect for planetary imaging |
-| 2 | Very Good | 0.5 – 0.75 arcsec | Excellent planetary detail |
-| 3 | Good | 0.75 – 1 arcsec | Very good for planetary imaging |
-| 4 | Moderate | 1 – 1.25 arcsec | Fair for planetary imaging |
-| 5 | Fair | 1.25 – 1.5 arcsec | Usable with reduced fine detail |
-| 6 | Poor | 1.5 – 2 arcsec | Poor conditions |
-| 7 | Very Poor | 2 – 2.5 arcsec | Unsuitable for high-res imaging |
+| 2 | Very Good | 0.5 - 0.75 arcsec | Excellent planetary detail |
+| 3 | Good | 0.75 - 1 arcsec | Very good for planetary imaging |
+| 4 | Moderate | 1 - 1.25 arcsec | Fair for planetary imaging |
+| 5 | Fair | 1.25 - 1.5 arcsec | Usable with reduced fine detail |
+| 6 | Poor | 1.5 - 2 arcsec | Poor conditions |
+| 7 | Very Poor | 2 - 2.5 arcsec | Unsuitable for high-res imaging |
 | 8 | Bad | > 2.5 arcsec | Unsuitable for planetary imaging |
 
 ### Transparency scale (7Timer)
 
-7Timer's transparency field uses the same 1–8 shape as seeing (1 = worst, 8 = best), expressed
+7Timer's transparency field uses the same 1-8 shape as seeing (1 = worst, 8 = best), expressed
 as limiting magnitude per air mass:
 
 | Value | Label | Mag per air mass |
 |-------|-------|-------------------|
 | 1 | Very Poor | < 0.3 |
-| 2 | Poor | 0.3 – 0.4 |
-| 3 | Below Average | 0.4 – 0.5 |
-| 4 | Average | 0.5 – 0.6 |
-| 5 | Above Average | 0.6 – 0.7 |
-| 6 | Good | 0.7 – 0.85 |
-| 7 | Very Good | 0.85 – 1 |
+| 2 | Poor | 0.3 - 0.4 |
+| 3 | Below Average | 0.4 - 0.5 |
+| 4 | Average | 0.5 - 0.6 |
+| 5 | Above Average | 0.6 - 0.7 |
+| 6 | Good | 0.7 - 0.85 |
+| 7 | Very Good | 0.85 - 1 |
 | 8 | Excellent | > 1 |
 
 ### Cloud cover scale (7Timer)
 
-1–9 scale, 1 = clearest (0–6% cover), 9 = fully overcast (94–100% cover).
+1-9 scale, 1 = clearest (0-6% cover), 9 = fully overcast (94-100% cover).
 
 ### Wind speed scale (7Timer, 10m)
 
-1–8 scale from calm (< 0.3 m/s) to hurricane (> 32.6 m/s), paired with a compass direction.
+1-8 scale from calm (< 0.3 m/s) to hurricane (> 32.6 m/s), paired with a compass direction.
 
 ### Composite quality score
 
@@ -221,21 +239,10 @@ Two "best window" cards are computed from the forecast:
 
 ---
 
-## Weather alerts
+## Data sources
 
-**Module**: `backend/weather/weather_astro.py` (alert generation)
-
-Alerts are generated from the Open-Meteo data and include:
-
-| Alert | Trigger condition |
-|-------|-----------------|
-| High cloud cover | Cloud cover > 50 % during the observing window |
-| Dew risk | Dew point within 2 °C of ambient temperature |
-| Strong wind | Wind speed > 30 km/h |
-| High humidity | Relative humidity > 85 % |
-| Rain risk | Precipitation probability > 30 % |
-
-Alerts are translated using the i18n system and displayed in the **Alerts** sub-tab.
+- **Open-Meteo**: [open-meteo.com](https://open-meteo.com/) - free, open-source weather API; no account required.
+- **7Timer**: [7timer.info](https://www.7timer.info/) - free astronomical weather service based on GFS model data; no account required.
 
 ---
 
@@ -248,10 +255,3 @@ Alerts are translated using the i18n system and displayed in the **Alerts** sub-
 | `GET` | `/api/weather/astro-current` | Current-hour astrophotography conditions snapshot (served from the `astro_weather` cache when warm) |
 | `GET` | `/api/weather/alerts` | Active weather alerts list |
 | `GET` | `/api/seeing-forecast` | 7Timer seeing and transparency time-series |
-
----
-
-## Data sources
-
-- **Open-Meteo**: [open-meteo.com](https://open-meteo.com/) — free, open-source weather API; no account required.
-- **7Timer**: [7timer.info](https://www.7timer.info/) — free astronomical weather service based on GFS model data; no account required.

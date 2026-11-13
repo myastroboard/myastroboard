@@ -1,127 +1,12 @@
 # Connectors
 
-Connectors integrate external astronomy tools into MyAstroBoard. Once configured and enabled, a connector's data appears in the app tabs it declares — AllSky feeds the **Observatory** tab, MyAstroShine feeds the **Astrodex**, and a connector may feed no tab at all: the MQTT / Home Assistant connector publishes MyAstroBoard's own state *outward* and is standalone.
-
----
-
-## Architecture
-
-Connectors are Python classes that extend `BaseConnector` (`backend/connectors/base_connector.py`) and are registered in `backend/connectors/__init__.py`. Each connector exposes one or more **modules** — discrete features that can be independently enabled or disabled.
-
-The registry is discovered at runtime and served via `GET /api/connectors`.
-
-### File layout
-
-One module per connector on each side, named after it:
-
-| | Shared | AllSky | MyAstroShine | MQTT / Home Assistant |
-|---|---|---|---|---|
-| Connector | `connectors/base_connector.py` | `connectors/allsky_connector.py` | `connectors/myastroshine_connector.py` | `connectors/mqtt_connector.py` (+ `mqtt_publisher.py`, `mqtt_payloads.py`) |
-| Blueprint | `blueprints/connectors.py` | `blueprints/connectors_allsky.py` | `blueprints/connectors_myastroshine.py` | `blueprints/connectors_mqtt.py` |
-| Tests | `tests/blueprints/test_connectors.py` | `tests/blueprints/test_connectors_allsky.py` | `tests/blueprints/test_connectors_myastroshine.py` | `tests/blueprints/test_connectors_mqtt.py`, `tests/connectors/test_mqtt_*.py` |
-
-Credentials of every connector (`SECRET_FIELDS`) live in `utils/connector_secrets.py`'s store,
-not in the configuration - see [Secrets](#secrets). A connector that talks MQTT does not declare a
-broker of its own: it picks a shared connection - see [MQTT connections](#mqtt-connections).
-
-`blueprints/connectors.py` serves the two routes every connector shares — the listing and the
-config save; a connector's own routes go in its own blueprint module, registered in
-`backend/app.py`.
-
-### Declaring a connector
-
-Beyond `name` / `label` / `description` / `min_version` / `homepage`, a connector says what it
-needs through class attributes, so the shared listing, save route and card can handle it without
-special-casing:
-
-| Attribute | Purpose |
-|---|---|
-| `MODULES` | Independently-toggleable features. Empty is valid — the card then shows no Modules section |
-| `target_modules` | App tabs the data lands in (see above). Empty = standalone |
-| `CONFIG_FIELDS` | Settable config keys beyond `label` / `url` / `enabled` / `modules`, as `{key: default}`. `POST /api/connectors/<name>/config` accepts these and nothing else, coercing each value to the type of its default (`str`, `bool` or `int`) |
-| `SECRET_FIELDS` | Keys holding credentials. Stored in the secrets sidecar, masked by `GET /api/connectors`; a blank or still-masked submission means "keep the stored value" |
-| `URL_FIELDS` | Keys among `CONFIG_FIELDS` holding a URL, so the save strips their trailing slash |
-| `CONNECTION_FIELD` | Config key holding the id of the shared MQTT connection the connector uses (`""` = none). See [MQTT connections](#mqtt-connections) |
-
-A connector's own tuning knobs (cache TTLs, size caps, rate limits) are class attributes too,
-not entries in `utils/constants.py` — adding a connector should not mean editing a shared file.
-
-`is_configured()` says what "installed" means (a base URL by default; MyAstroShine also requires
-its credentials). Only `health_check()` must be implemented — `get_module_urls()` and
-`fetch_sensor_data()` default to empty, for a connector that serves no browser-fetched resource
-and no live readings.
-
-### Secrets
-
-Credentials never reach the browser. `GET /api/connectors` is readable by any signed-in user, so
-it replaces every `SECRET_FIELDS` value with `****` + the last 4 characters and adds a
-`has_<field>` boolean; the card shows the masked form as an input placeholder and submits the
-field blank unless the admin types a new value. The merge happens server-side in
-`POST /api/connectors/<name>/config` (admin only), so a value the browser was never given cannot
-be echoed back and overwrite the real one.
-
-Credentials never sit in the configuration either (v1.6). They live in a separate database
-setting (`connectors_secrets`), written by `utils/connector_secrets.py` in one transaction, and
-deliberately absent from the backup ZIP and the config export - the same rule the session secret
-key and the VAPID keys already follow. Consequences:
-
-- a backup restored on a fresh host needs each connector's credentials re-entered once;
-- a connector is always constructed from `merge_secrets(name, config_block, cls.SECRET_FIELDS)`,
-  the config block overlaid with the stored secrets (`blueprints/connectors.py`,
-  `observation/myastroshine_integration.get_integration_config`, `connectors/mqtt_publisher.py`);
-- an install upgraded from an earlier version is migrated at startup and on the first save:
-  values still found in the configuration move to the secrets store and are stripped from it.
-
-### MQTT connections
-
-A broker is declared once, as a connection (`utils/mqtt_connections.py`, managed in
-Parameters -> Configuration through `blueprints/mqtt_connections.py`), and shared by every
-connector that talks MQTT - the Home Assistant publisher and the AllSky sensor reader today, a
-Home Assistant sensor reader tomorrow - on the same broker or on separate ones.
-
-- A connection is `{id, name, url, username, tls_insecure}` in `config["mqtt_connections"]`; its
-  password is in the secrets store under `mqtt_connection:<id>`; API answers only carry a fixed
-  `********` mask (no tail, unlike `SECRET_FIELDS` tokens).
-- A connector declares `CONNECTION_FIELD` (`mqtt_connection_id` for both). Callers build it as
-  `cls(block, connection=connection_for(cls, block, config))`: the connection
-  (`{id, name, url, username, tls_insecure}`) is kept apart from the block, so a connector keeps its
-  own `url` next to the broker (AllSky: its web interface). The password is fetched with
-  `connection_password(id)` and passed explicitly, never held by the connector.
-- A connector that **reads** topics lists them in `mqtt_subscriptions()`;
-  `connectors/mqtt_subscriber.py` (one background thread, like the publisher) keeps one client per
-  connector and stores its last message, read back with `mqtt_subscriber.read_last_message(name)`.
-- The card shows a connection picker (`connectionField` in `_CONNECTOR_UI`): in place of the URL
-  field (`connectionReplacesUrl`, Home Assistant), or inside one module (`connectionModule`, AllSky's
-  `sensor_data`). `GET /api/connectors` lists the connections' names as `connection_options`.
-- `BaseConnector.validate_config(block)` lets a connector refuse a save the typed coercion cannot
-  catch (AllSky: a topic with a wildcard).
-- The shared save refuses an unknown connection id, and refuses a `client_id` already used by
-  another connector on the same connection: each connector opens its own client, and a broker
-  disconnects a client when another one connects with the same id. A blank client id is generated
-  per connector, so it never conflicts.
-- A connection picked by a connector cannot be deleted (409 with `used_by`).
-- Up to 1.7.1 the MQTT connector held its own `url` / `username` / `tls_insecure` / password.
-  `repo_config` turns such a block into the fixed-id connection `home-assistant` on every read
-  (old backups included), and `app.py` moves its password once at startup.
-
-### Target modules
-
-A connector also declares `target_modules` — the list of app tabs where its data shows up:
-
-```python
-class AllSkyConnector(BaseConnector):
-    target_modules = ["observatory"]
-```
-
-Slugs match the navbar tab keys (`observatory`, `astrodex`, `weather`, `skytonight`, …) so the UI can reuse the existing translations; `static/js/connectors/connectors.js` maps them in `_TARGET_MODULE_I18N_KEYS`. The connector card renders one translated badge per slug under the description.
-
-The list is purely declarative — nothing is routed or wired from it. An **empty list is a valid, meaningful value**: it means the connector is self-contained and adds nothing to an existing tab (the MQTT / Home Assistant publisher), and the card then shows a single *Standalone* badge.
+Connectors integrate external astronomy tools into MyAstroBoard. Once configured and enabled, a connector's data appears in the app tabs it declares - AllSky feeds the **Observatory** tab, MyAstroShine feeds the **Astrodex**, and a connector may feed no tab at all: the MQTT / Home Assistant connector publishes MyAstroBoard's own state *outward* and is standalone.
 
 ---
 
 ## Configuration
 
-**Sub-tab**: Parameters → Connectors
+**Sub-tab**: App settings -> Connectors
 
 Each connector card shows its current status badge (Enabled / Installed / Not installed) and a Configure button to expand the settings panel.
 
@@ -130,14 +15,14 @@ Each connector card shows its current status badge (Enabled / Installed / Not in
 | **Display label** | Custom name shown in the Observatory tab header |
 | **Base URL** | Root URL of the external service (e.g. `http://192.168.1.42`) |
 | **Enable connector** | Toggle to activate this connector and expose it in its target tabs |
-| **Modules** | Per-feature toggles — each module can be independently enabled |
+| **Modules** | Per-feature toggles - each module can be independently enabled |
 
 Under the description each card shows an **Appears in** row: one badge per app tab the connector feeds, or a *Standalone* badge when it feeds none.
 
 Configuration is stored in the configuration under `connectors.<name>`, written by
 `POST /api/connectors/<name>/config`.
 
-### Base URL — use a static IP address
+### Base URL - use a static IP address
 
 > **Always configure the base URL with the device's static IP address** (e.g. `http://192.168.1.42`), not its mDNS hostname (e.g. `http://allsky.local`).
 
@@ -147,7 +32,7 @@ Your router's DHCP settings or your device's documentation will show its current
 
 ### Health check
 
-The **test button** (wifi icon, next to the URL field) immediately probes the URL you have typed — no save required — and shows Reachable / Unreachable. Use it to verify the IP address and port before saving.
+The **test button** (wifi icon, next to the URL field) immediately probes the URL you have typed - no save required - and shows Reachable / Unreachable. Use it to verify the IP address and port before saving.
 
 The **health-check button** (heart icon, after saving) runs a full per-module probe and reports status badges (✓ / ✗) with a detail message (200 OK, 404 + hint, timeout, etc.) for each enabled module.
 
@@ -298,7 +183,7 @@ When modules are enabled the Observatory tab renders the following layout:
 
 | Row | Left | Right |
 |-----|------|-------|
-| 1 | Live image (auto-refreshes every 30 s) | Sensor data (polls every 60 s) — if enabled |
+| 1 | Live image (auto-refreshes every 30 s) | Sensor data (polls every 60 s) - if enabled |
 | 2 | Startrails | Daily timelapse |
 | 3 | Keogram (full width) | |
 
@@ -310,7 +195,7 @@ A **last-updated timestamp** is shown below the live image and updates on each r
 
 ### Proxy
 
-All resource URLs are served through the MyAstroBoard backend at `/api/connectors/allsky/proxy?module=<slug>`. The browser never contacts the AllSky instance directly — this avoids mixed-content issues when MyAstroBoard is accessed remotely over HTTPS while AllSky runs on a local HTTP server.
+All resource URLs are served through the MyAstroBoard backend at `/api/connectors/allsky/proxy?module=<slug>`. The browser never contacts the AllSky instance directly - this avoids mixed-content issues when MyAstroBoard is accessed remotely over HTTPS while AllSky runs on a local HTTP server.
 
 ### Troubleshooting
 
@@ -330,7 +215,7 @@ All resource URLs are served through the MyAstroBoard backend at `/api/connector
 
 ## MyAstroShine integration
 
-MyAstroShine is a `BaseConnector` like AllSky — in the `REGISTRY`, listed by
+MyAstroShine is a `BaseConnector` like AllSky - in the `REGISTRY`, listed by
 `GET /api/connectors`, saved through `POST /api/connectors/myastroshine/config`, and rendered by
 the same card. What is specific to it is declared, not special-cased:
 
@@ -344,16 +229,18 @@ class MyAstroShineConnector(BaseConnector):
     CONFIG_FIELDS = {"token": "", "signing_secret": "", "callback_url_override": "", "copy_rating": False}
 ```
 
-**Appears in**: Astrodex — not the Observatory, so it has no Observatory panel.
+**Appears in**: Astrodex - not the Observatory, so it has no Observatory panel.
 
 `is_configured()` requires the two credentials on top of the URL: a URL alone signs no handoff,
 so the card reports *Not installed* until all three are set. `health_check()` probes
 `<url>/api/health`; MyAstroShine is LAN-only, so an unreachable result is expected and normal
 when the board runs on another network, and the card says so rather than showing a plain error.
 
-Its own routes — the handoff and the two cookieless endpoints the MyAstroShine container calls
-back on — stay in `blueprints/connectors_myastroshine.py` under `/api/astrodex/integration/*`.
+Its own routes - the handoff and the two cookieless endpoints the MyAstroShine container calls
+back on - stay in `blueprints/connectors_myastroshine.py` under `/api/astrodex/integration/*`.
 Full documentation: [MYASTROSHINE.md](MYASTROSHINE.md).
+
+---
 
 ## MQTT / Home Assistant connector
 
@@ -426,6 +313,8 @@ a circular import (a test guards this).
 
 See [HOME_ASSISTANT.md - Troubleshooting](HOME_ASSISTANT.md#troubleshooting).
 
+---
+
 ## Astrodex Stream connector
 
 A personal, auto-refreshing photo slideshow of a user's Astrodex pictures, rendered as a single
@@ -468,6 +357,123 @@ only revocation mechanism.
 Its own routes live in `blueprints/astrodex_stream.py` under `/api/astrodex/stream/*`. Full
 documentation: [ASTRODEX_STREAM.md](ASTRODEX_STREAM.md).
 
+---
+
+## Architecture
+
+Connectors are Python classes that extend `BaseConnector` (`backend/connectors/base_connector.py`) and are registered in `backend/connectors/__init__.py`. Each connector exposes one or more **modules** - discrete features that can be independently enabled or disabled.
+
+The registry is discovered at runtime and served via `GET /api/connectors`.
+
+### File layout
+
+One module per connector on each side, named after it:
+
+| | Shared | AllSky | MyAstroShine | MQTT / Home Assistant |
+|---|---|---|---|---|
+| Connector | `connectors/base_connector.py` | `connectors/allsky_connector.py` | `connectors/myastroshine_connector.py` | `connectors/mqtt_connector.py` (+ `mqtt_publisher.py`, `mqtt_payloads.py`) |
+| Blueprint | `blueprints/connectors.py` | `blueprints/connectors_allsky.py` | `blueprints/connectors_myastroshine.py` | `blueprints/connectors_mqtt.py` |
+| Tests | `tests/blueprints/test_connectors.py` | `tests/blueprints/test_connectors_allsky.py` | `tests/blueprints/test_connectors_myastroshine.py` | `tests/blueprints/test_connectors_mqtt.py`, `tests/connectors/test_mqtt_*.py` |
+
+Credentials of every connector (`SECRET_FIELDS`) live in `utils/connector_secrets.py`'s store,
+not in the configuration - see [Secrets](#secrets). A connector that talks MQTT does not declare a
+broker of its own: it picks a shared connection - see [MQTT connections](#mqtt-connections).
+
+`blueprints/connectors.py` serves the two routes every connector shares - the listing and the
+config save; a connector's own routes go in its own blueprint module, registered in
+`backend/app.py`.
+
+### Declaring a connector
+
+Beyond `name` / `label` / `description` / `min_version` / `homepage`, a connector says what it
+needs through class attributes, so the shared listing, save route and card can handle it without
+special-casing:
+
+| Attribute | Purpose |
+|---|---|
+| `MODULES` | Independently-toggleable features. Empty is valid - the card then shows no Modules section |
+| `target_modules` | App tabs the data lands in (see [Target modules](#target-modules)). Empty = standalone |
+| `CONFIG_FIELDS` | Settable config keys beyond `label` / `url` / `enabled` / `modules`, as `{key: default}`. `POST /api/connectors/<name>/config` accepts these and nothing else, coercing each value to the type of its default (`str`, `bool` or `int`) |
+| `SECRET_FIELDS` | Keys holding credentials. Stored in the secrets sidecar, masked by `GET /api/connectors`; a blank or still-masked submission means "keep the stored value" |
+| `URL_FIELDS` | Keys among `CONFIG_FIELDS` holding a URL, so the save strips their trailing slash |
+| `CONNECTION_FIELD` | Config key holding the id of the shared MQTT connection the connector uses (`""` = none). See [MQTT connections](#mqtt-connections) |
+
+A connector's own tuning knobs (cache TTLs, size caps, rate limits) are class attributes too,
+not entries in `utils/constants.py` - adding a connector should not mean editing a shared file.
+
+`is_configured()` says what "installed" means (a base URL by default; MyAstroShine also requires
+its credentials). Only `health_check()` must be implemented - `get_module_urls()` and
+`fetch_sensor_data()` default to empty, for a connector that serves no browser-fetched resource
+and no live readings.
+
+### Secrets
+
+Credentials never reach the browser. `GET /api/connectors` is readable by any signed-in user, so
+it replaces every `SECRET_FIELDS` value with `****` + the last 4 characters and adds a
+`has_<field>` boolean; the card shows the masked form as an input placeholder and submits the
+field blank unless the admin types a new value. The merge happens server-side in
+`POST /api/connectors/<name>/config` (admin only), so a value the browser was never given cannot
+be echoed back and overwrite the real one.
+
+Credentials never sit in the configuration either (v1.6). They live in a separate database
+setting (`connectors_secrets`), written by `utils/connector_secrets.py` in one transaction, and
+deliberately absent from the backup ZIP and the config export - the same rule the session secret
+key and the VAPID keys already follow. Consequences:
+
+- a backup restored on a fresh host needs each connector's credentials re-entered once;
+- a connector is always constructed from `merge_secrets(name, config_block, cls.SECRET_FIELDS)`,
+  the config block overlaid with the stored secrets (`blueprints/connectors.py`,
+  `observation/myastroshine_integration.get_integration_config`, `connectors/mqtt_publisher.py`);
+- an install upgraded from an earlier version is migrated at startup and on the first save:
+  values still found in the configuration move to the secrets store and are stripped from it.
+
+### MQTT connections
+
+A broker is declared once, as a connection (`utils/mqtt_connections.py`, managed in
+App settings -> Configuration through `blueprints/mqtt_connections.py`), and shared by every
+connector that talks MQTT - the Home Assistant publisher and the AllSky sensor reader today, a
+Home Assistant sensor reader tomorrow - on the same broker or on separate ones.
+
+- A connection is `{id, name, url, username, tls_insecure}` in `config["mqtt_connections"]`; its
+  password is in the secrets store under `mqtt_connection:<id>`; API answers only carry a fixed
+  `********` mask (no tail, unlike `SECRET_FIELDS` tokens).
+- A connector declares `CONNECTION_FIELD` (`mqtt_connection_id` for both). Callers build it as
+  `cls(block, connection=connection_for(cls, block, config))`: the connection
+  (`{id, name, url, username, tls_insecure}`) is kept apart from the block, so a connector keeps its
+  own `url` next to the broker (AllSky: its web interface). The password is fetched with
+  `connection_password(id)` and passed explicitly, never held by the connector.
+- A connector that **reads** topics lists them in `mqtt_subscriptions()`;
+  `connectors/mqtt_subscriber.py` (one background thread, like the publisher) keeps one client per
+  connector and stores its last message, read back with `mqtt_subscriber.read_last_message(name)`.
+- The card shows a connection picker (`connectionField` in `_CONNECTOR_UI`): in place of the URL
+  field (`connectionReplacesUrl`, Home Assistant), or inside one module (`connectionModule`, AllSky's
+  `sensor_data`). `GET /api/connectors` lists the connections' names as `connection_options`.
+- `BaseConnector.validate_config(block)` lets a connector refuse a save the typed coercion cannot
+  catch (AllSky: a topic with a wildcard).
+- The shared save refuses an unknown connection id, and refuses a `client_id` already used by
+  another connector on the same connection: each connector opens its own client, and a broker
+  disconnects a client when another one connects with the same id. A blank client id is generated
+  per connector, so it never conflicts.
+- A connection picked by a connector cannot be deleted (409 with `used_by`).
+- Up to 1.7.1 the MQTT connector held its own `url` / `username` / `tls_insecure` / password.
+  `repo_config` turns such a block into the fixed-id connection `home-assistant` on every read
+  (old backups included), and `app.py` moves its password once at startup.
+
+### Target modules
+
+A connector also declares `target_modules` - the list of app tabs where its data shows up:
+
+```python
+class AllSkyConnector(BaseConnector):
+    target_modules = ["observatory"]
+```
+
+Slugs match the navbar tab keys (`observatory`, `astrodex`, `weather`, `skytonight`, ...) so the UI can reuse the existing translations; `static/js/connectors/connectors.js` maps them in `_TARGET_MODULE_I18N_KEYS`. The connector card renders one translated badge per slug under the description.
+
+The list is purely declarative - nothing is routed or wired from it. An **empty list is a valid, meaningful value**: it means the connector is self-contained and adds nothing to an existing tab (the MQTT / Home Assistant publisher), and the card then shows a single *Standalone* badge.
+
+---
+
 ## Adding a new connector
 
 1. Create a class in `backend/connectors/<name>_connector.py` that extends `BaseConnector`
@@ -483,6 +489,6 @@ documentation: [ASTRODEX_STREAM.md](ASTRODEX_STREAM.md).
    config inputs beyond the common ones (text, password, url or number inputs, checkboxes,
    an optional status line and action buttons)
 
-The connector appears automatically in the Parameters → Connectors UI.
+The connector appears automatically in the App settings -> Connectors UI.
 
 Want to suggest a connector? [Open a discussion](https://github.com/myastroboard/myastroboard/discussions/new?category=ideas&labels=enhancement,connector).

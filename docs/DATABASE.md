@@ -45,7 +45,7 @@ since the upgrade is not in that archive - take an Admin backup first if you nee
 
 `data/backups/` is never cleaned up on its own: it is the only way back to 1.6. It also holds
 sensitive data (password hashes, two-factor and connector secrets, the data of accounts
-deleted since), so delete it once 1.7 is validated: **Parameters -> Backup / Restore -> 1.7
+deleted since), so delete it once 1.7 is validated: **App settings -> Backup / Restore -> 1.7
 upgrade archive** shows the archive, its size and the files set aside, offers the import
 report for download, and deletes it all. The section is only shown while there is something
 to delete; only the files the import wrote are removed, anything else you put in
@@ -53,7 +53,7 @@ to delete; only the files the import wrote are removed, anything else you put in
 
 ## Backups
 
-**Parameters → Backup / Restore** still produces a ZIP with the same layout as in 1.6
+**App settings -> Backup / Restore** still produces a ZIP with the same layout as in 1.6
 (`config.json`, `users.json`, `astrodex/`, `equipments/`, ...), readable with any text
 editor, and restores both 1.7 and 1.6 backups. As before, the security settings, connector
 secrets, VAPID keys and session key are not in it.
@@ -63,7 +63,7 @@ For a file-level copy of the whole database, stop the container first, or copy
 
 ## Diagnostics
 
-**Parameters -> Metrics -> Database** shows the schema version (and whether it matches what
+**App settings -> Metrics -> Database** shows the schema version (and whether it matches what
 the application expects), the database size and its journal mode, with a warning when the
 write-ahead log is unavailable (data directory on a network share). **Check integrity** runs
 SQLite's integrity and foreign key checks and lists any problem found.

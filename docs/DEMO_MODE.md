@@ -119,10 +119,10 @@ Open `http://<host>:5050` from your local network and:
 
 1. **Sign in as `admin` / `admin` and change the password.** Demo mode refuses the default
    password, so without this step the admin account stays locked out once demo mode is on.
-2. **Protect the admin account** (*Parameters -> Security*): add your local network as a trusted
+2. **Protect the admin account** (*App settings -> Users -> Trusted networks and two-factor authentication*): add your local network as a trusted
    network, then set the admin account's scope to *local*. It can then only sign in from your
    network, never through the public address.
-3. **Trust the proxy headers** (*Parameters -> Advanced -> Reverse proxy*) when the public address
+3. **Trust the proxy headers** (*App settings -> Configuration -> Reverse proxy*) when the public address
    goes through a tunnel or reverse proxy. Without it every visitor shares the proxy's IP
    address: one visitor's failed sign-ins would throttle everyone, and if the proxy's address is
    inside a trusted network, every visitor would count as local. The startup log warns when demo
@@ -132,7 +132,7 @@ Open `http://<host>:5050` from your local network and:
    a browser drops a `Secure` cookie on a plain-HTTP page, so the admin, who signs in from the
    local network only, could no longer sign in or out. Turn it on only once every address you use
    is HTTPS, local one included; the setting refuses to turn on from a plain-HTTP page.
-4. Leave *Search engine indexing* (*Parameters -> Advanced -> Privacy*) as you want the demo to
+4. Leave *Search engine indexing* (*App settings -> Configuration -> Privacy & search engines*) as you want the demo to
    be found or not.
 
 Do not set a location or create the demo account: demo mode does both (next step).
@@ -163,7 +163,7 @@ authentication in front, or visitors would hit a sign-in page again).
   the data carry over.
 - **Changing the demo data by hand**: the demo account cannot sign in and cannot write while demo
   mode is on. Set `DEMO_MODE=false`, restart, sign in as the demo account from your local network
-  (set its password in *Parameters -> Users* first), make the changes, then switch it back on.
+  (set its password in *App settings -> Users* first), make the changes, then switch it back on.
   Renaming or removing the generated combinations stops the nightly plans for them.
 - **Admin tasks** (logs, metrics, users): sign in at `/login?signin` from your local network
   while demo mode stays on.
@@ -175,7 +175,7 @@ authentication in front, or visitors would hit a sign-in page again).
   sky coordinates only, like the object images of any install (see
   [PRIVACY.md](PRIVACY.md#third-parties)).
 - Visitors leave their IP address in the application log (trimmed after the log retention
-  period, *Parameters -> Advanced -> Privacy*) and in your tunnel or proxy's logs.
+  period, *App settings -> Configuration -> Privacy & search engines*) and in your tunnel or proxy's logs.
 - The only cookie is the session cookie, which here also carries the visitor's UI preferences
   (see [PRIVACY.md](PRIVACY.md#cookies)).
 

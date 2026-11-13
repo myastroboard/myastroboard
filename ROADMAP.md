@@ -704,7 +704,7 @@ Already covered without any live connection: observatory state through the v1.6 
 
 | | |
 |---|---|
-| **Why** | Long-term vision, not a committed release. MyAstroBoard orchestrates existing astro software (NINA, PHD2, ASCOM Alpaca, INDI, Seestar, Stellarium, Home Assistant, weather, AllSky…) rather than replacing it, and becomes the one place that remembers everything across years of sessions. |
+| **Why** | Long-term vision, not a committed release. MyAstroBoard orchestrates existing astro software (NINA, PHD2, ASCOM Alpaca, INDI, Seestar, Stellarium, Home Assistant, weather, AllSky...) rather than replacing it, and becomes the one place that remembers everything across years of sessions. |
 | **Effort** | Very high / open-ended |
 | **Status** | 💡 Idea - subject to change |
 

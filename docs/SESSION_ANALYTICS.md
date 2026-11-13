@@ -9,72 +9,21 @@ the Observation Log, Photo Map and Catalogue Collection - so the whole
 `Plan -> Observe -> Log -> Astrodex` loop and everything derived from it stays under one
 navigational roof.
 
+---
+
 ## Table of Contents
 
-1. [What is computed, and from what](#what-is-computed-and-from-what)
-2. [Why the Observation Log is the primary source](#why-the-observation-log-is-the-primary-source)
-3. [The four analytics sections](#the-four-analytics-sections)
-4. [Resolving coordinates](#resolving-coordinates)
-5. [Scale directions](#scale-directions)
-6. [Wishlist](#wishlist)
-7. [What "best months" does and does not say](#what-best-months-does-and-does-not-say)
+1. [The four analytics sections](#the-four-analytics-sections)
+2. [Wishlist](#wishlist)
+3. [What "best months" does and does not say](#what-best-months-does-and-does-not-say)
+4. [What is computed, and from what](#what-is-computed-and-from-what)
+5. [Why the Observation Log is the primary source](#why-the-observation-log-is-the-primary-source)
+6. [Resolving coordinates](#resolving-coordinates)
+7. [Scale directions](#scale-directions)
 8. [Performance and caching](#performance-and-caching)
 9. [API endpoints](#api-endpoints)
 10. [Out of scope](#out-of-scope)
-
----
-
-## What is computed, and from what
-
-| Section | Source |
-|---|---|
-| Totals, monthly series, object/constellation/equipment breakdowns | Observation Log sessions, nights and entries |
-| Sky coverage map | Observation Log entries **+** Astrodex items, placed via the SkyTonight dataset |
-| Conditions and results | Observation Log entries (rating) joined to their night (seeing, transparency, SQM, Moon) |
-| Best months | Ephemeris at the active location **+** the user's own logged months |
-| Wishlist | Its own per-user store, plus derived captured state |
-
-Everything is **strictly self-scoped**: a user only ever sees aggregates of their own log
-and their own Astrodex. Observation Log sessions are permanently private, so the analytics
-built on them are too. Read-only accounts may read every analytics route; only the
-wishlist's write routes require the `user` role.
-
-All the aggregation is pure: `backend/observation/session_analytics.py` takes already-loaded
-sessions and returns a payload. Loading files, resolving the request's active location and
-reaching across feature packages is the blueprint layer's job
-(`backend/blueprints/session_analytics.py`), the same split the Observation Log uses.
-
----
-
-## Why the Observation Log is the primary source
-
-Attaching a photo to an entry is a manual, optional step, so Astrodex picture metadata
-covers an unknown subset of what was actually captured. Every **logged entry**, by
-contrast, carries its own `frame_count` / `sub_exposure_seconds` / `integration_minutes`.
-
-So: every "hours" and "objects captured" figure comes from the Observation Log. The
-Astrodex collection size is reported as its **own, separately-labelled figure** - never
-folded into the logged totals - and Astrodex items are used on the sky coverage map only
-to cover objects that were added straight to the gallery without a session entry.
-
-This was decided when v1.3 shipped; see `docs/OBSERVATION_LOG.md`.
-
-### Which figures come from where
-
-- `integration_minutes` is the one guaranteed-summable field. When it is absent but both
-  `frame_count` and `sub_exposure_seconds` were recorded, their product is used instead.
-- An entry counts as **captured** when it has frames or integration time - the same
-  threshold the Observation Log itself uses to auto-register a target in Astrodex. A
-  planned-but-clouded-out entry is logged but is not a capture.
-- Entries are attributed to **their night's date**, never to `created_at`: a session
-  written up three weeks later still lands in the month it happened.
-- Distinct objects are counted on the dataset's cross-catalogue `catalogue_group_id` when
-  it resolves, so "M 31" and "NGC 224" are one object, not two.
-- Equipment hours follow the **effective** combination of each entry: its own override if
-  it has one, else the session's. Both are frozen snapshots on the records themselves, so
-  renaming or deleting a combination never rewrites history. Entries with no equipment
-  recorded get an explicit bucket rather than being dropped, so the hours always add up to
-  the headline total.
+11. [Related documentation](#related-documentation)
 
 ---
 
@@ -157,49 +106,6 @@ of nights, one would be noise dressed as insight.
 
 ---
 
-## Resolving coordinates
-
-The sky coverage map and the wishlist both need numeric RA/Dec, and neither can take the
-stored `ra`/`dec` at face value. Plan My Night and the Observation Log copy those fields
-straight from whatever the client sent, and the two SkyTonight frontend paths disagree:
-the target cards send `coordinates.ra_hours` (a decimal-hours float) while the result
-tables send the formatted `ra_hms` string (`"21h 31m 48.32s"`). Astrodex items are worse -
-`ra`/`dec` are stripped on every write.
-
-`backend/observation/target_coordinates.py` is the single resolver, applying one order
-everywhere (first hit wins):
-
-1. **The SkyTonight dataset lookup**, which carries canonical numeric `ra_deg`/`dec_deg`
-   plus the object's cross-catalogue `group_id`. Display labels such as
-   `"M31 - Andromeda Galaxy"` are reduced to their identifier before the lookup.
-2. **The record's own stored values**, parsed tolerantly: a number (RA in decimal hours,
-   Dec in degrees) or a sexagesimal string in `h m s`, `d m s`, `deg ' "` or colon form.
-   A negative-zero degrees field (`-00 30 00`) keeps its sign.
-3. **Give up** - and the caller counts the miss.
-
-The wishlist stamps the resolved values onto the item at add time, so the visibility pass
-is a pure numeric loop that never re-learns this.
-
----
-
-## Scale directions
-
-Three of the recorded conditions run in different directions. Every bucket the API emits is
-ordered **best first** and carries its own numeric bounds, so no consumer has to re-derive
-which way a scale goes:
-
-| Field | Direction | Best band |
-|---|---|---|
-| `seeing` | 1 = best .. 8 = worst (7Timer ASTRO) | 1-3 |
-| `transparency` | 1 = worst .. 8 = best (7Timer ASTRO) | 6-8 |
-| `sqm` | higher is darker, therefore better | >= 20.5 |
-| `moon_illumination_percent` | lower is better | 0-33 |
-| `rating` | 0-5 in 0.5 steps, higher is better | - |
-
-A reversed seeing axis is a correctness bug, not a cosmetic one, and has its own test.
-
----
-
 ## Wishlist
 
 A wishlist item records **intent**: an object you want to capture. It is the only new
@@ -214,7 +120,7 @@ backup ZIP.
 1. **"Captured" is never stored.** It is recomputed on every read from the Observation Log
    entries and the Astrodex items. A stored boolean would go stale the moment an entry is
    edited or a session deleted, and silently-wrong progress is worse than no progress bar.
-2. **Coordinates are resolved and frozen at add time**, through the resolver above.
+2. **Coordinates are resolved and frozen at add time**, through the resolver (see [Resolving coordinates](#resolving-coordinates)).
 
 ### Behaviour
 
@@ -282,6 +188,103 @@ it is ever picked up.
 If the ephemeris cannot be computed for a location, the personal half still renders and the
 chart says the sky figures are missing, rather than showing a half-empty chart that looks
 complete.
+
+---
+
+## What is computed, and from what
+
+| Section | Source |
+|---|---|
+| Totals, monthly series, object/constellation/equipment breakdowns | Observation Log sessions, nights and entries |
+| Sky coverage map | Observation Log entries **+** Astrodex items, placed via the SkyTonight dataset |
+| Conditions and results | Observation Log entries (rating) joined to their night (seeing, transparency, SQM, Moon) |
+| Best months | Ephemeris at the active location **+** the user's own logged months |
+| Wishlist | Its own per-user store, plus derived captured state |
+
+Everything is **strictly self-scoped**: a user only ever sees aggregates of their own log
+and their own Astrodex. Observation Log sessions are permanently private, so the analytics
+built on them are too. Read-only accounts may read every analytics route; only the
+wishlist's write routes require the `user` role.
+
+All the aggregation is pure: `backend/observation/session_analytics.py` takes already-loaded
+sessions and returns a payload. Loading files, resolving the request's active location and
+reaching across feature packages is the blueprint layer's job
+(`backend/blueprints/session_analytics.py`), the same split the Observation Log uses.
+
+---
+
+## Why the Observation Log is the primary source
+
+Attaching a photo to an entry is a manual, optional step, so Astrodex picture metadata
+covers an unknown subset of what was actually captured. Every **logged entry**, by
+contrast, carries its own `frame_count` / `sub_exposure_seconds` / `integration_minutes`.
+
+So: every "hours" and "objects captured" figure comes from the Observation Log. The
+Astrodex collection size is reported as its **own, separately-labelled figure** - never
+folded into the logged totals - and Astrodex items are used on the sky coverage map only
+to cover objects that were added straight to the gallery without a session entry.
+
+This was decided when v1.3 shipped; see `docs/OBSERVATION_LOG.md`.
+
+### Which figures come from where
+
+- `integration_minutes` is the one guaranteed-summable field. When it is absent but both
+  `frame_count` and `sub_exposure_seconds` were recorded, their product is used instead.
+- An entry counts as **captured** when it has frames or integration time - the same
+  threshold the Observation Log itself uses to auto-register a target in Astrodex. A
+  planned-but-clouded-out entry is logged but is not a capture.
+- Entries are attributed to **their night's date**, never to `created_at`: a session
+  written up three weeks later still lands in the month it happened.
+- Distinct objects are counted on the dataset's cross-catalogue `catalogue_group_id` when
+  it resolves, so "M 31" and "NGC 224" are one object, not two.
+- Equipment hours follow the **effective** combination of each entry: its own override if
+  it has one, else the session's. Both are frozen snapshots on the records themselves, so
+  renaming or deleting a combination never rewrites history. Entries with no equipment
+  recorded get an explicit bucket rather than being dropped, so the hours always add up to
+  the headline total.
+
+---
+
+## Resolving coordinates
+
+The sky coverage map and the wishlist both need numeric RA/Dec, and neither can take the
+stored `ra`/`dec` at face value. Plan My Night and the Observation Log copy those fields
+straight from whatever the client sent, and the two SkyTonight frontend paths disagree:
+the target cards send `coordinates.ra_hours` (a decimal-hours float) while the result
+tables send the formatted `ra_hms` string (`"21h 31m 48.32s"`). Astrodex items are worse -
+`ra`/`dec` are stripped on every write.
+
+`backend/observation/target_coordinates.py` is the single resolver, applying one order
+everywhere (first hit wins):
+
+1. **The SkyTonight dataset lookup**, which carries canonical numeric `ra_deg`/`dec_deg`
+   plus the object's cross-catalogue `group_id`. Display labels such as
+   `"M31 - Andromeda Galaxy"` are reduced to their identifier before the lookup.
+2. **The record's own stored values**, parsed tolerantly: a number (RA in decimal hours,
+   Dec in degrees) or a sexagesimal string in `h m s`, `d m s`, `deg ' "` or colon form.
+   A negative-zero degrees field (`-00 30 00`) keeps its sign.
+3. **Give up** - and the caller counts the miss.
+
+The wishlist stamps the resolved values onto the item at add time, so the visibility pass
+is a pure numeric loop that never re-learns this.
+
+---
+
+## Scale directions
+
+Three of the recorded conditions run in different directions. Every bucket the API emits is
+ordered **best first** and carries its own numeric bounds, so no consumer has to re-derive
+which way a scale goes:
+
+| Field | Direction | Best band |
+|---|---|---|
+| `seeing` | 1 = best .. 8 = worst (7Timer ASTRO) | 1-3 |
+| `transparency` | 1 = worst .. 8 = best (7Timer ASTRO) | 6-8 |
+| `sqm` | higher is darker, therefore better | >= 20.5 |
+| `moon_illumination_percent` | lower is better | 0-33 |
+| `rating` | 0-5 in 0.5 steps, higher is better | - |
+
+A reversed seeing axis is a correctness bug, not a cosmetic one, and has its own test.
 
 ---
 

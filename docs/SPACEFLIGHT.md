@@ -32,12 +32,12 @@ Launch Library 2 is the de-facto standard for launch data. The free tier allows 
 | Field | Description |
 |-------|-------------|
 | Mission name | Launch or payload name |
-| Agency/provider | Launch operator (SpaceX, ULA, Roscosmos…) |
+| Agency/provider | Launch operator (SpaceX, ULA, Roscosmos...) |
 | Vehicle | Rocket family and variant |
 | Launch site | Pad location |
 | NET | No Earlier Than date-time (in your local timezone) |
 | Status | `Go`, `TBD`, `Hold`, `Success`, `Failure`, `Partial Failure` |
-| Launch video | Embedded webcast URL (YouTube, SpaceflightNow…) |
+| Launch video | Embedded webcast URL (YouTube, SpaceflightNow...) |
 | Mission image | Launch patch or vehicle image (cached locally) |
 
 ### Image caching
@@ -67,7 +67,7 @@ Fetches from Launch Library 2 the list of all people currently in orbit:
 | Name | Astronaut full name |
 | Agency | Space agency |
 | Vehicle | Spacecraft they arrived on |
-| Role | Mission role (Commander, Flight Engineer…) |
+| Role | Mission role (Commander, Flight Engineer...) |
 | Days in space | Days since launch |
 | Profile image | Locally cached from LL2 CDN |
 
@@ -123,7 +123,7 @@ For each pass:
 | `max_altitude_deg` | Maximum elevation above the horizon |
 | `start_azimuth_deg` / `end_azimuth_deg` | Direction at rise and set |
 | `visibility_class` | `visible` (ISS in sunlight, ground in darkness), `daylight`, `night_only`, `below_horizon` |
-| `visibility_score` | 0–100 quality score |
+| `visibility_score` | 0-100 quality score |
 
 Passes with max altitude < 10° (`MIN_EVENT_ALTITUDE_DEG`) are filtered out.
 
