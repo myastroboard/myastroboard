@@ -642,6 +642,13 @@ async function openShareCard(model) {
             redraw();
         })
     );
+    const brandHint = document.createElement('div');
+    brandHint.className = 'form-text';
+    brandHint.textContent = _shT(
+        'share.brand_hint',
+        'Keeping it also supports the project: it is how other astronomers discover MyAstroBoard.'
+    );
+    brandGroup.appendChild(brandHint);
     sideCol.appendChild(brandGroup);
 
     const privacy = document.createElement('p');

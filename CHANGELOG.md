@@ -8,11 +8,13 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Features
 
-- None.
+- Share card: a short note under the MyAstroBoard signature option explains that keeping it helps others discover the project.
 
 ### Fixes
 
-- None.
+- Sky images: the fallback used when CDS hips2fits is down now renders in bands, using about 110 MB instead of 1.3 GB for a large picture, so small servers no longer kill the worker mid-download.
+- Observation Log: an entry's object type and constellation are now translated.
+- Demo mode: Astrodex pictures that could not be downloaded are retried on later checks, and constellations are stored as full names so they are translated (Astrodex, Plan My Night, Observation Log).
 
 ### Breaking changes
 

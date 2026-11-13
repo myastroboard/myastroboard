@@ -49,6 +49,12 @@ _SUPERSAMPLE = 2
 _JPEG_QUALITY = 90
 _TILE_FETCH_WORKERS = 6
 
+# Sub-pixel rows mapped to the sky at a time. The working arrays of a whole 1200 px
+# image (a 2400 x 2400 sub-pixel grid of float64 and int64 temporaries) peak well above
+# 1 GB, enough for the kernel to kill a worker on a small server or a Raspberry Pi;
+# a band keeps them to a few tens of MB. A multiple of _SUPERSAMPLE.
+_BAND_ROWS = 128
+
 # Bit masks of the classic "spread / compact" bit interleaving used by the NESTED scheme.
 _SPREAD_MASKS = (
     (16, 0x0000FFFF0000FFFF),
@@ -123,17 +129,27 @@ def ang2pix_nest(order: int, ra_rad: np.ndarray, dec_rad: np.ndarray) -> np.ndar
     return (face << (2 * order)) + _spread_bits(ix) + (_spread_bits(iy) << 1)
 
 
-def tan_grid(ra_deg: float, dec_deg: float, fov_deg: float, size: int) -> tuple[np.ndarray, np.ndarray]:
+def tan_grid(
+    ra_deg: float,
+    dec_deg: float,
+    fov_deg: float,
+    size: int,
+    row_start: int = 0,
+    row_stop: int | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
     """Sky coordinates (radians) of the pixel centres of a square TAN image.
 
     The image is ``size`` pixels wide, covers *fov_deg* across, and is centred on
     (*ra_deg*, *dec_deg*), north up and east left - the hips2fits conventions.
+    *row_start* / *row_stop* return only that band of rows (the whole image by default).
     """
+    row_stop = size if row_stop is None else row_stop
     scale = math.radians(fov_deg) / size
     centre = (size - 1) / 2
     offsets = (np.arange(size) - centre) * scale
-    xi = np.broadcast_to(-offsets[np.newaxis, :], (size, size))  # east is left
-    eta = np.broadcast_to(-offsets[:, np.newaxis], (size, size))  # north is up
+    shape = (row_stop - row_start, size)
+    xi = np.broadcast_to(-offsets[np.newaxis, :], shape)  # east is left
+    eta = np.broadcast_to(-offsets[row_start:row_stop, np.newaxis], shape)  # north is up
 
     ra0 = math.radians(ra_deg)
     dec0 = math.radians(dec_deg)
@@ -186,37 +202,51 @@ def render_cutout(
     """
     order = tile_order_for(fov_deg, size)
     sub = size * _SUPERSAMPLE
-    ra, dec = tan_grid(ra_deg, dec_deg, fov_deg, sub)
-    ipix = ang2pix_nest(order + _TILE_ORDER_OFFSET, ra, dec)
-
     pixels_per_tile_bits = 2 * _TILE_ORDER_OFFSET
-    tile_ids = ipix >> pixels_per_tile_bits
-    local = ipix & ((1 << pixels_per_tile_bits) - 1)
-    # Inside a tile, the de-interleaved x addresses the image row and y the column.
-    rows = _compact_bits(local)
-    cols = _compact_bits(local >> 1)
 
-    unique_tiles = [int(t) for t in np.unique(tile_ids)]
-    with ThreadPoolExecutor(max_workers=min(_TILE_FETCH_WORKERS, len(unique_tiles))) as pool:
+    # Pass 1, band by band: the HEALPix pixel of every sub-pixel, and the tiles needed.
+    bands = []
+    unique_tiles: set[int] = set()
+    for start in range(0, sub, _BAND_ROWS):
+        stop = min(start + _BAND_ROWS, sub)
+        ra, dec = tan_grid(ra_deg, dec_deg, fov_deg, sub, start, stop)
+        ipix = ang2pix_nest(order + _TILE_ORDER_OFFSET, ra, dec)
+        bands.append((start, stop, ipix))
+        unique_tiles.update(int(t) for t in np.unique(ipix >> pixels_per_tile_bits))
+
+    ordered_tiles = sorted(unique_tiles)
+    with ThreadPoolExecutor(max_workers=min(_TILE_FETCH_WORKERS, len(ordered_tiles))) as pool:
         tiles = dict(
             zip(
-                unique_tiles,
-                pool.map(lambda npix: _fetch_tile(base_url, order, npix, timeout), unique_tiles),
+                ordered_tiles,
+                pool.map(lambda npix: _fetch_tile(base_url, order, npix, timeout), ordered_tiles),
                 strict=True,
             )
         )
     if all(tile is None for tile in tiles.values()):
         raise requests.RequestException(f'no tile found on {base_url} at order {order}')
-
-    canvas = np.zeros((sub, sub, 3), dtype=np.uint8)
     for npix, tile in tiles.items():
         if tile is None:
             logger.debug(f'HiPS tile Norder{order}/Npix{npix} missing on {base_url}, left black')
-            continue
-        mask = tile_ids == npix
-        canvas[mask] = tile[rows[mask], cols[mask]]
 
-    image = canvas.reshape(size, _SUPERSAMPLE, size, _SUPERSAMPLE, 3).mean(axis=(1, 3))
+    # Pass 2, band by band: copy the tile pixels, then average each sub-pixel block.
+    image = np.empty((size, size, 3), dtype=np.uint8)
+    for start, stop, ipix in bands:
+        tile_ids = ipix >> pixels_per_tile_bits
+        local = ipix & ((1 << pixels_per_tile_bits) - 1)
+        # Inside a tile, the de-interleaved x addresses the image row and y the column.
+        rows = _compact_bits(local)
+        cols = _compact_bits(local >> 1)
+        canvas = np.zeros((stop - start, sub, 3), dtype=np.uint8)
+        for npix in np.unique(tile_ids):
+            tile = tiles[int(npix)]
+            if tile is None:
+                continue
+            mask = tile_ids == npix
+            canvas[mask] = tile[rows[mask], cols[mask]]
+        block = canvas.reshape((stop - start) // _SUPERSAMPLE, _SUPERSAMPLE, size, _SUPERSAMPLE, 3).mean(axis=(1, 3))
+        image[start // _SUPERSAMPLE : stop // _SUPERSAMPLE] = np.round(block).astype(np.uint8)
+
     out = io.BytesIO()
-    Image.fromarray(np.round(image).astype(np.uint8)).save(out, format='JPEG', quality=_JPEG_QUALITY)
+    Image.fromarray(image).save(out, format='JPEG', quality=_JPEG_QUALITY)
     return out.getvalue()

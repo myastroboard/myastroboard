@@ -2736,6 +2736,7 @@
     "theme_light": "Light",
     "include": "Show on the card",
     "brand": "MyAstroBoard signature",
+    "brand_hint": "Keeping it also supports the project: it is how other astronomers discover MyAstroBoard.",
     "privacy_note": "The card is made in your browser and never contains your location. Nothing is sent anywhere until you share it yourself.",
     "download": "Download",
     "share": "Share",

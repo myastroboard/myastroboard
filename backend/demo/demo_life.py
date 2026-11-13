@@ -13,6 +13,8 @@ demo account the life of a real observer, built from the application's own data:
   Astrodex with a picture, and a new Plan My Night is built for tonight from tonight's
   SkyTonight results (the best-scoring targets that fit the combination's field), then
   ordered by the plan optimizer.
+- **Every check**: an Astrodex item still without its picture (no survey server answered
+  when it was added) gets another try, a few items per check.
 
 Every picture is a DSS2 colour survey cut-out (CDS / STScI) framed to the combination's
 field, and says so in its notes: no amateur photo is ever passed off as a real capture.
@@ -37,6 +39,7 @@ from skytonight.skytonight_storage import drop_location_results, get_dso_results
 from utils import demo_mode
 from utils.auth import user_manager
 from utils.constants import DATA_DIR
+from utils.constellation_names import full_constellation_name
 from utils.file_lock import interprocess_lock
 from utils.image_privacy import strip_image_metadata
 from utils.logging_config import get_logger
@@ -124,6 +127,8 @@ DEMO_PICTURE_NOTE = 'Demo picture: DSS2 colour survey image (CDS / STScI), not a
 DEMO_SESSION_NOTE = 'Demo night: logged automatically from the plan, acquisition figures are illustrative.'
 
 _PICTURE_SIZE_PX = 1200
+# Missing pictures retried per check: an outage of every survey server costs a few requests.
+_PICTURE_RETRIES_PER_CHECK = 3
 _MOVING_TYPES = ('planet', 'comet', 'moon', 'asteroid', 'minor')
 _MIN_OBSERVABLE_HOURS = 2.0
 # How often the background loop checks whether a new night has come.
@@ -214,6 +219,8 @@ def run_once(today: date | None = None) -> None:
     if not astrodex.load_user_astrodex(user.user_id, user.username).get('items'):
         _seed_astrodex(user, combinations, today or date.today())
         _seed_wishlist(user)
+    else:
+        repair_demo_data(user, combinations, today or date.today())
     refresh_tonight(user, combinations)
 
 
@@ -296,13 +303,13 @@ def _seed_astrodex(user, combinations: dict[str, dict], today: date) -> None:
                 'name': target.preferred_name,
                 'type': target.object_type,
                 'catalogue': _catalogue_of(target.catalogue_names, target.preferred_name),
-                'constellation': target.constellation,
+                'constellation': _astrodex_constellation(target.constellation),
             },
             ra_deg=target.coordinates.ra_hours * 15.0,
             dec_deg=target.coordinates.dec_degrees,
             setup=setup,
             combination=combination,
-            when=today - timedelta(days=12 + 19 * index),
+            when=_seed_date(today, index),
             frames=frames,
             integration_minutes=integration,
             rating=_rating(name),
@@ -420,7 +427,7 @@ def _build_plan(user, metadata: dict, setup: dict, combination: dict, picks: lis
                 'name': row.get('preferred_name'),
                 'catalogue': catalogue,
                 'type': row.get('object_type'),
-                'constellation': row.get('constellation'),
+                'constellation': full_constellation_name(row.get('constellation')),
                 'ra': coordinates.get('ra_hours'),
                 'dec': coordinates.get('dec_degrees'),
                 'mag': row.get('magnitude'),
@@ -483,7 +490,7 @@ def _log_plan(user, plan: dict, setup: dict, combination: dict, in_astrodex: set
             'name': best.get('name'),
             'type': best.get('type'),
             'catalogue': best.get('catalogue'),
-            'constellation': best.get('constellation'),
+            'constellation': _astrodex_constellation(best.get('constellation')),
         },
         ra_deg=ra_deg,
         dec_deg=dec_deg,
@@ -500,12 +507,168 @@ def _log_plan(user, plan: dict, setup: dict, combination: dict, in_astrodex: set
 
 
 # ---------------------------------------------------------------------------
+# Repair (every check on a seeded account)
+# ---------------------------------------------------------------------------
+
+
+def repair_demo_data(user, combinations: dict[str, dict], today: date) -> None:
+    """Finish what an earlier check could not, and bring older records to today's shape.
+
+    - Constellations stored as IAU abbreviations ("And") become the full names the UI
+      translates.
+    - An Astrodex item without its picture (no survey server answered when it was
+      added) gets another try.
+    """
+    _expand_constellations(user)
+    _retry_missing_pictures(user, combinations, today)
+
+
+def _expand_constellations(user) -> None:
+    for item in astrodex.load_user_astrodex(user.user_id, user.username).get('items', []):
+        current = item.get('constellation') if isinstance(item, dict) else None
+        if current and current != _astrodex_constellation(current):
+            astrodex.update_astrodex_item(user.user_id, item['id'], {'constellation': _astrodex_constellation(current)})
+
+    data = observation_sessions.load_user_sessions(user.user_id, user.username)
+    changed = False
+    for session in data.get('sessions', []):
+        for entry in session.get('entries', []) if isinstance(session, dict) else []:
+            current = entry.get('constellation') if isinstance(entry, dict) else None
+            if current and current != full_constellation_name(current):
+                entry['constellation'] = full_constellation_name(current)
+                changed = True
+    if changed:
+        observation_sessions.save_user_sessions(user.user_id, data, username=user.username)
+
+
+def _linked_entries(user) -> dict[str, tuple[dict, dict]]:
+    """Astrodex item id -> (session, entry) of the logged entry that added it."""
+    linked: dict[str, tuple[dict, dict]] = {}
+    for session in observation_sessions.load_user_sessions(user.user_id, user.username).get('sessions', []):
+        for entry in session.get('entries', []) if isinstance(session, dict) else []:
+            if isinstance(entry, dict) and entry.get('astrodex_item_id'):
+                linked[str(entry['astrodex_item_id'])] = (session, entry)
+    return linked
+
+
+def _retry_missing_pictures(user, combinations: dict[str, dict], today: date) -> None:
+    """Give a few picture-less items their survey picture; stop at the first failure.
+
+    A failure means every survey server is down or backed off: the next check retries.
+    """
+    items = [
+        item
+        for item in astrodex.load_user_astrodex(user.user_id, user.username).get('items', [])
+        if isinstance(item, dict) and not item.get('pictures')
+    ]
+    if not items:
+        return
+    linked = _linked_entries(user)
+    attempts = 0
+    for item in items:
+        if attempts >= _PICTURE_RETRIES_PER_CHECK:
+            return
+        link = linked.get(str(item.get('id')))
+        picture = _logged_picture(link, combinations) if link else _seed_picture(item, combinations, today)
+        if picture is None:
+            continue
+        attempts += 1
+        picture_id = _attach_picture(user, item['id'], **picture)
+        if not picture_id:
+            return
+        if link:
+            session, entry = link
+            observation_sessions.link_entry_to_astrodex(
+                user.user_id, session['id'], entry['id'], item['id'], picture_id
+            )
+        logger.info(f"Demo mode: survey picture added to {item.get('name')!r} on retry")
+
+
+def _setup_of_combination(combination_id, combinations: dict[str, dict]) -> tuple[dict, dict] | None:
+    for key, combination in combinations.items():
+        if combination.get('id') == combination_id:
+            return _setup_by_key(key), combination
+    return None
+
+
+def _night_date(session: dict, entry: dict) -> str:
+    """The date of the night an entry was logged on (the session's first night otherwise)."""
+    nights = [night for night in session.get('nights') or [] if isinstance(night, dict)]
+    night = next((night for night in nights if night.get('id') == entry.get('night_id')), None)
+    if night is None:
+        return observation_sessions.session_date_range(session)[0]
+    return str(night.get('date') or '')
+
+
+def _logged_picture(link: tuple[dict, dict], combinations: dict[str, dict]) -> dict | None:
+    """The picture arguments of an item added from a logged night, as _log_plan made them."""
+    session, entry = link
+    found = _setup_of_combination(session.get('combination_id'), combinations)
+    try:
+        ra_deg = float(entry['ra']) * 15.0
+        dec_deg = float(entry['dec'])
+        when = date.fromisoformat(_night_date(session, entry)[:10])
+    except KeyError, TypeError, ValueError:
+        return None
+    if found is None:
+        return None
+    setup, combination = found
+    return {
+        'ra_deg': ra_deg,
+        'dec_deg': dec_deg,
+        'setup': setup,
+        'combination': combination,
+        'when': when,
+        'frames': entry.get('frame_count'),
+        'integration_minutes': entry.get('integration_minutes'),
+        'rating': entry.get('rating'),
+    }
+
+
+def _seed_picture(item: dict, combinations: dict[str, dict], today: date) -> dict | None:
+    """The picture arguments of a seeded item, as _seed_astrodex made them."""
+    for index, (name, setup_key) in enumerate(DEMO_ASTRODEX_SEED):
+        target = skytonight_targets.find_target(name)
+        if target is None or _normalize(target.preferred_name) != _normalize(item.get('name')):
+            continue
+        combination = combinations.get(setup_key)
+        if target.coordinates is None or combination is None:
+            return None
+        try:
+            seeded_on = datetime.fromisoformat(str(item.get('created_at'))).date()
+        except ValueError:
+            seeded_on = today
+        setup = _setup_by_key(setup_key)
+        frames, integration = _acquisition(setup, name, setup['planned_minutes'])
+        return {
+            'ra_deg': target.coordinates.ra_hours * 15.0,
+            'dec_deg': target.coordinates.dec_degrees,
+            'setup': setup,
+            'combination': combination,
+            'when': _seed_date(seeded_on, index),
+            'frames': frames,
+            'integration_minutes': integration,
+            'rating': _rating(name),
+        }
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
 def _normalize(name) -> str:
     return ''.join(str(name or '').lower().split())
+
+
+def _astrodex_constellation(value) -> str:
+    """The constellation as the Astrodex form stores it: the full name, lowercase."""
+    return full_constellation_name(value).lower()
+
+
+def _seed_date(today: date, index: int) -> date:
+    return today - timedelta(days=12 + 19 * index)
 
 
 def _variation(name, spread: int) -> int:
@@ -547,13 +710,42 @@ def _add_to_astrodex(
     item = astrodex.create_astrodex_item(user.user_id, item_data, username=user.username)
     if not item:
         return None, None
+    picture_id = _attach_picture(
+        user,
+        item['id'],
+        ra_deg=ra_deg,
+        dec_deg=dec_deg,
+        setup=setup,
+        combination=combination,
+        when=when,
+        frames=frames,
+        integration_minutes=integration_minutes,
+        rating=rating,
+    )
+    return item['id'], picture_id
+
+
+def _attach_picture(
+    user,
+    item_id: str,
+    *,
+    ra_deg: float,
+    dec_deg: float,
+    setup: dict,
+    combination: dict,
+    when: date,
+    frames,
+    integration_minutes,
+    rating,
+) -> str | None:
+    """Download a survey picture framed to the setup's field and add it to an item."""
     filename = _download_picture(user.user_id, ra_deg, dec_deg, max(field_of_view_deg(setup)))
     if not filename:
-        return item['id'], None
+        return None
     location = get_install_default_location(load_config()) or {}
     picture = astrodex.add_picture_to_item(
         user.user_id,
-        item['id'],
+        item_id,
         {
             'filename': filename,
             'date': when.isoformat(),
@@ -572,7 +764,7 @@ def _add_to_astrodex(
             'rating': rating,
         },
     )
-    return item['id'], (picture or {}).get('id')
+    return (picture or {}).get('id')
 
 
 def _download_picture(user_id: str, ra_deg: float, dec_deg: float, fov_deg: float) -> str | None:

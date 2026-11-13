@@ -349,6 +349,124 @@ def test_next_night_logs_the_previous_plan_and_plans_again(demo_env):
         assert not {entry['name'] for entry in plan['entries']} & astrodex_names
 
 
+def test_constellations_are_stored_as_full_names(demo_env):
+    """The Astrodex keeps the form's lowercase full name, plans and logs the full name the UI translates."""
+    first_night = datetime.now(UTC) + timedelta(hours=2)
+    _write_results(demo_env, first_night, _night_rows())
+    demo_life.run_once(today=date(2026, 11, 11))
+    user = _demo_user()
+
+    by_name = {item['name']: item for item in astrodex.load_user_astrodex(user.user_id, user.username)['items']}
+    assert by_name['M31']['constellation'] == 'andromeda'
+    assert by_name['M51']['constellation'] == 'canes venatici'
+    for plan in _plans(user).values():
+        assert all(entry['constellation'] == 'Andromeda' for entry in plan['entries'])
+
+    _write_results(demo_env, first_night + timedelta(days=1), _night_rows())
+    demo_life.run_once()
+    for session in observation_sessions.get_user_sessions(user.user_id):
+        assert all(entry['constellation'] == 'Andromeda' for entry in session['entries'])
+    logged = [
+        item
+        for item in astrodex.load_user_astrodex(user.user_id, user.username)['items']
+        if item['name'] not in _FAKE_TARGETS
+    ]
+    assert logged and all(item['constellation'] == 'andromeda' for item in logged)
+
+
+def test_a_check_expands_constellations_stored_as_abbreviations(demo_env):
+    """Records written before the fix (IAU abbreviations) are expanded by the next check."""
+    demo_life.run_once()
+    user = _demo_user()
+    item = astrodex.load_user_astrodex(user.user_id, user.username)['items'][0]
+    astrodex.update_astrodex_item(user.user_id, item['id'], {'constellation': 'Ori'})
+    session = observation_sessions.create_session(user.user_id, user.username, {'date': '2026-11-01'})
+    data = observation_sessions.load_user_sessions(user.user_id, user.username)
+    stored = next(s for s in data['sessions'] if s['id'] == session['id'])
+    stored['entries'] = [{'id': 'e1', 'name': 'NGC 891', 'constellation': 'And'}]
+    observation_sessions.save_user_sessions(user.user_id, data, username=user.username)
+
+    demo_life.run_once()
+
+    assert astrodex.get_astrodex_item(user.user_id, item['id'])['constellation'] == 'orion'
+    sessions = observation_sessions.load_user_sessions(user.user_id, user.username)['sessions']
+    entry = next(s for s in sessions if s['id'] == session['id'])['entries'][0]
+    assert entry['constellation'] == 'Andromeda'
+
+
+def test_seed_pictures_missing_after_an_outage_are_retried_a_few_per_check(demo_env, monkeypatch):
+    """Seeded items left without a picture get it on later checks, three per check."""
+    monkeypatch.setattr(demo_life, 'download_dss_image', lambda *args, **kwargs: False)
+    demo_life.run_once(today=date(2026, 11, 11))
+    monkeypatch.setattr(demo_life, 'download_dss_image', _fake_download)
+    user = _demo_user()
+
+    def with_picture():
+        items = astrodex.load_user_astrodex(user.user_id, user.username)['items']
+        return [item for item in items if item['pictures']]
+
+    demo_life.run_once()
+    assert len(with_picture()) == demo_life._PICTURE_RETRIES_PER_CHECK
+    for _ in range(len(demo_life.DEMO_ASTRODEX_SEED)):
+        demo_life.run_once()
+    items = with_picture()
+    assert len(items) == len(demo_life.DEMO_ASTRODEX_SEED)
+    m31 = next(item for item in items if item['name'] == 'M31')
+    picture = m31['pictures'][0]
+    assert picture['notes'] == demo_life.DEMO_PICTURE_NOTE
+    assert picture['device'] == demo_life._combination_name(demo_life._setup_by_key('smart'))
+    assert picture['date'] == demo_life._seed_date(date.fromisoformat(m31['created_at'][:10]), 0).isoformat()
+    frames, _ = demo_life._acquisition(demo_life._setup_by_key('smart'), 'M31', 90)
+    assert picture['frames'] == frames
+
+
+def test_retry_stops_at_the_first_failed_download(demo_env, monkeypatch):
+    """While the survey servers stay down, a check makes one attempt, not one per item."""
+    calls = []
+
+    def failing(*args, **kwargs):
+        calls.append(args)
+        return False
+
+    monkeypatch.setattr(demo_life, 'download_dss_image', failing)
+    demo_life.run_once()
+    calls.clear()
+    demo_life.run_once()
+    assert len(calls) == 1
+
+
+def test_logged_picture_missing_after_an_outage_is_retried_and_linked(demo_env, monkeypatch):
+    """An item added from a logged night gets its picture later, linked back to the log entry."""
+    first_night = datetime.now(UTC) + timedelta(hours=2)
+    _write_results(demo_env, first_night, _night_rows())
+    demo_life.run_once()
+    monkeypatch.setattr(demo_life, 'download_dss_image', lambda *args, **kwargs: False)
+    _write_results(demo_env, first_night + timedelta(days=1), _night_rows())
+    demo_life.run_once()
+    monkeypatch.setattr(demo_life, 'download_dss_image', _fake_download)
+    user = _demo_user()
+
+    demo_life.run_once()
+
+    for session in observation_sessions.get_user_sessions(user.user_id):
+        entry = next(entry for entry in session['entries'] if entry.get('astrodex_item_id'))
+        item = astrodex.get_astrodex_item(user.user_id, entry['astrodex_item_id'])
+        assert len(item['pictures']) == 1
+        assert entry['astrodex_picture_id'] == item['pictures'][0]['id']
+        assert item['pictures'][0]['date'] == observation_sessions.session_date_range(session)[0]
+
+
+def test_picture_retry_skips_items_it_cannot_place(demo_env, monkeypatch):
+    """An item that is neither a seed nor from a logged night is left alone."""
+    demo_life.run_once()
+    user = _demo_user()
+    astrodex.create_astrodex_item(user.user_id, {'name': 'Hand added', 'type': 'Galaxy'}, username=user.username)
+    calls = []
+    monkeypatch.setattr(demo_life, 'download_dss_image', lambda *args, **kwargs: calls.append(args) or False)
+    demo_life.run_once()
+    assert calls == []
+
+
 def test_no_results_means_no_plan_yet(demo_env):
     """Without tonight's SkyTonight results, the plans wait for the next check."""
     demo_env.write_text(json.dumps({'metadata': {'night_found': False}, 'deep_sky': []}), encoding='utf-8')
@@ -655,3 +773,16 @@ def test_download_picture_survives_a_file_that_cannot_be_deleted(demo_env, monke
     _unreadable_image(monkeypatch, remove_fails=True)
 
     assert demo_life._download_picture('u1', 10.0, 41.0, 1.0) is None
+
+
+def test_logged_picture_needs_a_known_combination_and_coordinates():
+    """An entry whose combination is gone or whose coordinates are unusable cannot be retried."""
+    combinations = {'smart': {'id': 'k-smart', 'name': 'Smart'}}
+    session = {'combination_id': 'k-smart', 'nights': [{'id': 'n1', 'date': '2026-11-02'}]}
+    entry = {'night_id': 'missing', 'ra': 1.0, 'dec': 40.0, 'frame_count': 3}
+
+    picture = demo_life._logged_picture((session, entry), combinations)
+    assert picture['when'] == date(2026, 11, 2)
+    assert picture['setup']['key'] == 'smart'
+    assert demo_life._logged_picture(({**session, 'combination_id': 'gone'}, entry), combinations) is None
+    assert demo_life._logged_picture((session, {**entry, 'ra': None}), combinations) is None

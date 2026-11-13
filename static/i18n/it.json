@@ -2736,6 +2736,7 @@
     "theme_light": "Chiaro",
     "include": "Mostra sulla scheda",
     "brand": "Firma MyAstroBoard",
+    "brand_hint": "Mantenerla sostiene anche il progetto: è così che altri astronomi scoprono MyAstroBoard.",
     "privacy_note": "La scheda viene creata nel tuo browser e non contiene mai la tua posizione. Nulla viene inviato finché non la condividi tu.",
     "download": "Scarica",
     "share": "Condividi",
