@@ -127,7 +127,7 @@ These are **not** editable - they are absent from `update_picture()`'s allowed f
   manual choice.
 - `rating` is copied only when **Copy the source photo's rating** is on.
 - The Edit Photo modal shows a discreet
-  "Re-processed with MyAstroShine on <date>" line with a *view settings* disclosure that pretty-prints
+  "Re-processed with MyAstroShine on `<date>`" line with a *view settings* disclosure that pretty-prints
   `enhanced_parameters`.
 - The board gets no push when the enhanced picture arrives (MyAstroShine calls back
   server-to-server). When the Astrodex browser tab regains focus after a send, it re-fetches and
