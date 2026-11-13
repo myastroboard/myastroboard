@@ -8,41 +8,24 @@ the original is never touched.
 
 ## Where to find it
 
-- **Setup**: Parameters -> Connectors -> *MyAstroShine* card
+- **Setup**: App settings -> Connectors -> *MyAstroShine* card
 - **Use**: Astrodex -> open an object -> the photo action row shows a
   <i class="bi bi-stars"></i> **Send to MyAstroShine** button next to *Edit* / *Delete*, once the
   integration is configured and enabled.
 
 ---
 
-## Why "pull + webhook" and not "push"
-
-MyAstroShine always runs on the local network. MyAstroBoard might not - it can sit on a VPS
-behind a reverse proxy. The only server-to-server direction that is always reachable is
-**MyAstroShine -> MyAstroBoard** (the board's public URL, or its LAN IP). So:
-
-| Step | Carried by | Direction |
-|---|---|---|
-| Open MyAstroShine with the source photo | the **browser** (`window.open`) | browser -> shine |
-| Read the source image + metadata | **MyAstroShine container** | shine -> board |
-| Send the enhanced image home | **MyAstroShine container** | shine -> board |
-
-The browser makes **no cross-origin XHR**, so there is nothing to add to the board's CSP and no
-CORS to open on MyAstroShine.
-
----
-
 ## Setup
 
 **Minimum version**: MyAstroShine **v0.4.0** - older releases do not implement the pull + webhook
-round-trip described above. The connector card shows this requirement as a *Requires v0.4.0*
+round-trip (see [The round trip](#the-round-trip)). The connector card shows this requirement as a *Requires v0.4.0*
 line; it is informational, not enforced, since MyAstroShine only reports its own version once a
 handoff completes (stored per picture as `enhanced_source_version`).
 
 That version, and everything else the card shows, is declared on `MyAstroShineConnector`
 (`backend/connectors/myastroshine_connector.py`) - a `BaseConnector` in the `REGISTRY`, listed by
 `GET /api/connectors` and saved through `POST /api/connectors/myastroshine/config` like any other
-connector. See [CONNECTORS.md](CONNECTORS.md#myastroshine-connector).
+connector. See [CONNECTORS.md](CONNECTORS.md#myastroshine-integration).
 
 The token and signing secret are declared as `SECRET_FIELDS`, so the listing masks them and a
 blank submission keeps the stored value: they are never sent to the browser.
@@ -66,7 +49,7 @@ secret** (64 hex chars), shown once.
 ### 3. Allow the callback on the MyAstroShine side
 
 The board builds the callback URL from `X-Forwarded-Proto` / `X-Forwarded-Host` (so
-**Parameters -> Advanced -> Reverse proxy** must be on when behind a proxy), or from the override
+**App settings -> Configuration -> Reverse proxy** must be on when behind a proxy), or from the override
 field. That URL - the public one **and** the override if you use one - must be in MyAstroShine's
 `astrodex_callback_urls` allowlist.
 
@@ -170,15 +153,32 @@ These are **not** editable - they are absent from `update_picture()`'s allowed f
 
 ---
 
+## Why "pull + webhook" and not "push"
+
+MyAstroShine always runs on the local network. MyAstroBoard might not - it can sit on a VPS
+behind a reverse proxy. The only server-to-server direction that is always reachable is
+**MyAstroShine -> MyAstroBoard** (the board's public URL, or its LAN IP). So:
+
+| Step | Carried by | Direction |
+|---|---|---|
+| Open MyAstroShine with the source photo | the **browser** (`window.open`) | browser -> shine |
+| Read the source image + metadata | **MyAstroShine container** | shine -> board |
+| Send the enhanced image home | **MyAstroShine container** | shine -> board |
+
+The browser makes **no cross-origin XHR**, so there is nothing to add to the board's CSP and no
+CORS to open on MyAstroShine.
+
+---
+
 ## A connector, with two particularities
 
-This is a `BaseConnector` like AllSky — in the `REGISTRY`, listed by `GET /api/connectors`,
+This is a `BaseConnector` like AllSky - in the `REGISTRY`, listed by `GET /api/connectors`,
 stored under `config.connectors.myastroshine`, and rendered by the same card. Two things set it
 apart, both declared rather than special-cased:
 
 - **It is bidirectional.** The browser hands a photo to MyAstroShine and the MyAstroShine
-  container posts the enhanced result back, so it authenticates — hence `SECRET_FIELDS` and the
+  container posts the enhanced result back, so it authenticates - hence `SECRET_FIELDS` and the
   cookieless callback routes in `backend/blueprints/connectors_myastroshine.py` (logic in
   `backend/observation/myastroshine_integration.py`).
-- **It surfaces in the Astrodex, not the Observatory** — `target_modules = ["astrodex"]`, and it
+- **It surfaces in the Astrodex, not the Observatory** - `target_modules = ["astrodex"]`, and it
   has no Observatory panel.

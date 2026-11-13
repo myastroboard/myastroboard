@@ -46,11 +46,11 @@ Astronomical night begins when the Sun's altitude drops below **−18°** (astro
 | `practical` | Moon altitude **< 5°** | 30-min margin for moonrise/moonset |
 | `illumination` | Moon illumination **< 15%** | New moon neighbourhood; moon may be above horizon but is dim |
 
-All three modes use Sun < −18° as the primary constraint. The API returns all three simultaneously — the UI shows the one that gives the longest usable window.
+All three modes use Sun < −18° as the primary constraint. The API returns all three simultaneously - the UI shows the one that gives the longest usable window.
 
 ### Score
 
-The window score (0–100) reflects how good the dark window is:
+The window score (0-100) reflects how good the dark window is:
 
 - 100: No moon interference during full astronomical night.
 - 0: No dark window exists (full moon, high latitude in summer, polar day).
@@ -83,8 +83,8 @@ The window score (0–100) reflects how good the dark window is:
 
 | Field | Description |
 |-------|-------------|
-| `phase_name` | Named phase (New Moon, Waxing Crescent, First Quarter…) |
-| `illumination_percent` | Fraction of disk illuminated (0–100 %) |
+| `phase_name` | Named phase (New Moon, Waxing Crescent, First Quarter...) |
+| `illumination_percent` | Fraction of disk illuminated (0-100 %) |
 | `distance_km` | Geocentric distance |
 | `altitude_deg` / `azimuth_deg` | Current topocentric position |
 | `next_moonrise` / `next_moonset` | Next rise and set times |
@@ -128,7 +128,7 @@ allowed window; missing or malformed values fall back to the current month. The 
 | `partial_begin` / `total_begin` / `total_end` / `partial_end` | Contact times |
 | `peak_altitude_deg` | Moon altitude at peak (negative = below horizon = not visible) |
 | `total_duration_minutes` / `partial_duration_minutes` | Duration of each phase |
-| `astrophotography_score` | 0–10 score for imaging value |
+| `astrophotography_score` | 0-10 score for imaging value |
 | `altitude_vs_time` | Array of alt/az at 5-min resolution for chart display |
 
 **Astrophotography score** factors in: eclipse type (total > partial > penumbral), altitude at peak, and total duration.
@@ -155,7 +155,7 @@ allowed window; missing or malformed values fall back to the current month. The 
 | `astronomical_dusk` / `astronomical_dawn` | Sun = −18° |
 | `true_night_hours` | Duration of full astronomical night |
 
-**Library**: `astropy` — `get_sun()` + `AltAz` transforms over a dense time grid to find threshold crossings.
+**Library**: `astropy` - `get_sun()` + `AltAz` transforms over a dense time grid to find threshold crossings.
 
 **API**: `GET /api/sun/today`
 
@@ -197,7 +197,7 @@ The horizon graph displays the **altitude vs. time curves** for the Sun and Moon
 
 **Cache TTL**: 1 hour (`CACHE_TTL_SIDEREAL_TIME`).
 
-Local Apparent Sidereal Time (LAST) is displayed as a quick reference. LAST equals the Right Ascension (RA) of objects currently on the meridian — useful when manually slewing to targets.
+Local Apparent Sidereal Time (LAST) is displayed as a quick reference. LAST equals the Right Ascension (RA) of objects currently on the meridian - useful when manually slewing to targets.
 
 **API**: `GET /api/astro/sidereal-time`
 
@@ -215,32 +215,32 @@ Local Apparent Sidereal Time (LAST) is displayed as a quick reference. LAST equa
 
 ### Kp index
 
-The **Kp index** (0–9) is the primary indicator of global geomagnetic activity. Higher Kp = larger aurora oval extending further toward the equator.
+The **Kp index** (0-9) is the primary indicator of global geomagnetic activity. Higher Kp = larger aurora oval extending further toward the equator.
 
 | Kp | Activity level | Typical aurora visibility |
 |----|---------------|--------------------------|
-| 0–1 | Quiet | Polar regions only (> ~70° lat) |
-| 2–3 | Unsettled | High latitudes (~65–70°) |
-| 4 | Active | Mid-high latitudes (~60–65°) |
+| 0-1 | Quiet | Polar regions only (> ~70° lat) |
+| 2-3 | Unsettled | High latitudes (~65-70°) |
+| 4 | Active | Mid-high latitudes (~60-65°) |
 | 5 | Minor storm (G1) | Visible ~55° |
 | 6 | Moderate storm (G2) | Visible ~50° |
 | 7 | Strong storm (G3) | Visible ~45°, sometimes ~40° |
-| 8–9 | Severe/Extreme | Mid-latitude aurora possible |
+| 8-9 | Severe/Extreme | Mid-latitude aurora possible |
 
 **NOAA API**: `https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json` (current), `noaa-planetary-k-index-forecast.json` (3-day forecast).
 
 ### Aurora visibility probability
 
-`AuroraService.calculate_aurora_probability()` estimates aurora probability (0–100 %) from the current Kp and observer latitude:
+`AuroraService.calculate_aurora_probability()` estimates aurora probability (0-100 %) from the current Kp and observer latitude:
 
 ```
 aurora_edge_latitude = 67° - (Kp × 3.5°)
 ```
 
-- Observer **poleward of the edge** → probability = 25% + Kp × 7 (max 88%)
-- Observer **near the edge** → probability = 15% + Kp × 6
-- Observer **5° equatorward** → probability = 5% + Kp × 4
-- Observer **far equatorward** → probability = max(0, (Kp − 3) × 6)
+- Observer **poleward of the edge** -> probability = 25% + Kp × 7 (max 88%)
+- Observer **near the edge** -> probability = 15% + Kp × 6
+- Observer **5° equatorward** -> probability = 5% + Kp × 4
+- Observer **far equatorward** -> probability = max(0, (Kp − 3) × 6)
 
 The latitude of 67° is an approximation of the mean auroral oval edge during quiet conditions; the factor of 3.5°/Kp unit is a well-known empirical rule of thumb.
 
@@ -268,9 +268,9 @@ Covers all seven naked-eye planets (Mercury, Venus, Mars, Jupiter, Saturn, Uranu
 
 | Event type | Description | Which planets |
 |------------|-------------|---------------|
-| **Opposition** | Planet is 180° from the Sun — closest approach, highest altitude at midnight | Outer planets only (Mars and beyond) |
+| **Opposition** | Planet is 180° from the Sun - closest approach, highest altitude at midnight | Outer planets only (Mars and beyond) |
 | **Conjunction** | Planet appears very close to another planet or the Sun | All |
-| **Greatest elongation** | Maximum angular distance from the Sun — best for inner planets | Mercury (18°), Venus (46°) |
+| **Greatest elongation** | Maximum angular distance from the Sun - best for inner planets | Mercury (18°), Venus (46°) |
 | **Retrograde begin/end** | Apparent backward motion as Earth overtakes an outer planet | All outer planets |
 
 Events are computed over a **365-day rolling window** from today using `astropy` body positions.
@@ -294,7 +294,7 @@ Events are computed over a **365-day rolling window** from today using `astropy`
 | **Zodiacal light window** | Best period to see the faint dust band in the ecliptic (western sky after dusk in spring, eastern sky before dawn in autumn) |
 | **Milky Way core visibility** | Period when the galactic centre (Sagittarius) rises and sets in darkness |
 
-**Library**: `astropy` — `get_sun()` position for equinox/solstice crossing detection; `SkyCoord` for galactic-plane altitudes.
+**Library**: `astropy` - `get_sun()` position for equinox/solstice crossing detection; `SkyCoord` for galactic-plane altitudes.
 
 **API**: `GET /api/events/phenomena`
 
@@ -320,7 +320,7 @@ Contains a curated database of annual meteor showers with:
 
 Major showers included: Quadrantids, Lyrids, Eta Aquariids, Delta Aquariids, Perseids, Orionids, Leonids, Geminids, Ursids.
 
-Radiant altitude is computed using `astropy` AltAz transforms — a shower with a radiant below the horizon is flagged as not visible from the configured location.
+Radiant altitude is computed using `astropy` AltAz transforms - a shower with a radiant below the horizon is flagged as not visible from the configured location.
 
 **API**: `GET /api/events/solarsystem`
 
@@ -328,7 +328,7 @@ Radiant altitude is computed using `astropy` AltAz transforms — a shower with 
 
 **Module**: `backend/utils/events_aggregator.py`
 
-`GET /api/events/upcoming` merges all three event sources and returns a single sorted list of events in the coming days/weeks — used for the Calendar sub-tab and for push notification triggers N4 and N5.
+`GET /api/events/upcoming` merges all three event sources and returns a single sorted list of events in the coming days/weeks - used for the Calendar sub-tab and for push notification triggers N4 and N5.
 
 ---
 

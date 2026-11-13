@@ -9,46 +9,15 @@ doesn't have your URL.
 
 ## Where to find it
 
-- **Setup**: Parameters -> Connectors -> *Astrodex Stream* card
+- **Setup**: App settings -> Connectors -> *Astrodex Stream* card
 - **Your URL**: Astrodex -> the small <i class="bi bi-collection-play"></i> icon next to the
   page title, once the connector is enabled
 
 ---
 
-## Why not a real video stream
-
-The original idea was an RTSP stream. That does not fit this project's zero-manual-Docker-config
-promise: RTSP needs a real media server (ffmpeg + something like MediaMTX) listening on a **new**
-port, and Docker port mappings are fixed at container creation - nothing running inside the
-container can publish a new port to the host afterwards, no matter how that server is started or
-stopped. The only way to reconcile RTSP with "nothing to configure" would be to reserve that port
-in the official `docker-compose.yml` for every install, whether the feature is used or not -
-rejected as a permanent cost for an optional feature.
-
-A continuously pushed MJPEG stream avoids the new-port problem (it can ride the existing HTTP
-port), but the app runs `gunicorn` with **synchronous workers** and no thread pool: a long-lived
-streaming connection would pin a worker for as long as it stays open, and two simultaneous
-viewers (a browser tab plus one Home Assistant card is a very ordinary case) would starve the
-whole app for everyone else.
-
-So instead the server renders whichever photo is "current" as a **pure function of wall-clock
-time**, and a client just polls the same URL periodically, exactly like AllSky's `live_image`
-module already does for an external camera. No open connection, no new port, no background
-thread, no ffmpeg. Home Assistant's built-in **Generic Camera** integration does exactly this
-kind of polling natively - see [Using it in Home Assistant](#using-it-in-home-assistant).
-
-**No crossfade between photos, on purpose.** A blended transition was considered and dropped: a
-client that happens to poll mid-transition would receive one half-blended frame and then keep
-displaying it, unchanged, until its own next poll - which can be much later than the transition
-itself. The result would be a broken-looking static image sitting on the dashboard for a long
-stretch, not a smooth fade. Every served frame is always one full, clean photo; only *which*
-photo changes between slots (see [Shuffling](#shuffling) below).
-
----
-
 ## Setup
 
-Parameters -> Connectors -> **Astrodex Stream** -> Configure:
+App settings -> Connectors -> **Astrodex Stream** -> Configure:
 
 | Field | Notes |
 |---|---|
@@ -79,7 +48,7 @@ with:
   photos. Treat it like a password: anyone who has the URL can view your stream, so it is not
   shown anywhere else in the interface.
 - **The shared stream URL** - shown only when Astrodex is **not** set to private
-  (Parameters -> Configuration). Shows every user's photos merged, GPS coordinates stripped, with
+  (App settings -> Configuration). Shows every user's photos merged, GPS coordinates stripped, with
   an owner-name in the banner so a shared viewer (e.g. an astronomy club's screen) can tell whose
   photo is on display.
 
@@ -104,6 +73,18 @@ already does this:
 Home Assistant - not this connector - decides how often it re-fetches the still image. Set
 **Display duration per photo** generously (tens of seconds, not two or three) so a typical
 refresh cadence reliably lands on each photo instead of mostly skipping between them.
+
+---
+
+## Troubleshooting
+
+| Symptom | Likely cause |
+|---|---|
+| The <i class="bi bi-collection-play"></i> icon does not appear on the Astrodex page | The connector is not enabled - App settings -> Connectors -> Astrodex Stream. |
+| The modal has no shared URL | Astrodex is set to private (App settings -> Configuration) - the personal URL still works. |
+| The image shows a dark placeholder instead of a photo | The user has no eligible pictures yet (own photos for the personal URL, any visible photo for the shared one). |
+| Home Assistant's camera stopped updating after a "Rotate keys" | Expected - re-add the camera in Home Assistant with the new URL from the Astrodex modal. |
+| Photos change less often than expected in Home Assistant | Home Assistant polls a still image on its own schedule; it is not pushed. Increase *Display duration per photo* rather than expecting frame-accurate sync. |
 
 ---
 
@@ -146,12 +127,31 @@ refresh cadence reliably lands on each photo instead of mostly skipping between 
 
 ---
 
-## Troubleshooting
+## Why not a real video stream
 
-| Symptom | Likely cause |
-|---|---|
-| The <i class="bi bi-collection-play"></i> icon does not appear on the Astrodex page | The connector is not enabled - Parameters -> Connectors -> Astrodex Stream. |
-| The modal has no shared URL | Astrodex is set to private (Parameters -> Configuration) - the personal URL still works. |
-| The image shows a dark placeholder instead of a photo | The user has no eligible pictures yet (own photos for the personal URL, any visible photo for the shared one). |
-| Home Assistant's camera stopped updating after a "Rotate keys" | Expected - re-add the camera in Home Assistant with the new URL from the Astrodex modal. |
-| Photos change less often than expected in Home Assistant | Home Assistant polls a still image on its own schedule; it is not pushed. Increase *Display duration per photo* rather than expecting frame-accurate sync. |
+The original idea was an RTSP stream. That does not fit this project's zero-manual-Docker-config
+promise: RTSP needs a real media server (ffmpeg + something like MediaMTX) listening on a **new**
+port, and Docker port mappings are fixed at container creation - nothing running inside the
+container can publish a new port to the host afterwards, no matter how that server is started or
+stopped. The only way to reconcile RTSP with "nothing to configure" would be to reserve that port
+in the official `docker-compose.yml` for every install, whether the feature is used or not -
+rejected as a permanent cost for an optional feature.
+
+A continuously pushed MJPEG stream avoids the new-port problem (it can ride the existing HTTP
+port), but the app runs `gunicorn` with **synchronous workers** and no thread pool: a long-lived
+streaming connection would pin a worker for as long as it stays open, and two simultaneous
+viewers (a browser tab plus one Home Assistant card is a very ordinary case) would starve the
+whole app for everyone else.
+
+So instead the server renders whichever photo is "current" as a **pure function of wall-clock
+time**, and a client just polls the same URL periodically, exactly like AllSky's `live_image`
+module already does for an external camera. No open connection, no new port, no background
+thread, no ffmpeg. Home Assistant's built-in **Generic Camera** integration does exactly this
+kind of polling natively - see [Using it in Home Assistant](#using-it-in-home-assistant).
+
+**No crossfade between photos, on purpose.** A blended transition was considered and dropped: a
+client that happens to poll mid-transition would receive one half-blended frame and then keep
+displaying it, unchanged, until its own next poll - which can be much later than the transition
+itself. The result would be a broken-looking static image sitting on the dashboard for a long
+stretch, not a smooth fade. Every served frame is always one full, clean photo; only *which*
+photo changes between slots (see [Shuffling](#shuffling) above).

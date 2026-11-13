@@ -13,11 +13,209 @@ The **Equipment** tab lets you catalogue all your astronomy gear. Profiles pre-f
 | **Telescope** | Telescopes | OTA specs: focal length, aperture, type, reducer/barlow |
 | **Camera** | Cameras | Sensor specs: pixel size, resolution, QE, read noise |
 | **Mount** | Mounts | Payload capacity, mount type |
-| **Filter** | Filters | Type (LRGB, narrowband…), central wavelength, bandwidth |
+| **Filter** | Filters | Type (LRGB, narrowband...), central wavelength, bandwidth |
 | **Accessory** | Accessories | Field flattener, focuser, filter wheel, etc. |
 | **Combination** | Combinations | Named set of telescope + camera + mount + filters + accessories |
 
 Data is stored in the database: `equipment_items` (one row per telescope, camera, mount, filter or accessory), `equipment_combinations` and `combination_equipment` (the filters and accessories of each combination); `equipments/<user_id>_<type>.json` inside a backup ZIP.
+
+---
+
+## Equipment combinations
+
+A **combination** is a named configuration that groups a telescope, camera, mount, filters, and accessories. It is the unit used by:
+
+- The **FOV Calculator** (computes field of view for that telescope + camera pair)
+- **SkyTonight** ("Best Equipment For This Target" rates all your enabled and valid combinations)
+- **Astrodex** picture metadata (which setup was used for an image session)
+- **Plan My Night** combination selector (see [PLAN_MY_NIGHT.md](PLAN_MY_NIGHT.md))
+
+At least one of **telescope** or **camera** is required; both are single-value fields (max one telescope,
+max one imaging camera per combination). Two additional fields cover setups the base telescope+camera model
+doesn't:
+
+| Field | Description |
+|-------|-------------|
+| `guide_camera_id` | Optional second camera used purely for guiding (OAG or guide scope). Informational only - never factored into FOV or scoring math, since a guide camera never determines framing. |
+| `lens_focal_length_mm` / `lens_focal_ratio` | Optional focal length/ratio of a lens mounted directly on the camera, used **only** when no telescope is selected (e.g. a DSLR/mirrorless camera + lens on a star tracker for wide-field imaging). Lets a camera-only combination still be scored like a telescope+camera one. |
+
+A combination is flagged **Shared** only when **every component** in it is individually shared. If one component is later made private, the combination shows a ⚠ warning.
+
+### Photo badges
+
+Each combination card carries two badges sourced from Astrodex:
+
+- **Photo count** - number of Astrodex pictures linking to this combination. Click it to open the same
+  slideshow used elsewhere in Astrodex, showing every one of those pictures.
+- **Average rating** - mean of the 0-5 star ratings across those pictures (unrated pictures don't count
+  toward the average, though they do count toward the photo count).
+
+Both respect the same visibility as the rest of Astrodex: with `config['astrodex']['private']` off
+(default), they aggregate every visible user's pictures for that combination; with it on, only your own.
+
+### Deletion
+
+A combination can't be deleted while it's still referenced by any Astrodex picture (any user), pinned to
+any Plan My Night plan (any user), or referenced by any Observation Log session (any user) - the
+delete-guard mirrors the one on individual equipment items. This is checked in addition to the
+component-level guard: deleting the *equipment inside* a combination is blocked separately (see
+[Disabling equipment](#disabling-equipment)) while deleting the *combination itself* is blocked by its
+pictures, plans or sessions (see [OBSERVATION_LOG.md](OBSERVATION_LOG.md#deletion-and-reference-counting)).
+
+---
+
+## Field of View calculator
+
+**Sub-tab**: Equipment -> FOV
+
+**Endpoint**: `POST /api/equipment/fov-calculator`
+
+### Formulas
+
+#### Image scale (arcsec/pixel)
+
+$$\text{image scale} = \frac{206.265 \times \text{pixel size}\ [\mu m]}{\text{focal length}\ [mm]} \quad [\text{arcsec/px}]$$
+
+The constant 206 265 arcsec ≈ 1 radian.
+
+#### Field of view (degrees)
+
+$$\text{FOV}_\text{h} = \frac{57.3 \times \text{sensor width}\ [mm]}{\text{focal length}\ [mm]}$$
+
+$$\text{FOV}_\text{v} = \frac{57.3 \times \text{sensor height}\ [mm]}{\text{focal length}\ [mm]}$$
+
+$$\text{FOV}_\text{diag} = \frac{57.3 \times \sqrt{\text{width}^2 + \text{height}^2}}{\text{focal length}}$$
+
+The constant 57.3° ≈ 1 radian (small-angle approximation valid for typical FOV values).
+
+#### Sampling classification (Nyquist criterion)
+
+The optimal sampling range is **2-3 pixels per FWHM** of the seeing disk:
+
+$$\text{optimal min} = \frac{\text{seeing}}{3}\quad[\text{arcsec/px}]$$
+$$\text{optimal max} = \frac{\text{seeing}}{2}\quad[\text{arcsec/px}]$$
+
+| Result | Condition |
+|--------|-----------|
+| **Optimal** | `optimal_min ≤ image_scale ≤ optimal_max` |
+| **Undersampled** | `image_scale > optimal_max` - fewer than 2 px per FWHM; detail is lost |
+| **Oversampled** | `image_scale < optimal_min` - more than 3 px per FWHM; SNR per pixel is low |
+
+Default seeing used for the classification: **2.0 arcsec** (typical suburban sky). You can override this in the calculator UI.
+
+---
+
+## Equipment sharing
+
+Any telescope, camera, mount, filter, or accessory can be marked **"Share with all users"** in its edit form. Shared items are immediately visible to every user on the instance:
+
+- Shared items appear under a *"Shared by Others"* section labelled with the owner's name.
+- Non-owners can **read** but not edit or delete.
+- Your own shared items show a **Shared** badge.
+
+Shared equipment flows through the whole app:
+
+| Feature | Effect |
+|---------|--------|
+| FOV Calculator | Shared telescopes & cameras appear in dropdowns |
+| SkyTonight - Combination recommendations | Recommendations include shared combinations (own listed first) |
+| Astrodex - Add Picture | Shared combinations and filters available in selectors |
+| Plan My Night | Shared combinations appear in the combination selector |
+| Exposure Calculator | Shared cameras appear in the camera selector |
+
+---
+
+## Disabling equipment
+
+Every gear type (Telescope, Camera, Mount, Filter, Accessory) and every Combination has an `is_disabled`
+flag, set from its own edit form.
+
+- **Deletion is blocked while an item is still referenced by a combination** (your own, or another user's
+  if the item is shared) - the delete request returns the combination name(s) so you know what to unlink
+  first. Disabling is the alternative when you don't want to fully delete something that's still tied to
+  a combination.
+- Disabled items are excluded from every combination editor's dropdowns/checkboxes, **unless** they are
+  already selected on the combination currently being edited - an existing combination never silently
+  loses a component from the editor UI just because that component got disabled later.
+- Disabled items are hidden from their list tab by default. A **"Show hidden (N)"** toggle at the top of
+  each tab (Telescopes, Cameras, Mounts, Filters, Accessories, Combinations) reveals them, tagged with a
+  "Hidden" badge.
+- A combination that references a disabled (or no longer resolvable) piece of equipment is automatically
+  flagged **invalid** - a computed status, independent of the combination's own `is_disabled` toggle - and
+  shown with a warning badge in the Equipment tab. Invalid/disabled combinations are not hidden or blocked
+  from further use here; other features (SkyTonight, Plan My Night, Astrodex) are expected to start
+  filtering on this status as each becomes combination-aware.
+
+---
+
+## SkyTonight integration
+
+For each DSO, `POST /api/skytonight/combination-recommendations` rates every enabled and valid equipment combination (own + shared) on a 1-5 scale:
+
+1. Resolves each combination's effective optics - a telescope's aperture/focal length/f-ratio, or for a camera-only combination (no telescope), its `lens_focal_length_mm`/`lens_focal_ratio`.
+2. Scores focal length against an ideal range derived from the target's apparent size/type, and aperture against the target's magnitude.
+3. When the combination's camera has sensor dimensions, blends in a real field-of-view match (via the FOV Calculator's formulas) against the target's apparent size, instead of relying on the focal-length heuristic alone.
+
+Disabled or invalid combinations (see [Disabling equipment](#disabling-equipment)) never appear in recommendations. See [SKYTONIGHT.md](SKYTONIGHT.md#equipment-combination-recommendations) for the full scoring model.
+
+---
+
+## Presets
+
+**File**: `static/data/equipment_presets.json` (static asset, no backend involvement - fetched directly by the frontend)
+
+A curated list of real-world gear (telescopes, cameras, mounts, filters, accessories) that lets users
+skip manual data entry for common models. Each entry has an `id`, a `label`, a `manufacturer`, a
+`source_url` for provenance, a `suggests_experience` (`beginner` / `intermediate` / `advanced`) used to
+sort the closest match to the user's own experience level to the top, and type-specific spec fields
+matching the corresponding [gear type](#gear-types) table above one-to-one (e.g. a telescope preset's
+`type` maps to `telescope_type`, a filter preset's `filter_type` must be one of the enum values listed
+under [Filters](#filters), etc.).
+
+Consumed in two places:
+
+- The **guided setup wizard**'s equipment step (`static/js/first_run.js`) - offered alongside a manual-entry option.
+- The **Equipment tab**'s "New Telescope / Camera / Mount / Filter / Accessory" modals (`static/js/equipment.js`) -
+  a "Start from a preset" dropdown prefills the form, which remains fully editable afterward. Only shown when
+  adding a new item, not when editing an existing one.
+
+To add a preset, append an entry to the relevant array in the JSON file - no code change or restart needed
+(it's fetched fresh by the browser). Keep enum-like fields (`type`, `sensor_type`, `mount_type`, `filter_type`)
+consistent with the values each form's `<select>` accepts, or the preset will silently fail to prefill that field.
+
+### Bundles (smart telescopes)
+
+A **telescope** preset can declare a `bundle`: an array of sibling equipment items that ship built into the
+same physical unit - most commonly an all-in-one "smart telescope" (Seestar, Dwarf, Vespera, ...) whose fixed
+built-in camera sensor has no other way to be represented, since a plain telescope preset only carries
+optical specs (aperture/focal length), not sensor data.
+
+```json
+{
+  "id": "seestar_s50",
+  "...": "... normal telescope fields ...",
+  "auto_combination": true,
+  "bundle": [
+    { "kind": "camera", "label": "Seestar S50 built-in camera (Sony IMX462)", "sensor_width_mm": 5.6, "...": "..." },
+    { "kind": "mount", "label": "Seestar S50 built-in AZ mount/tripod", "mount_type": "Alt-Azimuth", "...": "..." },
+    { "kind": "filter", "label": "Seestar S50 Solar Filter", "filter_type": "Solar", "...": "..." }
+  ]
+}
+```
+
+- `kind` is one of `camera` / `mount` / `filter` / `accessory`; the rest of each bundle entry's fields match
+  that kind's normal preset shape one-to-one (same as a standalone entry in the `cameras`/`mounts`/
+  `filters`/`accessories` arrays above).
+- Set **`weight_kg: 0`** on every bundle entry - the parent telescope's own `weight_kg` already represents
+  the whole fused unit's mass; giving bundle items their own non-zero weight would multiply-count it in a
+  combination card's total payload calculation.
+- `auto_combination: true` on the parent tells the **guided setup wizard** (`static/js/first_run.js`) to
+  create every bundle item alongside the telescope and link them all into one auto-created combination -
+  this is what makes "every time the wizard creates equipment, a combination is created" true even for a
+  single-preset pick. When a bundling preset is selected, the wizard's separate camera picker is hidden
+  (a combination can only have one imaging camera, and the bundle already supplies it).
+- Bundle items are never independently selectable elsewhere (no separate preset dropdown entry) - they only
+  ever get created as part of their parent telescope's wizard flow.
 
 ---
 
@@ -96,204 +294,6 @@ Generic category for any optical or mechanical accessory not covered above: fiel
 |-------|-------------|
 | `accessory_type` | Free text (e.g. "Field Flattener", "Electronic Focuser") |
 | `weight_kg` | Weight for payload computation |
-
----
-
-## Disabling equipment
-
-Every gear type (Telescope, Camera, Mount, Filter, Accessory) and every Combination has an `is_disabled`
-flag, set from its own edit form.
-
-- **Deletion is blocked while an item is still referenced by a combination** (your own, or another user's
-  if the item is shared) — the delete request returns the combination name(s) so you know what to unlink
-  first. Disabling is the alternative when you don't want to fully delete something that's still tied to
-  a combination.
-- Disabled items are excluded from every combination editor's dropdowns/checkboxes, **unless** they are
-  already selected on the combination currently being edited — an existing combination never silently
-  loses a component from the editor UI just because that component got disabled later.
-- Disabled items are hidden from their list tab by default. A **"Show hidden (N)"** toggle at the top of
-  each tab (Telescopes, Cameras, Mounts, Filters, Accessories, Combinations) reveals them, tagged with a
-  "Hidden" badge.
-- A combination that references a disabled (or no longer resolvable) piece of equipment is automatically
-  flagged **invalid** — a computed status, independent of the combination's own `is_disabled` toggle — and
-  shown with a warning badge in the Equipment tab. Invalid/disabled combinations are not hidden or blocked
-  from further use here; other features (SkyTonight, Plan My Night, Astrodex) are expected to start
-  filtering on this status as each becomes combination-aware.
-
----
-
-## Presets
-
-**File**: `static/data/equipment_presets.json` (static asset, no backend involvement — fetched directly by the frontend)
-
-A curated list of real-world gear (telescopes, cameras, mounts, filters, accessories) that lets users
-skip manual data entry for common models. Each entry has an `id`, a `label`, a `manufacturer`, a
-`source_url` for provenance, a `suggests_experience` (`beginner` / `intermediate` / `advanced`) used to
-sort the closest match to the user's own experience level to the top, and type-specific spec fields
-matching the corresponding [gear type](#gear-types) table above one-to-one (e.g. a telescope preset's
-`type` maps to `telescope_type`, a filter preset's `filter_type` must be one of the enum values listed
-under [Filters](#filters), etc.).
-
-Consumed in two places:
-
-- The **guided setup wizard**'s equipment step (`static/js/first_run.js`) — offered alongside a manual-entry option.
-- The **Equipment tab**'s "New Telescope / Camera / Mount / Filter / Accessory" modals (`static/js/equipment.js`) —
-  a "Start from a preset" dropdown prefills the form, which remains fully editable afterward. Only shown when
-  adding a new item, not when editing an existing one.
-
-To add a preset, append an entry to the relevant array in the JSON file — no code change or restart needed
-(it's fetched fresh by the browser). Keep enum-like fields (`type`, `sensor_type`, `mount_type`, `filter_type`)
-consistent with the values each form's `<select>` accepts, or the preset will silently fail to prefill that field.
-
-### Bundles (smart telescopes)
-
-A **telescope** preset can declare a `bundle`: an array of sibling equipment items that ship built into the
-same physical unit — most commonly an all-in-one "smart telescope" (Seestar, Dwarf, Vespera, …) whose fixed
-built-in camera sensor has no other way to be represented, since a plain telescope preset only carries
-optical specs (aperture/focal length), not sensor data.
-
-```json
-{
-  "id": "seestar_s50",
-  "...": "... normal telescope fields ...",
-  "auto_combination": true,
-  "bundle": [
-    { "kind": "camera", "label": "Seestar S50 built-in camera (Sony IMX462)", "sensor_width_mm": 5.6, "...": "..." },
-    { "kind": "mount", "label": "Seestar S50 built-in AZ mount/tripod", "mount_type": "Alt-Azimuth", "...": "..." },
-    { "kind": "filter", "label": "Seestar S50 Solar Filter", "filter_type": "Solar", "...": "..." }
-  ]
-}
-```
-
-- `kind` is one of `camera` / `mount` / `filter` / `accessory`; the rest of each bundle entry's fields match
-  that kind's normal preset shape one-to-one (same as a standalone entry in the `cameras`/`mounts`/
-  `filters`/`accessories` arrays above).
-- Set **`weight_kg: 0`** on every bundle entry — the parent telescope's own `weight_kg` already represents
-  the whole fused unit's mass; giving bundle items their own non-zero weight would multiply-count it in a
-  combination card's total payload calculation.
-- `auto_combination: true` on the parent tells the **guided setup wizard** (`static/js/first_run.js`) to
-  create every bundle item alongside the telescope and link them all into one auto-created combination —
-  this is what makes "every time the wizard creates equipment, a combination is created" true even for a
-  single-preset pick. When a bundling preset is selected, the wizard's separate camera picker is hidden
-  (a combination can only have one imaging camera, and the bundle already supplies it).
-- Bundle items are never independently selectable elsewhere (no separate preset dropdown entry) — they only
-  ever get created as part of their parent telescope's wizard flow.
-
----
-
-## Equipment combinations
-
-A **combination** is a named configuration that groups a telescope, camera, mount, filters, and accessories. It is the unit used by:
-
-- The **FOV Calculator** (computes field of view for that telescope + camera pair)
-- **SkyTonight** ("Best Equipment For This Target" rates all your enabled and valid combinations)
-- **Astrodex** picture metadata (which setup was used for an image session)
-- **Plan My Night** combination selector (see [PLAN_MY_NIGHT.md](PLAN_MY_NIGHT.md))
-
-At least one of **telescope** or **camera** is required; both are single-value fields (max one telescope,
-max one imaging camera per combination). Two additional fields cover setups the base telescope+camera model
-doesn't:
-
-| Field | Description |
-|-------|-------------|
-| `guide_camera_id` | Optional second camera used purely for guiding (OAG or guide scope). Informational only — never factored into FOV or scoring math, since a guide camera never determines framing. |
-| `lens_focal_length_mm` / `lens_focal_ratio` | Optional focal length/ratio of a lens mounted directly on the camera, used **only** when no telescope is selected (e.g. a DSLR/mirrorless camera + lens on a star tracker for wide-field imaging). Lets a camera-only combination still be scored like a telescope+camera one. |
-
-A combination is flagged **Shared** only when **every component** in it is individually shared. If one component is later made private, the combination shows a ⚠ warning.
-
-### Photo badges
-
-Each combination card carries two badges sourced from Astrodex:
-
-- **Photo count** — number of Astrodex pictures linking to this combination. Click it to open the same
-  slideshow used elsewhere in Astrodex, showing every one of those pictures.
-- **Average rating** — mean of the 0-5 star ratings across those pictures (unrated pictures don't count
-  toward the average, though they do count toward the photo count).
-
-Both respect the same visibility as the rest of Astrodex: with `config['astrodex']['private']` off
-(default), they aggregate every visible user's pictures for that combination; with it on, only your own.
-
-### Deletion
-
-A combination can't be deleted while it's still referenced by any Astrodex picture (any user), pinned to
-any Plan My Night plan (any user), or referenced by any Observation Log session (any user) - the
-delete-guard mirrors the one on individual equipment items above. This is checked in addition to the
-component-level guard: deleting the *equipment inside* a combination is blocked separately (see
-[Disabling equipment](#disabling-equipment)) while deleting the *combination itself* is blocked by its
-pictures, plans or sessions (see [OBSERVATION_LOG.md](OBSERVATION_LOG.md#deletion-and-reference-counting)).
-
----
-
-## Field of View calculator
-
-**Sub-tab**: Equipment → FOV
-
-**Endpoint**: `POST /api/equipment/fov-calculator`
-
-### Formulas
-
-#### Image scale (arcsec/pixel)
-
-$$\text{image scale} = \frac{206.265 \times \text{pixel size}\ [\mu m]}{\text{focal length}\ [mm]} \quad [\text{arcsec/px}]$$
-
-The constant 206 265 arcsec ≈ 1 radian.
-
-#### Field of view (degrees)
-
-$$\text{FOV}_\text{h} = \frac{57.3 \times \text{sensor width}\ [mm]}{\text{focal length}\ [mm]}$$
-
-$$\text{FOV}_\text{v} = \frac{57.3 \times \text{sensor height}\ [mm]}{\text{focal length}\ [mm]}$$
-
-$$\text{FOV}_\text{diag} = \frac{57.3 \times \sqrt{\text{width}^2 + \text{height}^2}}{\text{focal length}}$$
-
-The constant 57.3° ≈ 1 radian (small-angle approximation valid for typical FOV values).
-
-#### Sampling classification (Nyquist criterion)
-
-The optimal sampling range is **2–3 pixels per FWHM** of the seeing disk:
-
-$$\text{optimal min} = \frac{\text{seeing}}{3}\quad[\text{arcsec/px}]$$
-$$\text{optimal max} = \frac{\text{seeing}}{2}\quad[\text{arcsec/px}]$$
-
-| Result | Condition |
-|--------|-----------|
-| **Optimal** | `optimal_min ≤ image_scale ≤ optimal_max` |
-| **Undersampled** | `image_scale > optimal_max` — fewer than 2 px per FWHM; detail is lost |
-| **Oversampled** | `image_scale < optimal_min` — more than 3 px per FWHM; SNR per pixel is low |
-
-Default seeing used for the classification: **2.0 arcsec** (typical suburban sky). You can override this in the calculator UI.
-
----
-
-## Equipment sharing
-
-Any telescope, camera, mount, filter, or accessory can be marked **"Share with all users"** in its edit form. Shared items are immediately visible to every user on the instance:
-
-- Shared items appear under a *"Shared by Others"* section labelled with the owner's name.
-- Non-owners can **read** but not edit or delete.
-- Your own shared items show a **Shared** badge.
-
-Shared equipment flows through the whole app:
-
-| Feature | Effect |
-|---------|--------|
-| FOV Calculator | Shared telescopes & cameras appear in dropdowns |
-| SkyTonight — Combination recommendations | Recommendations include shared combinations (own listed first) |
-| Astrodex — Add Picture | Shared combinations and filters available in selectors |
-| Plan My Night | Shared combinations appear in the combination selector |
-| Exposure Calculator | Shared cameras appear in the camera selector |
-
----
-
-## SkyTonight integration
-
-For each DSO, `POST /api/skytonight/combination-recommendations` rates every enabled and valid equipment combination (own + shared) on a 1-5 scale:
-
-1. Resolves each combination's effective optics - a telescope's aperture/focal length/f-ratio, or for a camera-only combination (no telescope), its `lens_focal_length_mm`/`lens_focal_ratio`.
-2. Scores focal length against an ideal range derived from the target's apparent size/type, and aperture against the target's magnitude.
-3. When the combination's camera has sensor dimensions, blends in a real field-of-view match (via the FOV Calculator's formulas) against the target's apparent size, instead of relying on the focal-length heuristic alone.
-
-Disabled or invalid combinations (see [Disabling equipment](#disabling-equipment)) never appear in recommendations. See [SKYTONIGHT.md](SKYTONIGHT.md#equipment-combination-recommendations) for the full scoring model.
 
 ---
 

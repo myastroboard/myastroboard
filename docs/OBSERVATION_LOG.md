@@ -1,25 +1,28 @@
 # Observation Log
 
-The Observation Log (v1.3) is the **Log** step of the `Plan → Observe → Log → Astrodex` loop: a
+The Observation Log (v1.3) is the **Log** step of the `Plan -> Observe -> Log -> Astrodex` loop: a
 private, chronological record of what actually happened on a given night, and what was actually
 captured.
 
 It lives as the 5th sub-tab of the **Astrodex** main tab, next to Astrodex, Plan My Night, Photo Map
 and Catalogue Collection - so the whole loop stays under one navigational roof.
 
+---
+
 ## Table of Contents
 
 1. [Concept](#concept)
-2. [Multi-night sessions](#multi-night-sessions)
-3. [The one-directional Astrodex relationship](#the-one-directional-astrodex-relationship)
-4. [Data model](#data-model)
-5. [Attachments](#attachments)
-6. [Storage and write safety](#storage-and-write-safety)
-7. [API endpoints](#api-endpoints)
-8. [PDF export](#pdf-export)
-9. [Import from Plan](#import-from-plan)
-10. [Deletion and reference counting](#deletion-and-reference-counting)
+2. [Import from Plan](#import-from-plan)
+3. [Multi-night sessions](#multi-night-sessions)
+4. [Attachments](#attachments)
+5. [PDF export](#pdf-export)
+6. [The one-directional Astrodex relationship](#the-one-directional-astrodex-relationship)
+7. [Deletion and reference counting](#deletion-and-reference-counting)
+8. [Data model](#data-model)
+9. [Storage and write safety](#storage-and-write-safety)
+10. [API endpoints](#api-endpoints)
 11. [Out of scope for v1.3](#out-of-scope-for-v13)
+12. [Related documentation](#related-documentation)
 
 ---
 
@@ -50,6 +53,38 @@ view: this is a personal logbook, not a second Astrodex. (The storage mechanics 
 - `read-only` users can view the Observation Log but cannot mutate anything (the two list/detail
   routes are `@login_required`; every mutating route is `@user_required`).
 - A session is only ever visible to its owner - there is no admin-wide view.
+
+---
+
+## Import from Plan
+
+`POST /api/observation-sessions/from-plan`, body `{combination_id, session_id?}`:
+
+1. Loads the plan via `plan_my_night.get_plan_with_timeline()`.
+2. **Both `'current'` and `'previous'` plans are importable.** A plan flips to `'previous'` the
+   moment `night_end` passes - which is exactly when a user sits down to log what they captured.
+   Importing is a read operation from the plan's perspective; only `'none'` (nothing to import) is
+   refused with a 404.
+3. **No target session** (`session_id` omitted): creates a new session, seeding its location and
+   combination from the plan's frozen fields, with one night built from the plan's date and
+   nautical-twilight window.
+4. **Existing target session** (`session_id` given): finds-or-creates the night matching the plan's
+   date within that session (`_find_or_create_night_for_date()`) - reusing an existing night of the
+   same date refreshes its start/end from the plan rather than creating a duplicate, so importing
+   "day 2" of a multi-night trip's plan just adds a second night to the ongoing session. A different
+   date always appends a new night.
+5. Every imported entry is attributed to that night. Re-import is **idempotent** at the entry level
+   too: any plan entry whose id already appears as a `source_plan_entry_id` in the target session is
+   skipped.
+
+`plan_my_night.py` itself is unchanged - this is a new blueprint route only.
+
+In the UI, Plan My Night gains a **"Log this session"** button rendered in its own row (gated only
+on the plan having entries, independent of state - unlike the CSV/PDF export block, which is
+`'current'`-only). The Observation Log list has an equivalent **"Import from Plan"** entry point,
+shown only when at least one importable plan exists. When exactly one session created today already
+came from the same plan, the user is offered a merge into it instead of a second session for the
+same night.
 
 ---
 
@@ -87,6 +122,104 @@ not one per night, so the trip stays grouped and its total integration is one nu
   any reason - and idempotent, so there is no separate migration step to run.
 - **Importing a Plan My Night plan reuses a night of the same date** within the target session rather
   than duplicating it - see [Import from Plan](#import-from-plan).
+
+---
+
+## Attachments
+
+A session can hold generic files - guiding graphs, subframe logs, planning notes exported from
+another tool - separate from the entry -> Astrodex picture link above: an attachment never lives in
+Astrodex, and the actual keeper photo attached through `.../astrodex-picture` never lives here. Two
+independent upload paths into two different places, on purpose.
+
+- **Allowed types**: `jpg`, `jpeg`, `png`, `webp`, `pdf`, `txt`, `doc`, `docx` - extension-only
+  validation via `secure_filename()`, the same allow-list mechanism as Astrodex's own image upload
+  (just a different, wider set of extensions). No MIME sniffing, no size cap - matches Astrodex's own
+  upload route, which has neither either. Image attachments (`jpg`/`jpeg`/`png`/`webp`) are the
+  exception: they must be real images (`400` otherwise) and lose their EXIF/GPS metadata on upload,
+  like Astrodex pictures - see [Privacy & GDPR](PRIVACY.md#photo-metadata).
+- **Storage**: `data/observation_sessions/attachments/` (flat, mirroring `data/astrodex/images/`),
+  filenames regenerated as `{user_id}_{uuid4()}.{ext}`, never the original name. The directory path is
+  computed by `observation_sessions.attachments_dir()` - a function, not a module-level constant, so
+  it re-reads `OBSERVATION_SESSIONS_DIR` on every call and stays correct for test fixtures (and any
+  future runtime reconfiguration) that swap that directory out.
+- **Upload is one combined step** (`POST .../attachments`, multipart), unlike Astrodex's own
+  upload-then-attach split - an attachment only ever belongs to the one session it's uploaded to, so
+  there's no reason to separate "store the file" from "record it."
+- **Download is ownership-checked**, not just login-checked: `GET /api/observation-sessions/
+  attachments/<filename>` verifies the filename appears in one of the *caller's own* sessions before
+  serving it (sessions are never shared, so this is simpler than Astrodex's own private/shared-mode
+  check on `can_user_view_image()`). An unrecognized filename and someone else's real file both get
+  the same 403, so the response never confirms whether a given filename exists. The response's
+  `Content-Disposition` filename is `display_name` (with the real extension re-attached if the custom
+  name omits it) or else `original_name` - never the on-disk `{uuid}.{ext}` storage name, which is what
+  a browser would otherwise suggest since it's the last path segment of the URL.
+- **Renaming** (`PUT /api/observation-sessions/<session_id>/attachments/<attachment_id>`, `{"name":
+  "..."}`) only ever writes `display_name`. It never touches `filename` or `original_name`, so the file
+  on disk and its storage key are untouched - purely a cosmetic label plus the download filename above.
+  An empty/blank name clears `display_name` back to `null`, reverting the UI to `original_name`.
+- **Deleting a session deletes its attachment files too** - unlike the entry -> Astrodex link (a soft
+  reference into a *different* feature's data, deliberately left untouched on delete), an attachment
+  file is owned entirely by its session, so `delete_session()` removes them from disk before removing
+  the session record. A missing file on disk (already cleaned up by other means) doesn't block the
+  deletion - only logged.
+- **Covered by the admin backup ZIP**: `observation_sessions/attachments/` is one of the binary
+  folders of `utils/backup_archive.py`, restored with the sessions themselves.
+
+---
+
+## PDF export
+
+Two routes, both built on the same page-rendering code
+(`backend/observation/observation_sessions.py`'s `_render_session_section()`), styled to match
+Plan My Night's own PDF export (same header/footer bar, palette and A4 layout):
+
+| Method | Path | Produces |
+|---|---|---|
+| `GET` | `/api/observation-sessions/<session_id>/export.pdf` | One session |
+| `GET` | `/api/observation-sessions/export.pdf` | Every own session in an optional date range |
+
+**Per-session PDF** - a button on the session detail view. First page: a common-information card,
+then the logged targets. The card's shape depends on the session:
+
+- **Single night** (still the overwhelmingly common case): unchanged from the original layout - date,
+  location, equipment, start/end time, SQM, seeing, transparency, trip notes, plus a one-line summary
+  (target count, average rating). Targets follow as a flat list.
+- **Multiple nights**: a shorter card with only location, equipment, total integration (across every
+  night) and night count, plus trip notes. Targets are grouped: each night that has at least one
+  logged target gets its own compact sub-header (date, start/end, SQM, seeing, transparency, moon
+  illumination, that night's own notes) immediately before its targets; an entry whose `night_id`
+  doesn't resolve to any of the session's nights falls back to a final "Other" group rather than
+  being silently dropped. Long nights/target lists paginate onto further pages exactly like the
+  single-night list always did, without repeating a night's sub-header on the continuation page.
+
+Every target row shows its attached Astrodex photo when it has one (a neutral "No photo" placeholder
+otherwise) alongside its identity, capture numbers (frames, sub-exposure, integration) and notes -
+this part is unchanged by the multi-night breakdown.
+
+**Global PDF** - a button on the session list, shown only once at least one session exists (nothing
+to configure otherwise). It opens a modal asking for a date range - prefilled with the earliest and
+latest night dates across all of the user's sessions, so the untouched default is "every session" -
+and a sort order (`asc`/oldest-first is the default, `desc` available). The resulting PDF is: a cover
+page (title, date range or "All sessions", generation timestamp, and aggregate stats -
+sessions/targets/integration/average rating), a summary table (one row per session: date **range**
+for a multi-night session or a single date otherwise, location, equipment, target count, integration,
+rating), then every session in the range rendered exactly like the per-session export, in the
+requested order.
+
+Both routes are `@login_required` (read action, no `@user_required` gate) and only ever operate on
+the caller's own sessions. `from_date`/`to_date` match a session when **any** of its nights falls in
+range (inclusive, string comparison against `YYYY-MM-DD`) - a multi-night trip straddling a filter
+boundary still matches, and every one of its nights still renders regardless of which of them
+individually fell inside the window. An empty range means every session. `lang` (or
+`Accept-Language`) selects the PDF's own translated labels, independently of the query's paging.
+
+An entry's photo is resolved by the blueprint layer (`_resolve_entry_image_path()`), never by the
+storage module - `observation/observation_sessions.py` never imports `astrodex` (see its module
+docstring), so the PDF generators receive a pre-built `{entry_id: absolute_file_path}` map instead of
+resolving Astrodex links themselves. A picture whose file has since been deleted, or whose linked
+Astrodex item/picture no longer resolves, degrades to the "No photo" placeholder rather than failing
+the export.
 
 ---
 
@@ -156,6 +289,33 @@ numeric field. Cross-reference Astrodex only for gallery/photo display.
 
 ---
 
+## Deletion and reference counting
+
+| Deleted object | Effect on sessions |
+|---|---|
+| **Equipment combination** | **Blocked** while any session (any user) references it - either as its own `combination_id` or as any entry's per-target override - `delete_combination()` returns `in_use_by_session`, joining the existing `in_use_by_picture` / `in_use_by_plan` guards |
+| **Location preset** | **Never cascaded, never orphan-flagged.** `GET /api/locations/<id>/references` reports the count under `observation_sessions` for information only |
+| **Astrodex item / picture** | Nothing happens to the session. The entry's pointer just stops resolving |
+| **Night** | **Blocked** while it's the session's last remaining night, or while any entry still references it via `night_id` - move or delete those entries first (see [Multi-night sessions](#multi-night-sessions)) |
+| **Session** | Its nights and entries go with it. Any Astrodex item or picture it linked to is left completely untouched |
+
+The location choice is deliberate: a session, like an Astrodex picture, is a **historical record** -
+its frozen `location_name` snapshot stays valid as display-only history. That is different from a
+Plan My Night plan, which is an *active* object that needs a live location to keep computing
+altitude data against, and is therefore cascade-deleted.
+
+The reference scans (`count_sessions_for_combination`, `count_sessions_for_location`) are
+**fail-open**: an unreadable file is skipped rather than aborting the scan, matching
+`count_pictures_for_combination` / `count_plans_for_combination`.
+
+`count_sessions_for_combination` counts a session once whether the match is its own session-level
+`combination_id`, any entry's own per-target `combination_id` override, or both - a single session can
+reference more than one combination across its different targets. An entry's separate
+`combination_used_components` field is unrelated: it's a checklist of which parts of whichever
+combination is *effective* for that entry (its own override, or the session's) were actually used.
+
+---
+
 ## Data model
 
 ### Session object
@@ -186,8 +346,8 @@ the earliest night's date (`session_date_range(session)[0]`) for a single value,
 | `date` | str `YYYY-MM-DD` | Usually in the past (sessions are logged the morning after). **Required** - a night can never be undated, mirroring the pre-v1.3.1 session-level rule this replaced |
 | `start_time` / `end_time` | str (iso8601) \| null | *Actual* observing start/end - distinct from Plan My Night's *planned* `night_start`/`night_end` |
 | `sqm` | float \| null | Measured/estimated sky quality; pre-filled from the location preset's own `sqm` when the night is created, always editable |
-| `seeing` | int 1-8 \| null | Same scale as `astroweather/seeing_forecast_7timer.py`'s `SEEING_SCALE` (1 = best … 8 = worst) |
-| `transparency` | int 1-8 \| null | Same scale as 7Timer's `TRANSPARENCY_SCALE` (1 = worst … 8 = best - inverted vs. seeing, per 7Timer's own convention) |
+| `seeing` | int 1-8 \| null | Same scale as `astroweather/seeing_forecast_7timer.py`'s `SEEING_SCALE` (1 = best ... 8 = worst) |
+| `transparency` | int 1-8 \| null | Same scale as 7Timer's `TRANSPARENCY_SCALE` (1 = worst ... 8 = best - inverted vs. seeing, per 7Timer's own convention) |
 | `moon_illumination_percent` | float 0-100 \| null | **Server-computed**, never client-supplied - see [Multi-night sessions](#multi-night-sessions) |
 | `notes` | str | This night's own notes (weather, mishaps specific to it) |
 | `created_at` / `updated_at` | iso8601 str | |
@@ -234,50 +394,7 @@ set through `link_entry_to_astrodex()` rather than by a client payload.
 | `uploaded_at` | iso8601 str | |
 
 Attachments are **session-level**, not per-night or per-entry - a guiding graph or a subframe log
-belongs to the whole night's session, not one specific target. See [Attachments](#attachments) below.
-
----
-
-## Attachments
-
-A session can hold generic files - guiding graphs, subframe logs, planning notes exported from
-another tool - separate from the entry → Astrodex picture link above: an attachment never lives in
-Astrodex, and the actual keeper photo attached through `.../astrodex-picture` never lives here. Two
-independent upload paths into two different places, on purpose.
-
-- **Allowed types**: `jpg`, `jpeg`, `png`, `webp`, `pdf`, `txt`, `doc`, `docx` - extension-only
-  validation via `secure_filename()`, the same allow-list mechanism as Astrodex's own image upload
-  (just a different, wider set of extensions). No MIME sniffing, no size cap - matches Astrodex's own
-  upload route, which has neither either. Image attachments (`jpg`/`jpeg`/`png`/`webp`) are the
-  exception: they must be real images (`400` otherwise) and lose their EXIF/GPS metadata on upload,
-  like Astrodex pictures - see [Privacy & GDPR](PRIVACY.md#photo-metadata).
-- **Storage**: `data/observation_sessions/attachments/` (flat, mirroring `data/astrodex/images/`),
-  filenames regenerated as `{user_id}_{uuid4()}.{ext}`, never the original name. The directory path is
-  computed by `observation_sessions.attachments_dir()` - a function, not a module-level constant, so
-  it re-reads `OBSERVATION_SESSIONS_DIR` on every call and stays correct for test fixtures (and any
-  future runtime reconfiguration) that swap that directory out.
-- **Upload is one combined step** (`POST .../attachments`, multipart), unlike Astrodex's own
-  upload-then-attach split - an attachment only ever belongs to the one session it's uploaded to, so
-  there's no reason to separate "store the file" from "record it."
-- **Download is ownership-checked**, not just login-checked: `GET /api/observation-sessions/
-  attachments/<filename>` verifies the filename appears in one of the *caller's own* sessions before
-  serving it (sessions are never shared, so this is simpler than Astrodex's own private/shared-mode
-  check on `can_user_view_image()`). An unrecognized filename and someone else's real file both get
-  the same 403, so the response never confirms whether a given filename exists. The response's
-  `Content-Disposition` filename is `display_name` (with the real extension re-attached if the custom
-  name omits it) or else `original_name` - never the on-disk `{uuid}.{ext}` storage name, which is what
-  a browser would otherwise suggest since it's the last path segment of the URL.
-- **Renaming** (`PUT /api/observation-sessions/<session_id>/attachments/<attachment_id>`, `{"name":
-  "..."}`) only ever writes `display_name`. It never touches `filename` or `original_name`, so the file
-  on disk and its storage key are untouched - purely a cosmetic label plus the download filename above.
-  An empty/blank name clears `display_name` back to `null`, reverting the UI to `original_name`.
-- **Deleting a session deletes its attachment files too** - unlike the entry → Astrodex link (a soft
-  reference into a *different* feature's data, deliberately left untouched on delete), an attachment
-  file is owned entirely by its session, so `delete_session()` removes them from disk before removing
-  the session record. A missing file on disk (already cleaned up by other means) doesn't block the
-  deletion - only logged.
-- **Covered by the admin backup ZIP**: `observation_sessions/attachments/` is one of the binary
-  folders of `utils/backup_archive.py`, restored with the sessions themselves.
+belongs to the whole night's session, not one specific target. See [Attachments](#attachments).
 
 ---
 
@@ -334,120 +451,6 @@ on failure.
 `{total_sessions, total_entries, total_integration_minutes, average_rating}` (`average_rating` is
 `None` until at least one entry has been rated). Full analytics is v1.5 Session Analytics' job, not
 this feature's.
-
----
-
-## PDF export
-
-Two routes, both built on the same page-rendering code
-(`backend/observation/observation_sessions.py`'s `_render_session_section()`), styled to match
-Plan My Night's own PDF export (same header/footer bar, palette and A4 layout):
-
-| Method | Path | Produces |
-|---|---|---|
-| `GET` | `/api/observation-sessions/<session_id>/export.pdf` | One session |
-| `GET` | `/api/observation-sessions/export.pdf` | Every own session in an optional date range |
-
-**Per-session PDF** — a button on the session detail view. First page: a common-information card,
-then the logged targets. The card's shape depends on the session:
-
-- **Single night** (still the overwhelmingly common case): unchanged from the original layout - date,
-  location, equipment, start/end time, SQM, seeing, transparency, trip notes, plus a one-line summary
-  (target count, average rating). Targets follow as a flat list.
-- **Multiple nights**: a shorter card with only location, equipment, total integration (across every
-  night) and night count, plus trip notes. Targets are grouped: each night that has at least one
-  logged target gets its own compact sub-header (date, start/end, SQM, seeing, transparency, moon
-  illumination, that night's own notes) immediately before its targets; an entry whose `night_id`
-  doesn't resolve to any of the session's nights falls back to a final "Other" group rather than
-  being silently dropped. Long nights/target lists paginate onto further pages exactly like the
-  single-night list always did, without repeating a night's sub-header on the continuation page.
-
-Every target row shows its attached Astrodex photo when it has one (a neutral "No photo" placeholder
-otherwise) alongside its identity, capture numbers (frames, sub-exposure, integration) and notes -
-this part is unchanged by the multi-night breakdown.
-
-**Global PDF** — a button on the session list, shown only once at least one session exists (nothing
-to configure otherwise). It opens a modal asking for a date range - prefilled with the earliest and
-latest night dates across all of the user's sessions, so the untouched default is "every session" -
-and a sort order (`asc`/oldest-first is the default, `desc` available). The resulting PDF is: a cover
-page (title, date range or "All sessions", generation timestamp, and aggregate stats -
-sessions/targets/integration/average rating), a summary table (one row per session: date **range**
-for a multi-night session or a single date otherwise, location, equipment, target count, integration,
-rating), then every session in the range rendered exactly like the per-session export, in the
-requested order.
-
-Both routes are `@login_required` (read action, no `@user_required` gate) and only ever operate on
-the caller's own sessions. `from_date`/`to_date` match a session when **any** of its nights falls in
-range (inclusive, string comparison against `YYYY-MM-DD`) - a multi-night trip straddling a filter
-boundary still matches, and every one of its nights still renders regardless of which of them
-individually fell inside the window. An empty range means every session. `lang` (or
-`Accept-Language`) selects the PDF's own translated labels, independently of the query's paging.
-
-An entry's photo is resolved by the blueprint layer (`_resolve_entry_image_path()`), never by the
-storage module - `observation/observation_sessions.py` never imports `astrodex` (see its module
-docstring), so the PDF generators receive a pre-built `{entry_id: absolute_file_path}` map instead of
-resolving Astrodex links themselves. A picture whose file has since been deleted, or whose linked
-Astrodex item/picture no longer resolves, degrades to the "No photo" placeholder rather than failing
-the export.
-
----
-
-## Import from Plan
-
-`POST /api/observation-sessions/from-plan`, body `{combination_id, session_id?}`:
-
-1. Loads the plan via `plan_my_night.get_plan_with_timeline()`.
-2. **Both `'current'` and `'previous'` plans are importable.** A plan flips to `'previous'` the
-   moment `night_end` passes - which is exactly when a user sits down to log what they captured.
-   Importing is a read operation from the plan's perspective; only `'none'` (nothing to import) is
-   refused with a 404.
-3. **No target session** (`session_id` omitted): creates a new session, seeding its location and
-   combination from the plan's frozen fields, with one night built from the plan's date and
-   nautical-twilight window.
-4. **Existing target session** (`session_id` given): finds-or-creates the night matching the plan's
-   date within that session (`_find_or_create_night_for_date()`) - reusing an existing night of the
-   same date refreshes its start/end from the plan rather than creating a duplicate, so importing
-   "day 2" of a multi-night trip's plan just adds a second night to the ongoing session. A different
-   date always appends a new night.
-5. Every imported entry is attributed to that night. Re-import is **idempotent** at the entry level
-   too: any plan entry whose id already appears as a `source_plan_entry_id` in the target session is
-   skipped.
-
-`plan_my_night.py` itself is unchanged - this is a new blueprint route only.
-
-In the UI, Plan My Night gains a **"Log this session"** button rendered in its own row (gated only
-on the plan having entries, independent of state - unlike the CSV/PDF export block, which is
-`'current'`-only). The Observation Log list has an equivalent **"Import from Plan"** entry point,
-shown only when at least one importable plan exists. When exactly one session created today already
-came from the same plan, the user is offered a merge into it instead of a second session for the
-same night.
-
----
-
-## Deletion and reference counting
-
-| Deleted object | Effect on sessions |
-|---|---|
-| **Equipment combination** | **Blocked** while any session (any user) references it - either as its own `combination_id` or as any entry's per-target override - `delete_combination()` returns `in_use_by_session`, joining the existing `in_use_by_picture` / `in_use_by_plan` guards |
-| **Location preset** | **Never cascaded, never orphan-flagged.** `GET /api/locations/<id>/references` reports the count under `observation_sessions` for information only |
-| **Astrodex item / picture** | Nothing happens to the session. The entry's pointer just stops resolving |
-| **Night** | **Blocked** while it's the session's last remaining night, or while any entry still references it via `night_id` - move or delete those entries first (see [Multi-night sessions](#multi-night-sessions)) |
-| **Session** | Its nights and entries go with it. Any Astrodex item or picture it linked to is left completely untouched |
-
-The location choice is deliberate: a session, like an Astrodex picture, is a **historical record** -
-its frozen `location_name` snapshot stays valid as display-only history. That is different from a
-Plan My Night plan, which is an *active* object that needs a live location to keep computing
-altitude data against, and is therefore cascade-deleted.
-
-The reference scans (`count_sessions_for_combination`, `count_sessions_for_location`) are
-**fail-open**: an unreadable file is skipped rather than aborting the scan, matching
-`count_pictures_for_combination` / `count_plans_for_combination`.
-
-`count_sessions_for_combination` counts a session once whether the match is its own session-level
-`combination_id`, any entry's own per-target `combination_id` override, or both - a single session can
-reference more than one combination across its different targets. An entry's separate
-`combination_used_components` field is unrelated: it's a checklist of which parts of whichever
-combination is *effective* for that entry (its own override, or the session's) were actually used.
 
 ---
 

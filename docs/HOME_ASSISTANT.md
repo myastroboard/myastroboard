@@ -36,7 +36,7 @@ integration below works the same whichever way MyAstroBoard is installed (broker
 1. **Broker.** Create a user for MyAstroBoard on the broker (Mosquitto add-on: Settings ->
    Add-ons -> Mosquitto -> Configuration, or a Home Assistant user - the add-on accepts those).
    Note the broker's IP address and port (1883, or 8883 for TLS).
-2. **MQTT connection.** Parameters -> Configuration -> *MQTT connections* -> **Add a connection**
+2. **MQTT connection.** App settings -> Configuration -> *MQTT connections* -> **Add a connection**
    (see [MQTT connections](#mqtt-connections)):
    - *Display name*: any name, shown in the connector's picker.
    - *Broker URL*: `mqtt://192.168.1.10:1883` (or `mqtts://host:8883` for TLS). Use the IP
@@ -45,7 +45,7 @@ integration below works the same whichever way MyAstroBoard is installed (broker
    - Press the **test** button (wifi icon): it opens one real connection to the broker with the
      settings as typed and reports *Reachable* or the reason it is not (refused, timeout, not
      authorized, TLS...). **Save**.
-3. **Connector.** Parameters -> Connectors -> **MQTT / Home Assistant** -> Configure:
+3. **Connector.** App settings -> Connectors -> **MQTT / Home Assistant** -> Configure:
    - *MQTT connection*: pick the connection created above (the wifi button tests it).
    - Tick the modules you want (see [Modules](#modules)), switch **Enable connector** on, **Save**.
 4. **Home Assistant.** Settings -> Devices & services -> MQTT: within a minute a **MyAstroBoard**
@@ -58,7 +58,7 @@ Nothing has to be added to `configuration.yaml`.
 
 Location and board data are install-level and published as soon as the connector is on. A
 **user's** data (Astrodex, plan, observation log, pictures) is private, so it is published only
-when that user asks for it: Parameters -> Customize -> *Publish my activity to Home Assistant
+when that user asks for it: My settings -> Customize -> *Publish my activity to Home Assistant
 (MQTT)*. The switch only shows once an admin has enabled the connector, and it only ever covers
 the user's own data - an admin cannot publish another user's activity. The admin-side
 *User activity* and *Latest Astrodex picture* modules must be on as well.
@@ -92,7 +92,7 @@ the entities you do not need from the device page in Home Assistant.
 
 ### MQTT connections
 
-A broker is declared once, in Parameters -> Configuration -> *MQTT connections*, and each MQTT
+A broker is declared once, in App settings -> Configuration -> *MQTT connections*, and each MQTT
 connector picks one. Several connectors can share a connection: each one opens its own client,
 which is why two connectors on one connection cannot be saved with the same client ID (a broker
 keeps one session per client ID and would disconnect them in turn).
@@ -138,27 +138,69 @@ the recorder as orphans. Home Assistant lists them under Developer tools -> Stat
 
 ---
 
-## Topics
+## Automation ideas
 
-`<base>` is the base topic (`myastroboard` by default), `<prefix>` the discovery prefix.
+```yaml
+# Red observatory light at astronomical dusk
+trigger:
+  - platform: state
+    entity_id: sensor.myastroboard_backyard_sky_period
+    to: astronomical_night
+action:
+  - service: light.turn_on
+    target: { entity_id: light.observatory }
+    data: { rgb_color: [255, 0, 0], brightness: 40 }
 
-| Topic | Payload | Retained |
+# Tonight looks good
+trigger:
+  - platform: numeric_state
+    entity_id: sensor.myastroboard_backyard_observation_score
+    above: 7
+condition:
+  - condition: state
+    entity_id: binary_sensor.myastroboard_backyard_astronomical_night
+    state: "on"
+action:
+  - service: notify.mobile_app_phone
+    data:
+      message: "Night score {{ states('sensor.myastroboard_backyard_observation_score') }} - top target {{ states('sensor.myastroboard_backyard_top_target_tonight') }}"
+```
+
+---
+
+## Privacy and security
+
+- Outbound only. No command topic exists; nothing Home Assistant publishes is acted upon.
+- The password lives in the connector secrets store, never in the configuration, backups, the
+  config export or any API response (the connection list only sees a mask).
+- The connection test never pairs the stored password with a URL that differs from the saved
+  one, and the MQTT and MQTT connection routes are admin-only.
+- `mqtts://` gives TLS; *Accept self-signed certificates* is meant for a LAN broker with its own
+  CA, nothing else.
+- A user's data is published only while that user's own switch is on. Location devices carry the
+  preset name and timezone, not its coordinates; pictures are published without location data.
+
+---
+
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
 |---|---|---|
-| `<base>/status` | `online` / `offline` (last will) - the availability of every entity | yes |
-| `<base>/board/state` | JSON, board diagnostics | yes |
-| `<base>/location/<location_id>/state` | JSON, one object with every enabled location module's keys | yes |
-| `<base>/user/<user_id>/state` | JSON, user activity keys | yes |
-| `<base>/user/<user_id>/astrodex/latest_image` | raw JPEG (max 1280 px, max 1 MB) | yes |
-| `<prefix>/device/<base>_board/config` | device discovery message | yes |
-| `<prefix>/device/<base>_loc_<location_id>/config` | device discovery message | yes |
-| `<prefix>/device/<base>_user_<user_id>/config` | device discovery message | yes |
+| Test says *connection refused* | wrong IP / port, or the broker only listens on localhost | use the LAN IP, check the broker's listener (`0.0.0.0:1883`) |
+| Test says *not authorized* | wrong user / password, or the broker requires one | create a broker user, re-enter the password |
+| Test says *TLS handshake failed* | self-signed certificate | `mqtts://` + *Accept self-signed certificates*, or use `mqtt://` on the LAN |
+| Status shows *Connected* but no device in Home Assistant | discovery off, or the discovery prefix differs from the MQTT integration's | tick *Home Assistant MQTT Discovery*, align the prefix (`homeassistant` by default) |
+| Devices are *unavailable* | the connector is off or the container is down | enable the connector / check the card's status line and `data/myastroboard.log` |
+| No user device | the user has not opted in, or the *User activity* module is off | My settings -> Customize -> *Publish my activity...*; module on |
+| No picture entity | *Latest Astrodex picture* module off, no picture yet, or the picture exceeds 1 MB even at 640 px | see the log line; the entity appears after the next picture is added |
+| Values show *unknown* | the cache behind them is not warm yet (fresh install, new location) | wait for the cache scheduler's next cycle |
+| Two boards on one broker fight over devices | same base topic | give each board its own base topic |
+| Stale devices after renaming the base topic | old retained topics | *Remove from Home Assistant* before renaming, or delete the topics with `mosquitto_sub`/your broker's tools |
 
-Every timestamp is ISO 8601 with a UTC offset; an unknown value is JSON `null` (the entity
-shows *unknown*). A location device carries `location_id`, `location_name` and `timezone`
-next to the entity keys; a user device carries `user_id` and `username`.
+Log lines are prefixed `MQTT publisher:` in `data/myastroboard.log`.
 
-The MQTT integration's own `homeassistant/status` topic is the connector's only subscription:
-`online` triggers a full republish.
+Tested against Home Assistant 2024.11+ discovery format; re-check the release notes of the Home
+Assistant version you run if entities fail to appear.
 
 ---
 
@@ -309,66 +351,24 @@ Nearest hourly forecast row plus the astro analysis.
 
 ---
 
-## Automation ideas
+## Topics
 
-```yaml
-# Red observatory light at astronomical dusk
-trigger:
-  - platform: state
-    entity_id: sensor.myastroboard_backyard_sky_period
-    to: astronomical_night
-action:
-  - service: light.turn_on
-    target: { entity_id: light.observatory }
-    data: { rgb_color: [255, 0, 0], brightness: 40 }
+`<base>` is the base topic (`myastroboard` by default), `<prefix>` the discovery prefix.
 
-# Tonight looks good
-trigger:
-  - platform: numeric_state
-    entity_id: sensor.myastroboard_backyard_observation_score
-    above: 7
-condition:
-  - condition: state
-    entity_id: binary_sensor.myastroboard_backyard_astronomical_night
-    state: "on"
-action:
-  - service: notify.mobile_app_phone
-    data:
-      message: "Night score {{ states('sensor.myastroboard_backyard_observation_score') }} - top target {{ states('sensor.myastroboard_backyard_top_target_tonight') }}"
-```
-
----
-
-## Privacy and security
-
-- Outbound only. No command topic exists; nothing Home Assistant publishes is acted upon.
-- The password lives in the connector secrets store, never in the configuration, backups, the
-  config export or any API response (the connection list only sees a mask).
-- The connection test never pairs the stored password with a URL that differs from the saved
-  one, and the MQTT and MQTT connection routes are admin-only.
-- `mqtts://` gives TLS; *Accept self-signed certificates* is meant for a LAN broker with its own
-  CA, nothing else.
-- A user's data is published only while that user's own switch is on. Location devices carry the
-  preset name and timezone, not its coordinates; pictures are published without location data.
-
----
-
-## Troubleshooting
-
-| Symptom | Likely cause | Fix |
+| Topic | Payload | Retained |
 |---|---|---|
-| Test says *connection refused* | wrong IP / port, or the broker only listens on localhost | use the LAN IP, check the broker's listener (`0.0.0.0:1883`) |
-| Test says *not authorized* | wrong user / password, or the broker requires one | create a broker user, re-enter the password |
-| Test says *TLS handshake failed* | self-signed certificate | `mqtts://` + *Accept self-signed certificates*, or use `mqtt://` on the LAN |
-| Status shows *Connected* but no device in Home Assistant | discovery off, or the discovery prefix differs from the MQTT integration's | tick *Home Assistant MQTT Discovery*, align the prefix (`homeassistant` by default) |
-| Devices are *unavailable* | the connector is off or the container is down | enable the connector / check the card's status line and `data/myastroboard.log` |
-| No user device | the user has not opted in, or the *User activity* module is off | Parameters -> Customize -> *Publish my activity...*; module on |
-| No picture entity | *Latest Astrodex picture* module off, no picture yet, or the picture exceeds 1 MB even at 640 px | see the log line; the entity appears after the next picture is added |
-| Values show *unknown* | the cache behind them is not warm yet (fresh install, new location) | wait for the cache scheduler's next cycle |
-| Two boards on one broker fight over devices | same base topic | give each board its own base topic |
-| Stale devices after renaming the base topic | old retained topics | *Remove from Home Assistant* before renaming, or delete the topics with `mosquitto_sub`/your broker's tools |
+| `<base>/status` | `online` / `offline` (last will) - the availability of every entity | yes |
+| `<base>/board/state` | JSON, board diagnostics | yes |
+| `<base>/location/<location_id>/state` | JSON, one object with every enabled location module's keys | yes |
+| `<base>/user/<user_id>/state` | JSON, user activity keys | yes |
+| `<base>/user/<user_id>/astrodex/latest_image` | raw JPEG (max 1280 px, max 1 MB) | yes |
+| `<prefix>/device/<base>_board/config` | device discovery message | yes |
+| `<prefix>/device/<base>_loc_<location_id>/config` | device discovery message | yes |
+| `<prefix>/device/<base>_user_<user_id>/config` | device discovery message | yes |
 
-Log lines are prefixed `MQTT publisher:` in `data/myastroboard.log`.
+Every timestamp is ISO 8601 with a UTC offset; an unknown value is JSON `null` (the entity
+shows *unknown*). A location device carries `location_id`, `location_name` and `timezone`
+next to the entity keys; a user device carries `user_id` and `username`.
 
-Tested against Home Assistant 2024.11+ discovery format; re-check the release notes of the Home
-Assistant version you run if entities fail to appear.
+The MQTT integration's own `homeassistant/status` topic is the connector's only subscription:
+`online` triggers a full republish.

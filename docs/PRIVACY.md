@@ -44,7 +44,7 @@ database `myastroboard.db` ([details](DATABASE.md)), pictures and attachments as
 | Observation log attachments | `observation_sessions/attachments/` | |
 | Equipment profiles, Plan My Night plans, wishlist | database, `equipment_*`, `plans`/`plan_entries`, `wishlist_items` | |
 | Application log | `myastroboard.log*` | Contains usernames and client IP addresses (sign-ins, refused access). See [Retention](#retention). |
-| Pre-1.7 data archive | `backups/pre-1.7-*.zip` | Written once by the 1.7 upgrade (every 1.6 data file, secrets included); delete it from *Parameters -> Backup / Restore* once you no longer need to go back to 1.6. Data of accounts deleted later remains in it until then. |
+| Pre-1.7 data archive | `backups/pre-1.7-*.zip` | Written once by the 1.7 upgrade (every 1.6 data file, secrets included); delete it from *App settings -> Backup / Restore* once you no longer need to go back to 1.6. Data of accounts deleted later remains in it until then. |
 
 The browser keeps only the session cookie and a few display settings in `localStorage`
 (language, time format, a photo filter, the last seen app version). None of them is used for tracking.
@@ -77,7 +77,7 @@ private* (see [Astrodex](ASTRODEX.md)).
 ## Cookies
 
 MyAstroBoard sets a single cookie: the Flask **session cookie**, which keeps the user signed in
-(`HttpOnly`, `SameSite=Lax`, `Secure` when enabled in *Parameters -> Advanced*). It lasts until the
+(`HttpOnly`, `SameSite=Lax`, `Secure` when enabled in *App settings -> Configuration*). It lasts until the
 browser closes, or 30 days when *Remember me* is ticked. It is strictly necessary for the service,
 so no consent banner is required (ePrivacy Directive, Art. 5(3)).
 
@@ -127,7 +127,7 @@ Transfers outside the EU: 7Timer (China) receives location coordinates, and the 
 |---|---|
 | Account and all per-user files | The account is deleted (see below). |
 | Locations | An administrator deletes them. |
-| Application log | 90 days by default: older lines are removed once a day (*Parameters -> Logs*, 0 to 3650 days; 0 keeps only the size limit of 10 MB x 6 files). |
+| Application log | 90 days by default: older lines are removed once a day (*App settings -> Logs*, 0 to 3650 days; 0 keeps only the size limit of 10 MB x 6 files). |
 | Backups downloaded from *Configuration* | Under your control, outside the application: they contain everything listed above. |
 
 ---
@@ -136,7 +136,7 @@ Transfers outside the EU: 7Timer (China) receives location coordinates, and the 
 
 | Right | How to fulfil it today |
 |---|---|
-| Access (Art. 15) | *My Settings -> Security -> Your data* downloads a ZIP of everything stored about the user; an administrator can download the same archive for any user from *Parameters -> Users -> Export data*. |
+| Access (Art. 15) | *My settings -> Security -> Your data* downloads a ZIP of everything stored about the user; an administrator can download the same archive for any user from *App settings -> Users -> Export data*. |
 | Rectification (Art. 16) | Users edit their own data; an administrator edits accounts and locations. |
 | Erasure (Art. 17) | An administrator deletes the account in *Users*. This removes the account **and all of its data**: Astrodex and pictures, observation sessions and attachments, equipment, plans and wishlist. Log lines mentioning the user remain until rotation. |
 | Portability (Art. 20) | The same ZIP: account and preferences, locations, Astrodex, observation log, equipment, plans and wishlist as JSON, with pictures and attachments as the original files. Password hashes and two-factor secrets are left out. |
@@ -160,7 +160,7 @@ prefixes of the files in `astrodex/images/` and `observation_sessions/attachment
 - Role-based access (admin / user / read-only) and *local-only* accounts restricted to trusted
   networks ([details](AUTHENTICATION.md)).
 - Private by default towards search engines: `robots.txt` disallows crawling and the login page is
-  `noindex` unless you opt in (*Parameters -> Advanced -> Privacy*).
+  `noindex` unless you opt in (*App settings -> Configuration -> Privacy & search engines*).
 - Connector secrets (MQTT connection passwords included) are stored apart from the configuration,
   with owner-only file permissions, and never appear in exports or API responses.
 - All front-end libraries are served locally: no CDN, font or analytics request leaves the browser
@@ -198,7 +198,7 @@ place names (OpenStreetMap) by your browser. [Add enabled integrations: MQTT, My
 Retention: your data is kept while your account exists and deleted with it. Server logs
 are kept for [90] days.
 
-You can download all your data at any time from My Settings -> Security -> Your data.
+You can download all your data at any time from My settings -> Security -> Your data.
 
 Your rights: access, rectification, erasure, portability, objection. Contact [email].
 You may lodge a complaint with your data protection authority ([e.g. CNIL]).

@@ -14,7 +14,7 @@ On first startup, a single admin account is created automatically:
 |----------|----------|
 | `admin` | `admin` |
 
-**Change the default password immediately** after first login via **My Settings → Security → Change Password**, or via the admin user management panel.
+**Change the default password immediately** after first login via **My settings -> Security -> Change Password**, or via the admin user management panel.
 
 ---
 
@@ -44,77 +44,9 @@ On first startup, a single admin account is created automatically:
 
 ---
 
-## Users storage
-
-All user accounts are stored in the database (`data/myastroboard.db`, `users` table - see [DATABASE.md](DATABASE.md)). Each account holds:
-
-```json
-[
-  {
-    "user_id": "<uuid>",
-    "username": "admin",
-    "password_hash": "<werkzeug bcrypt hash>",
-    "role": "admin",
-    "created_at": "2025-01-01T00:00:00+00:00",
-    "last_login": "2026-06-01T20:00:00+00:00",
-    "preferences": { ... },
-    "push_subscriptions": [ ... ],
-    "account_scope": "global",
-    "totp_secret": null,
-    "totp_enabled": false,
-    "totp_confirmed_at": null
-  }
-]
-```
-
-Passwords are hashed using **Werkzeug's `generate_password_hash`** (PBKDF2-SHA256 by default). Plain-text passwords are never stored.
-
-`account_scope`, `totp_secret`, `totp_enabled` and `totp_confirmed_at` are documented in full under
-[Two-factor authentication](#two-factor-authentication) and
-[Local vs. global accounts](#local-vs-global-accounts) below. Entries written before these fields
-existed load with `account_scope: "global"` and the three 2FA fields falsy - no migration script
-is needed.
-
----
-
-## Sessions
-
-MyAstroBoard uses Flask server-side sessions (cookie-based, signed with a persistent `SECRET_KEY`).
-
-The `SECRET_KEY` is generated once on first startup and stored in the database. It persists across container restarts so existing sessions remain valid; deleting the database invalidates all active sessions.
-
-The session cookie name is `session`. Session expiry follows Flask defaults (browser session unless `SESSION_COOKIE_SECURE` is enabled).
-
-A session is only valid while its account exists. When an admin deletes an account, or a backup restore
-replaces it, the next request from that browser is answered `401` and its session is cleared: the user is
-back on the sign-in page and reads nothing more, install-wide data included.
-
----
-
-## User preferences
-
-Each user has a `preferences` object stored on their account. These are saved via `PUT /api/auth/preferences`.
-
-| Preference | Allowed values | Default | Description |
-|------------|---------------|---------|-------------|
-| `startup_main_tab` | `forecast-astro`, `forecast-weather`, `skytonight`, `spaceflight`, `astrodex`, `equipment`, `my-settings`, `parameters` | `forecast-astro` | Which tab opens on login |
-| `startup_subtab` | (list of valid sub-tab IDs) | `astro-weather` | Which sub-tab opens on login |
-| `time_format` | `auto`, `12h`, `24h` | `auto` | Time display format (`auto` follows browser locale) |
-| `density` | `comfortable`, `compact` | `comfortable` | UI row density |
-| `theme_mode` | `auto`, `light`, `dark`, `red` | `auto` | Colour theme (`auto` follows OS preference) |
-| `first_day_of_week` | `monday`, `sunday` | `monday` | Calendar and date picker start day |
-| `language` | `en`, `fr`, plus community translations | `en` | Interface language |
-| `experience_level` | `beginner`, `intermediate`, `advanced` | `advanced` | Filters SkyTonight recommendations and the Beginner Catalog by difficulty (see [BEGINNER_EXPERIENCE.md](BEGINNER_EXPERIENCE.md)) |
-| `beginner_catalog_enabled` | boolean | `true` | Shows/hides the "Beginner" SkyTonight sub-tab |
-| `wizard` | Object (`completed`, `skipped` booleans) | both `false` | Guided setup wizard completion state (see [BEGINNER_EXPERIENCE.md](BEGINNER_EXPERIENCE.md)) |
-| `notifications` | Object (see [NOTIFICATIONS.md](NOTIFICATIONS.md)) | enabled, defaults per trigger | Push and in-browser notification settings; includes `disabled_location_ids` per-location mutes (v1.2) |
-| `location` | Object (see [LOCATIONS.md](LOCATIONS.md)) | empty attribution, install default | v1.2 multi-location block: `attributed_location_ids` (admin-set), `default_location_id` (user's "what I see when I connect"), `active_location_id` (session-scoped, reset to default at login), `order` |
-
----
-
 ## User management (admin)
 
-The **Parameters → Users** panel (admin only) allows:
+The **App settings -> Users** panel (admin only) allows:
 
 - **Create user**: username, password, role, and optionally the account scope (see
   [Local vs. global accounts](#local-vs-global-accounts)).
@@ -123,7 +55,7 @@ The **Parameters → Users** panel (admin only) allows:
   and either spelling signs in.
 - **Delete user**: removes the account **and every per-user file** (Astrodex and pictures, observation
   sessions and attachments, equipment, plans, wishlist) - see [Privacy & GDPR](PRIVACY.md).
-- **Export data**: downloads the same personal-data ZIP the user gets from *My Settings → Security →
+- **Export data**: downloads the same personal-data ZIP the user gets from *My settings -> Security ->
   Your data*, to answer an access or portability request.
 - **Reset 2FA**: shown only when the user has two-factor authentication active. Clears it
   unconditionally, no password check - see
@@ -142,112 +74,6 @@ The **Parameters → Users** panel (admin only) allows:
 
 ---
 
-## Authentication API
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| `POST` | `/api/auth/login` | Public | Submit `{"username": ..., "password": ...}` → sets session cookie, or returns `{"status": "2fa_required"}` when a second step is needed (see [Two-factor authentication](#two-factor-authentication)), `403` when a local-scoped account signs in from an untrusted network or, on a [demo instance](DEMO_MODE.md), for the demo account and any account on the default password, or `429` after too many failures (see [Security notes](#security-notes)) |
-| `POST` | `/api/auth/login/verify-2fa` | pending session | Second login step: submit `{"code": "123456"}` to complete a login that returned `2fa_required` |
-| `POST` | `/api/auth/logout` | login | Clears session |
-| `GET` | `/api/auth/status` | Public | Returns `{"authenticated": bool, "role": ..., "username": ..., "two_factor_available": bool, "totp_enabled": bool, "account_scope": ..., "demo_mode": bool}` (`demo_mode` is true for a visitor of a [demo instance](DEMO_MODE.md)) |
-| `POST` | `/api/auth/change-password` | login | Change own password |
-| `GET` | `/api/users/me/export` | login | ZIP of everything stored about the signed-in user (any role) |
-| `GET` | `/api/auth/preferences` | login | Get current user's preferences |
-| `PUT` | `/api/auth/preferences` | login | Update preferences (partial update supported). On a [demo instance](DEMO_MODE.md) the demo account's changes go to the visitor's session, not the account |
-| `POST` | `/api/auth/2fa/setup` | login | Generate this user's TOTP secret, returns `{"secret": ..., "otpauth_uri": ...}`; `400` if 2FA is already active for this user (disable it first) |
-| `POST` | `/api/auth/2fa/confirm` | login | Submit `{"code": "123456"}` to activate 2FA after setup |
-| `POST` | `/api/auth/2fa/disable` | login | Submit `{"password": ...}` to turn 2FA off (self-service, re-authenticates) |
-| `GET` | `/api/auth/security-settings` | admin | Read the trusted-network list and the instance-wide 2FA switch |
-| `POST` | `/api/auth/security-settings` | admin | Save the trusted-network list and the instance-wide 2FA switch (validation rules below) |
-
----
-
-## Advanced settings (admin)
-
-Stored in the database (setting `app_settings`) via `backend/utils/app_settings.py`:
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `vapid_contact_email` | `""` | Contact email embedded in Web Push VAPID tokens (required for iOS push; see [NOTIFICATIONS.md](NOTIFICATIONS.md)) |
-| `trust_proxy_headers` | `false` | Set `true` when behind a reverse proxy sending `X-Forwarded-For` / `X-Forwarded-Proto` headers (see [6.REVERSE_PROXY.md](6.REVERSE_PROXY.md)) |
-| `session_cookie_secure` | `false` | Set `true` to restrict the session cookie to HTTPS connections only (recommended when using HTTPS) |
-| `search_engine_indexing` | `false` | Set `true` to let search engines crawl and index the login page. Instances are private by default (`/robots.txt` disallows everything, login page is `noindex, nofollow`) |
-
-These are managed in **Parameters → Advanced → Application** in the admin UI, or via `GET/POST /api/admin/app-settings`.
-
----
-
-## Trusted networks
-
-**Module**: `backend/utils/security_settings.py` · **Stored as**: database setting `security_settings`
-
-Trusted networks are the shared foundation for both two-factor authentication and local/global
-accounts below: an admin-managed list of CIDR blocks or bare IP addresses, matched against the
-client IP of each login attempt. Two independent features read the same list for opposite
-purposes - two-factor authentication trusts the network to **skip** a step, local/global accounts
-trust it to **allow** a step - but they are otherwise unrelated checks.
-
-```json
-{
-  "trusted_networks": ["192.168.1.0/24"],
-  "two_factor_enabled": false
-}
-```
-
-- Each entry is normalized with Python's `ipaddress.ip_network(value, strict=False)`, so
-  `192.168.1.5/24` and `192.168.1.0/24` are stored as the same, single entry. Both IPv4 and IPv6
-  are supported.
-- `127.0.0.0/8` and `::1/128` are **always** implicitly trusted. They are hardcoded and never
-  written to the file, so clearing the configured list can never lock an admin out of localhost
-  access.
-- The client IP is `request.remote_addr`, which already resolves the real client IP behind a
-  reverse proxy when `trust_proxy_headers` is enabled (see [Advanced settings](#advanced-settings-admin) above) - no separate configuration is needed for trusted networks to work correctly behind a proxy.
-- **Docker Desktop / plain `docker-compose` without a reverse proxy**: when the browser reaches
-  the container through Docker's own port mapping (`ports: - "5000:5000"`) rather than through a
-  reverse proxy, `request.remote_addr` is the Docker bridge gateway (typically `172.17.0.1` or
-  `172.18.0.1`, one fixed address for every host and every LAN client alike), not the browser's
-  real address - Docker rewrites the packet's source before it reaches the container, and there
-  is no `X-Forwarded-For` header at that point for `trust_proxy_headers` to read. Trusted
-  networks, the 2FA bypass and local-scope logins will not recognize `127.0.0.1` or a LAN CIDR in
-  this setup. Confirm the address your instance actually sees for a given login attempt in
-  `data/myastroboard.log` (`"Password accepted for user ... from <ip>, awaiting 2FA code"`), or
-  `docker network inspect <compose_project>_default` for the bridge subnet. Adding that one
-  address as a trusted network unblocks testing, but note it then trusts **every** connection
-  reaching the mapped port, not just localhost - the real fix for a LAN or public deployment is a
-  reverse proxy in front (nginx/Traefik) with `trust_proxy_headers = true`, per
-  [6.REVERSE_PROXY.md](6.REVERSE_PROXY.md).
-- **Not included in backups**: the security settings are excluded from both
-  `/api/backup/download` and `/api/config/export`, for the same reason as `trust_proxy_headers` -
-  see [docs/CONFIGURATION.md](CONFIGURATION.md#backup-and-restore).
-
-Managed in **Parameters → Users**, in the "Trusted networks and two-factor authentication" panel
-(admin only), or via `GET/POST /api/auth/security-settings`.
-
-### Validation rules (enforced server-side, in `POST /api/auth/security-settings`)
-
-1. Each entry must parse as a valid IP network. The whole save is rejected with `400` and
-   `error_key: settings.invalid_trusted_network` otherwise, naming the bad entry.
-2. `two_factor_enabled` cannot be set to `true` while the resulting `trusted_networks` list is
-   empty. Rejected with `error_key: settings.2fa_requires_trusted_network`.
-3. If a save removes the last entry from `trusted_networks` while `two_factor_enabled` was
-   previously `true`, it is **silently forced to `false`** as part of the same save (not an
-   error - a documented cascade) and a warning is logged. The admin UI shows a confirmation
-   dialog before this happens when removing the last entry, and again when adding an
-   unusually broad entry (see below).
-4. This invariant (rule 2/3) is also enforced as a defensive backstop directly in
-   `save_security_settings()` itself, not only in the API handler above - no future caller,
-   now or later, can persist the inconsistent pair to disk even if it skips the handler's own
-   checks.
-
-A network broader than a plausible home/office LAN (an IPv4 prefix narrower than `/8`, or an
-IPv6 prefix narrower than `/32`) is still accepted - an admin may have a genuine reason - but
-logs a warning and prompts for confirmation in the admin UI before being added, since it is
-often a typo in the prefix (`/24` losing a digit to become `/2`, for example) rather than an
-intentional choice, and a too-broad entry silently makes every login on that IP version bypass
-2FA and the local-account restriction alike.
-
----
-
 ## Two-factor authentication
 
 Optional TOTP (Time-based One-Time Password) second factor, compatible with any standard
@@ -263,10 +89,10 @@ QR codes are rendered **client-side** from a small vendored JS library
 ### Two levels of control
 
 1. **Instance switch** (security settings, `two_factor_enabled`): an admin turns 2FA on or
-   off for the whole install. Requires at least one trusted network (see above). Managed in
-   **Parameters → Users**.
+   off for the whole install. Requires at least one trusted network (see [Trusted networks](#trusted-networks)). Managed in
+   **App settings -> Users**.
 2. **Per-user opt-in** (account, `totp_enabled`): once the instance switch is on, each user
-   individually enables 2FA for their own account in **My Settings → Security**. A user whose
+   individually enables 2FA for their own account in **My settings -> Security**. A user whose
    account was never opted in is never challenged at login, even with the instance switch on.
 
 ### Trusted-network bypass
@@ -276,9 +102,9 @@ a trusted network (including the always-trusted loopback ranges). This is delibe
 trusted network already establishes who is signing in, so the second factor would be redundant
 from there.
 
-### Setup flow (My Settings → Security)
+### Setup flow (My settings -> Security)
 
-1. **Enable 2FA** → `POST /api/auth/2fa/setup` generates a TOTP secret and persists it
+1. **Enable 2FA** -> `POST /api/auth/2fa/setup` generates a TOTP secret and persists it
    immediately with `totp_enabled: false`. It is **not** held in server memory or the Flask
    session: the container runs `gunicorn -w 2` (two worker processes), so an in-memory pending
    secret would randomly fail confirmation depending on which worker handled it.
@@ -289,11 +115,11 @@ from there.
      the same phone as the browser (QR scanning is then impossible).
    - An `otpauth://` link/button to open directly in an authenticator app - best effort, not every
      app registers the URI scheme as a system handler.
-3. **Confirm** with a 6-digit code → `POST /api/auth/2fa/confirm` verifies it against the
+3. **Confirm** with a 6-digit code -> `POST /api/auth/2fa/confirm` verifies it against the
    just-generated secret (`pyotp.TOTP(secret).verify(code, valid_window=1)`, tolerating +/-30
    seconds of clock drift) and sets `totp_enabled: true`, `totp_confirmed_at` to the current
    timestamp.
-4. **Disable** (self-service) → `POST /api/auth/2fa/disable` requires the current password
+4. **Disable** (self-service) -> `POST /api/auth/2fa/disable` requires the current password
    (re-authentication) and clears `totp_secret`, `totp_enabled`, `totp_confirmed_at`.
 
 ### Login flow
@@ -323,7 +149,7 @@ local/global account check:
 
 ### Admin: forced disable
 
-An admin can clear any user's 2FA from **Parameters → Users** (shown only when that user has it
+An admin can clear any user's 2FA from **App settings -> Users** (shown only when that user has it
 active), via `DELETE /api/users/<user_id>/2fa`. No password check - admin authority is the check.
 Intended for a lost or reset authenticator device.
 
@@ -343,6 +169,77 @@ same way.
 
 ---
 
+## Trusted networks
+
+**Module**: `backend/utils/security_settings.py` · **Stored as**: database setting `security_settings`
+
+Trusted networks are the shared foundation for both two-factor authentication and local/global
+accounts below: an admin-managed list of CIDR blocks or bare IP addresses, matched against the
+client IP of each login attempt. Two independent features read the same list for opposite
+purposes - two-factor authentication trusts the network to **skip** a step, local/global accounts
+trust it to **allow** a step - but they are otherwise unrelated checks.
+
+```json
+{
+  "trusted_networks": ["192.168.1.0/24"],
+  "two_factor_enabled": false
+}
+```
+
+- Each entry is normalized with Python's `ipaddress.ip_network(value, strict=False)`, so
+  `192.168.1.5/24` and `192.168.1.0/24` are stored as the same, single entry. Both IPv4 and IPv6
+  are supported.
+- `127.0.0.0/8` and `::1/128` are **always** implicitly trusted. They are hardcoded and never
+  written to the file, so clearing the configured list can never lock an admin out of localhost
+  access.
+- The client IP is `request.remote_addr`, which already resolves the real client IP behind a
+  reverse proxy when `trust_proxy_headers` is enabled (see [Application settings](#application-settings-admin)) - no separate configuration is needed for trusted networks to work correctly behind a proxy.
+- **Docker Desktop / plain `docker-compose` without a reverse proxy**: when the browser reaches
+  the container through Docker's own port mapping (`ports: - "5000:5000"`) rather than through a
+  reverse proxy, `request.remote_addr` is the Docker bridge gateway (typically `172.17.0.1` or
+  `172.18.0.1`, one fixed address for every host and every LAN client alike), not the browser's
+  real address - Docker rewrites the packet's source before it reaches the container, and there
+  is no `X-Forwarded-For` header at that point for `trust_proxy_headers` to read. Trusted
+  networks, the 2FA bypass and local-scope logins will not recognize `127.0.0.1` or a LAN CIDR in
+  this setup. Confirm the address your instance actually sees for a given login attempt in
+  `data/myastroboard.log` (`"Password accepted for user ... from <ip>, awaiting 2FA code"`), or
+  `docker network inspect <compose_project>_default` for the bridge subnet. Adding that one
+  address as a trusted network unblocks testing, but note it then trusts **every** connection
+  reaching the mapped port, not just localhost - the real fix for a LAN or public deployment is a
+  reverse proxy in front (nginx/Traefik) with `trust_proxy_headers = true`, per
+  [6.REVERSE_PROXY.md](6.REVERSE_PROXY.md).
+- **Not included in backups**: the security settings are excluded from both
+  `/api/backup/download` and `/api/config/export`, for the same reason as `trust_proxy_headers` -
+  see [docs/CONFIGURATION.md](CONFIGURATION.md#backup-and-restore).
+
+Managed in **App settings -> Users**, in the "Trusted networks and two-factor authentication" panel
+(admin only), or via `GET/POST /api/auth/security-settings`.
+
+### Validation rules (enforced server-side, in `POST /api/auth/security-settings`)
+
+1. Each entry must parse as a valid IP network. The whole save is rejected with `400` and
+   `error_key: settings.invalid_trusted_network` otherwise, naming the bad entry.
+2. `two_factor_enabled` cannot be set to `true` while the resulting `trusted_networks` list is
+   empty. Rejected with `error_key: settings.2fa_requires_trusted_network`.
+3. If a save removes the last entry from `trusted_networks` while `two_factor_enabled` was
+   previously `true`, it is **silently forced to `false`** as part of the same save (not an
+   error - a documented cascade) and a warning is logged. The admin UI shows a confirmation
+   dialog before this happens when removing the last entry, and again when adding an
+   unusually broad entry (see below).
+4. This invariant (rule 2/3) is also enforced as a defensive backstop directly in
+   `save_security_settings()` itself, not only in the API handler above - no future caller,
+   now or later, can persist the inconsistent pair to disk even if it skips the handler's own
+   checks.
+
+A network broader than a plausible home/office LAN (an IPv4 prefix narrower than `/8`, or an
+IPv6 prefix narrower than `/32`) is still accepted - an admin may have a genuine reason - but
+logs a warning and prompts for confirmation in the admin UI before being added, since it is
+often a typo in the prefix (`/24` losing a digit to become `/2`, for example) rather than an
+intentional choice, and a too-broad entry silently makes every login on that IP version bypass
+2FA and the local-account restriction alike.
+
+---
+
 ## Local vs. global accounts
 
 Each account has an `account_scope` of `global` (default - can sign in from anywhere) or `local`
@@ -350,7 +247,7 @@ Each account has an `account_scope` of `global` (default - can sign in from anyw
 two-factor authentication above, but for the opposite purpose: trusting the network to **allow**
 the login rather than to **skip** a step.
 
-- Managed per user from **Parameters → Users** ("Scope" column and action button), or via
+- Managed per user from **App settings -> Users** ("Scope" column and action button), or via
   `PUT /api/users/<user_id>` with `{"account_scope": "local"}`. `POST /api/users` also accepts
   `account_scope` at creation time.
 - Enforced in `POST /api/auth/login`, after password verification and before the 2FA check: a
@@ -359,8 +256,23 @@ the login rather than to **skip** a step.
 - **Fallback rule**: when `trusted_networks` is empty, the local/global check is **not**
   performed at all - a `local` account can sign in from anywhere in that state. Without any
   configured network, "local" is undefined, and blocking every non-localhost login for every
-  `local` account would be a silent full lockout. **Parameters → Users** shows a warning banner
+  `local` account would be a silent full lockout. **App settings -> Users** shows a warning banner
   when this fallback is active and at least one account is scoped `local`.
+
+---
+
+## Application settings (admin)
+
+Stored in the database (setting `app_settings`) via `backend/utils/app_settings.py`:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `vapid_contact_email` | `""` | Contact email embedded in Web Push VAPID tokens (required for iOS push; see [NOTIFICATIONS.md](NOTIFICATIONS.md)) |
+| `trust_proxy_headers` | `false` | Set `true` when behind a reverse proxy sending `X-Forwarded-For` / `X-Forwarded-Proto` headers (see [6.REVERSE_PROXY.md](6.REVERSE_PROXY.md)) |
+| `session_cookie_secure` | `false` | Set `true` to restrict the session cookie to HTTPS connections only (recommended when using HTTPS) |
+| `search_engine_indexing` | `false` | Set `true` to let search engines crawl and index the login page. Instances are private by default (`/robots.txt` disallows everything, login page is `noindex, nofollow`) |
+
+These are managed in **App settings -> Configuration** in the admin UI, or via `GET/POST /api/admin/app-settings`.
 
 ---
 
@@ -379,3 +291,93 @@ the login rather than to **skip** a step.
 - There is no email-based password reset: an admin must reset passwords via the Users panel.
 - Network and 2FA checks in `POST /api/auth/login` run strictly **after** password verification. Checking them first would let an unauthenticated caller probe account existence or configuration (local scope, 2FA status) without a valid credential.
 - Two-factor secrets live directly on the `User` record, the same record and precedent as `password_hash` (already a sensitive field included in backups) - not in the separate secrets store used for connector credentials, since that pattern exists specifically to keep those out of backups.
+
+---
+
+## Sessions
+
+MyAstroBoard uses Flask server-side sessions (cookie-based, signed with a persistent `SECRET_KEY`).
+
+The `SECRET_KEY` is generated once on first startup and stored in the database. It persists across container restarts so existing sessions remain valid; deleting the database invalidates all active sessions.
+
+The session cookie name is `session`. Session expiry follows Flask defaults (browser session unless `SESSION_COOKIE_SECURE` is enabled).
+
+A session is only valid while its account exists. When an admin deletes an account, or a backup restore
+replaces it, the next request from that browser is answered `401` and its session is cleared: the user is
+back on the sign-in page and reads nothing more, install-wide data included.
+
+---
+
+## User preferences
+
+Each user has a `preferences` object stored on their account. These are saved via `PUT /api/auth/preferences`. The user-facing description of each setting is in [USER_SETTINGS.md](USER_SETTINGS.md).
+
+| Preference | Allowed values | Default | Description |
+|------------|---------------|---------|-------------|
+| `startup_main_tab` | `forecast-astro`, `forecast-weather`, `skytonight`, `spaceflight`, `astrodex`, `equipment`, `my-settings`, `parameters` | `forecast-astro` | Which tab opens on login |
+| `startup_subtab` | (list of valid sub-tab IDs) | `astro-weather` | Which sub-tab opens on login |
+| `time_format` | `auto`, `12h`, `24h` | `auto` | Time display format (`auto` follows browser locale) |
+| `density` | `comfortable`, `compact` | `comfortable` | UI row density |
+| `theme_mode` | `auto`, `light`, `dark`, `red` | `auto` | Colour theme (`auto` follows OS preference) |
+| `first_day_of_week` | `monday`, `sunday` | `monday` | Calendar and date picker start day |
+| `language` | `en`, `fr`, plus community translations | `en` | Interface language |
+| `experience_level` | `beginner`, `intermediate`, `advanced` | `advanced` | Filters SkyTonight recommendations and the Beginner Catalog by difficulty (see [BEGINNER_EXPERIENCE.md](BEGINNER_EXPERIENCE.md)) |
+| `beginner_catalog_enabled` | boolean | `true` | Shows/hides the "Beginner" SkyTonight sub-tab |
+| `recommendations_enabled` | boolean | `true` | Shows the "Tonight for you" panel at the top of SkyTonight -> Deep Sky Objects |
+| `mqtt_publish_enabled` | boolean | `false` | The user's consent to publish their own activity (Astrodex counters, plan, log totals) through the MQTT connector (see [HOME_ASSISTANT.md](HOME_ASSISTANT.md)) |
+| `wizard` | Object (`completed`, `skipped` booleans) | both `false` | Guided setup wizard completion state (see [BEGINNER_EXPERIENCE.md](BEGINNER_EXPERIENCE.md)) |
+| `notifications` | Object (see [NOTIFICATIONS.md](NOTIFICATIONS.md)) | enabled, defaults per trigger | Push and in-browser notification settings; includes `disabled_location_ids` per-location mutes (v1.2) |
+| `location` | Object (see [LOCATIONS.md](LOCATIONS.md)) | empty attribution, install default | v1.2 multi-location block: `attributed_location_ids` (admin-set), `default_location_id` (user's "what I see when I connect"), `active_location_id` (session-scoped, reset to default at login), `order` |
+
+---
+
+## Users storage
+
+All user accounts are stored in the database (`data/myastroboard.db`, `users` table - see [DATABASE.md](DATABASE.md)). Each account holds:
+
+```json
+[
+  {
+    "user_id": "<uuid>",
+    "username": "admin",
+    "password_hash": "<werkzeug scrypt hash>",
+    "role": "admin",
+    "created_at": "2025-01-01T00:00:00+00:00",
+    "last_login": "2026-06-01T20:00:00+00:00",
+    "preferences": { ... },
+    "push_subscriptions": [ ... ],
+    "account_scope": "global",
+    "totp_secret": null,
+    "totp_enabled": false,
+    "totp_confirmed_at": null
+  }
+]
+```
+
+Passwords are hashed using **Werkzeug's `generate_password_hash`** (PBKDF2-SHA256 by default). Plain-text passwords are never stored.
+
+`account_scope`, `totp_secret`, `totp_enabled` and `totp_confirmed_at` are documented in full under
+[Two-factor authentication](#two-factor-authentication) and
+[Local vs. global accounts](#local-vs-global-accounts) above. Entries written before these fields
+existed load with `account_scope: "global"` and the three 2FA fields falsy - no migration script
+is needed.
+
+---
+
+## Authentication API
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/api/auth/login` | Public | Submit `{"username": ..., "password": ...}` -> sets session cookie, or returns `{"status": "2fa_required"}` when a second step is needed (see [Two-factor authentication](#two-factor-authentication)), `403` when a local-scoped account signs in from an untrusted network or, on a [demo instance](DEMO_MODE.md), for the demo account and any account on the default password, or `429` after too many failures (see [Security notes](#security-notes)) |
+| `POST` | `/api/auth/login/verify-2fa` | pending session | Second login step: submit `{"code": "123456"}` to complete a login that returned `2fa_required` |
+| `POST` | `/api/auth/logout` | login | Clears session |
+| `GET` | `/api/auth/status` | Public | Returns `{"authenticated": bool, "role": ..., "username": ..., "two_factor_available": bool, "totp_enabled": bool, "account_scope": ..., "demo_mode": bool}` (`demo_mode` is true for a visitor of a [demo instance](DEMO_MODE.md)) |
+| `POST` | `/api/auth/change-password` | login | Change own password |
+| `GET` | `/api/users/me/export` | login | ZIP of everything stored about the signed-in user (any role) |
+| `GET` | `/api/auth/preferences` | login | Get current user's preferences |
+| `PUT` | `/api/auth/preferences` | login | Update preferences (partial update supported). On a [demo instance](DEMO_MODE.md) the demo account's changes go to the visitor's session, not the account |
+| `POST` | `/api/auth/2fa/setup` | login | Generate this user's TOTP secret, returns `{"secret": ..., "otpauth_uri": ...}`; `400` if 2FA is already active for this user (disable it first) |
+| `POST` | `/api/auth/2fa/confirm` | login | Submit `{"code": "123456"}` to activate 2FA after setup |
+| `POST` | `/api/auth/2fa/disable` | login | Submit `{"password": ...}` to turn 2FA off (self-service, re-authenticates) |
+| `GET` | `/api/auth/security-settings` | admin | Read the trusted-network list and the instance-wide 2FA switch |
+| `POST` | `/api/auth/security-settings` | admin | Save the trusted-network list and the instance-wide 2FA switch (validation rules under [Trusted networks](#trusted-networks)) |

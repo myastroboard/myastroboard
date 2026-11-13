@@ -7,8 +7,8 @@ assumed prior knowledge: no onboarding, no skill-aware guidance, no starter targ
 | Piece | What it does |
 |---|---|
 | [Guided Setup Wizard](#guided-setup-wizard) | Multi-step first-run modal: location, sky quality, equipment, notifications, "tonight" preview |
-| [Difficulty model](#difficulty-model) | A static, per-target 0–100 difficulty score computed alongside AstroScore |
-| ["Tonight for you" recommendations](#tonight-for-you-recommendations) | 3–5 targets matched to the user's skill level, shown at the top of SkyTonight → DSO |
+| [Difficulty model](#difficulty-model) | A static, per-target 0-100 difficulty score computed alongside AstroScore |
+| ["Tonight for you" recommendations](#tonight-for-you-recommendations) | 3-5 targets matched to the user's skill level, shown at the top of SkyTonight -> DSO |
 | [Beginner Catalog](#beginner-catalog) | A curated, hand-picked list of ~30 forgiving starter targets with explanations |
 
 All of it is opt-out, not opt-in: existing users default to `experience_level: advanced`, which
@@ -34,8 +34,8 @@ function _getWizardFlow(config, currentUser) {
 
 | Flow | Who sees it | Steps |
 |---|---|---|
-| `full` (Context A) | Admin, on a fresh install with no location configured yet | Location → Sky quality (Bortle/SQM) → Equipment → Notifications → Tonight |
-| `user` (Context B) | Any other user (location already configured by an admin) | Welcome (read-only site info) → Equipment → Notifications → Tonight |
+| `full` (Context A) | Admin, on a fresh install with no location configured yet | Location -> Sky quality (Bortle/SQM) -> Equipment -> Notifications -> Tonight |
+| `user` (Context B) | Any other user (location already configured by an admin) | Welcome (read-only site info) -> Equipment -> Notifications -> Tonight |
 
 Location and Bortle steps only appear for the admin doing the initial install, since those
 settings are shared/global (see [CONFIGURATION.md](CONFIGURATION.md)) rather than per-user.
@@ -43,7 +43,7 @@ settings are shared/global (see [CONFIGURATION.md](CONFIGURATION.md)) rather tha
 - **Equipment step**: preset picker (`static/data/equipment_presets.json`) or manual entry; also
   lists the user's existing telescopes/cameras (including shared equipment). Saves via the
   existing `POST /api/equipment/telescopes` / cameras endpoints (see [EQUIPMENT.md](EQUIPMENT.md)).
-- **Notifications step**: same triggers as My Settings → Notifications, toggle-only; on the fresh
+- **Notifications step**: same triggers as My settings -> Notifications, toggle-only; on the fresh
   install it also asks for the VAPID contact email (see [NOTIFICATIONS.md](NOTIFICATIONS.md)).
   Skip is always available and never pressured.
 - **Tonight step**: renders the same "Tonight for you" panel described below, then a button to
@@ -58,20 +58,72 @@ A new `wizard` preference tracks completion:
 ```
 
 The wizard shows when both are `false`. Skipping (single step or "skip all") sets `skipped: true`
-and persists via `PUT /api/auth/preferences` — unlike the old popup, the skip is permanent across
+and persists via `PUT /api/auth/preferences` - unlike the old popup, the skip is permanent across
 sessions/devices, not a `sessionStorage` flag. Users can run it again anytime from
-**My Settings → Customize → Redo Setup Wizard**.
+**My settings -> Customize -> Redo Setup Wizard**.
+
+---
+
+## "Tonight for you" recommendations
+
+**Endpoint**: `GET /api/skytonight/recommendations` (`@login_required`) - see
+[API_ENDPOINTS.md](API_ENDPOINTS.md)
+
+A panel injected above the DSO table on the SkyTonight tab. It reads the user's `experience_level`
+preference, filters `dso_results.json` to matching difficulty tiers, sorts by AstroScore
+descending, and returns the top N (default 5, max 10 via `?limit=`):
+
+| `experience_level` | Difficulties shown |
+|---|---|
+| `beginner` | `beginner` only |
+| `intermediate` | `beginner` + `intermediate` |
+| `advanced` (default) | everything |
+
+Each card shows the target name, type badge, difficulty badge, estimated integration time, and an
+"Add to Plan" button. `estimated_integration_hours` comes from the Beginner Catalog when the
+target is one of its ~30 curated entries; otherwise it's a rough estimate derived from the
+difficulty tier (`beginner -> 2h`, `intermediate -> 4h`, `advanced -> 8h`) and flagged as such via
+`estimated_integration_hours_is_estimate`.
+
+The preference is set in **My settings -> Customize** alongside density/theme, and defaults to
+`advanced` so existing users see no behavior change until they opt in.
+
+---
+
+## Beginner Catalog
+
+**Module**: `backend/observation/beginner_catalog.py` · **Data**: `backend/catalogues/beginner_catalog.json`
+(34 hand-picked entries) · **Endpoint**: `GET /api/beginner-catalog` - see
+[API_ENDPOINTS.md](API_ENDPOINTS.md)
+
+A "Beginner" sub-tab on SkyTonight showing a card grid (not a table) of curated, forgiving starter
+targets - bright nebulae, open clusters, and a few landmark galaxies. Each card explains *why*
+the object is beginner-friendly and suggests a framing, plus:
+
+- **Visible tonight** badge, cross-referenced against the current `dso_results.json`
+- **Captured** state, cross-referenced against the user's Astrodex
+- **In plan** state, cross-referenced against Plan My Night
+- Filters: visible-tonight-only toggle, difficulty (capped at the user's own `experience_level`),
+  object type
+
+The catalogue JSON stores only structural data and an `i18n_key` per object - no English text is
+hardcoded in the data file. The `why_beginner` and `suggested_framing` strings are resolved at
+request time via `I18nManager` from `beginner_catalog.objects.<i18n_key>.why` / `.framing` in the
+i18n files, so the whole catalogue is translated in all 6 supported languages.
+
+This tab can be turned off entirely per-user via the `beginner_catalog_enabled` preference
+(**My settings -> Customize**) for users who find it redundant with the DSO table.
 
 ---
 
 ## Difficulty model
 
-**Module**: `backend/skytonight/skytonight_calculator.py` → `compute_difficulty_score()`
+**Module**: `backend/skytonight/skytonight_calculator.py` -> `compute_difficulty_score()`
 
 Every target that SkyTonight computes gets a static difficulty score alongside its AstroScore.
-Unlike AstroScore, difficulty does **not** depend on location, date, or Bortle class — the same
+Unlike AstroScore, difficulty does **not** depend on location, date, or Bortle class - the same
 object is always the same difficulty everywhere. It is computed once per calculation run and
-stored in `dso_results.json` as `difficulty_score` (0–100, lower = easier) and `difficulty`
+stored in `dso_results.json` as `difficulty_score` (0-100, lower = easier) and `difficulty`
 (`beginner` / `intermediate` / `advanced`).
 
 | Factor | Weight | Easier when... |
@@ -89,63 +141,11 @@ When magnitude or size is missing, the surface-brightness and size components ar
 the magnitude factor is used ("magnitude-only" scoring). If magnitude is also missing, the target
 gets a neutral default of `(50, 'intermediate')`.
 
-**Thresholds**: `score ≤ 35 → beginner`, `35 < score ≤ 65 → intermediate`, `score > 65 → advanced`.
+**Thresholds**: `score ≤ 35 -> beginner`, `35 < score ≤ 65 -> intermediate`, `score > 65 -> advanced`.
 
 Difficulty is surfaced as a color-coded badge (green/orange/red) wherever a target appears:
 the SkyTonight DSO table (with a difficulty filter dropdown), Astrodex entries, and Plan My Night
 entries.
-
----
-
-## "Tonight for you" recommendations
-
-**Endpoint**: `GET /api/skytonight/recommendations` (`@login_required`) — see
-[API_ENDPOINTS.md](API_ENDPOINTS.md)
-
-A panel injected above the DSO table on the SkyTonight tab. It reads the user's `experience_level`
-preference, filters `dso_results.json` to matching difficulty tiers, sorts by AstroScore
-descending, and returns the top N (default 5, max 10 via `?limit=`):
-
-| `experience_level` | Difficulties shown |
-|---|---|
-| `beginner` | `beginner` only |
-| `intermediate` | `beginner` + `intermediate` |
-| `advanced` (default) | everything |
-
-Each card shows the target name, type badge, difficulty badge, estimated integration time, and an
-"Add to Plan" button. `estimated_integration_hours` comes from the Beginner Catalog when the
-target is one of its ~30 curated entries; otherwise it's a rough estimate derived from the
-difficulty tier (`beginner → 2h`, `intermediate → 4h`, `advanced → 8h`) and flagged as such via
-`estimated_integration_hours_is_estimate`.
-
-The preference is set in **My Settings → Customize** alongside density/theme, and defaults to
-`advanced` so existing users see no behavior change until they opt in.
-
----
-
-## Beginner Catalog
-
-**Module**: `backend/observation/beginner_catalog.py` · **Data**: `backend/catalogues/beginner_catalog.json`
-(34 hand-picked entries) · **Endpoint**: `GET /api/beginner-catalog` — see
-[API_ENDPOINTS.md](API_ENDPOINTS.md)
-
-A "Beginner" sub-tab on SkyTonight showing a card grid (not a table) of curated, forgiving starter
-targets — bright nebulae, open clusters, and a few landmark galaxies. Each card explains *why*
-the object is beginner-friendly and suggests a framing, plus:
-
-- **Visible tonight** badge, cross-referenced against the current `dso_results.json`
-- **Captured** state, cross-referenced against the user's Astrodex
-- **In plan** state, cross-referenced against Plan My Night
-- Filters: visible-tonight-only toggle, difficulty (capped at the user's own `experience_level`),
-  object type
-
-The catalogue JSON stores only structural data and an `i18n_key` per object — no English text is
-hardcoded in the data file. The `why_beginner` and `suggested_framing` strings are resolved at
-request time via `I18nManager` from `beginner_catalog.objects.<i18n_key>.why` / `.framing` in the
-i18n files, so the whole catalogue is translated in all 6 supported languages.
-
-This tab can be turned off entirely per-user via the `beginner_catalog_enabled` preference
-(**My Settings → Customize**) for users who find it redundant with the DSO table.
 
 ---
 
@@ -178,11 +178,11 @@ New keys added to `preferences` (see [AUTHENTICATION.md](AUTHENTICATION.md#user-
 | File | Role |
 |---|---|
 | `static/js/first_run.js` | Wizard flow selection, step rendering, skip/completion persistence |
-| `static/data/equipment_presets.json` | Gear presets offered in the wizard's equipment step and in the Equipment tab's "New ..." modals — see [EQUIPMENT.md#presets](EQUIPMENT.md#presets) |
+| `static/data/equipment_presets.json` | Gear presets offered in the wizard's equipment step and in the Equipment tab's "New ..." modals - see [EQUIPMENT.md#presets](EQUIPMENT.md#presets) |
 | `backend/skytonight/skytonight_calculator.py` | `compute_difficulty_score()` |
 | `backend/blueprints/skytonight_api.py` | `GET /api/skytonight/recommendations` |
 | `backend/observation/beginner_catalog.py` | Catalogue loading, i18n resolution, SkyTonight/Astrodex/Plan enrichment |
 | `backend/catalogues/beginner_catalog.json` | The 34-entry curated dataset |
 | `backend/blueprints/astrodex.py` | `GET /api/beginner-catalog` route |
 | `static/js/skytonight.js` | Recommendations panel, difficulty badges/filter, Beginner sub-tab |
-| `static/js/auth.js` | `experience_level` / `beginner_catalog_enabled` controls in My Settings → Customize |
+| `static/js/auth.js` | `experience_level` / `beginner_catalog_enabled` controls in My settings -> Customize |
