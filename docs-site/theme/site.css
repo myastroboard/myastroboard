@@ -1,12 +1,372 @@
-/* Small additions to the mdBook theme for the MyAstroBoard documentation. */
+/* MyAstroBoard documentation: the palette and feel of myastroboard.org on top of mdBook.
+   "navy" (dark, the default on a dark device) and "light" are restyled; the other mdBook themes
+   keep their colours and get the components below through the --mab-* fallbacks. */
+
+:root {
+    --mab-accent: var(--links);
+    --mab-accent-2: var(--links);
+    --mab-heading: var(--fg);
+    --mab-muted: var(--fg);
+    --mab-card: var(--quote-bg);
+    --mab-card-border: var(--quote-border);
+    --mab-card-hover: var(--theme-hover);
+    --mab-hero-bg: var(--quote-bg);
+    --mab-btn-fg: var(--bg);
+}
+
+html.navy {
+    --bg: #090d1b;
+    --fg: #ccd5ee;
+    --sidebar-bg: #060913;
+    --sidebar-fg: #a8b4d6;
+    --sidebar-non-existant: #6b7fa8;
+    --sidebar-active: #94adff;
+    --sidebar-spacer: rgba(173, 193, 255, 0.12);
+    --sidebar-header-border-color: #7f9dff;
+    --scrollbar: #4c5a80;
+    --icons: #8090b8;
+    --icons-hover: #e8eeff;
+    --links: #94adff;
+    --inline-code-color: #d4dcff;
+    --theme-popup-bg: #0e1322;
+    --theme-popup-border: rgba(173, 193, 255, 0.38);
+    --theme-hover: rgba(127, 157, 255, 0.15);
+    --quote-bg: rgba(44, 58, 102, 0.22);
+    --quote-border: rgba(173, 193, 255, 0.22);
+    --table-border-color: rgba(173, 193, 255, 0.16);
+    --table-header-bg: rgba(44, 58, 102, 0.6);
+    --table-alternate-bg: rgba(44, 58, 102, 0.16);
+    --searchbar-border-color: rgba(173, 193, 255, 0.38);
+    --searchbar-bg: #0e1322;
+    --searchbar-fg: #e8eeff;
+    --searchbar-shadow-color: transparent;
+    --searchresults-header-fg: #a8b4d6;
+    --searchresults-border-color: rgba(173, 193, 255, 0.22);
+    --searchresults-li-bg: rgba(44, 58, 102, 0.25);
+    --search-mark-bg: rgba(245, 200, 66, 0.45);
+    --blockquote-note-color: #7f9dff;
+    --blockquote-tip-color: #74e3b0;
+    --blockquote-warning-color: #f5c842;
+    --mab-accent: #7f9dff;
+    --mab-accent-2: #74e3b0;
+    --mab-heading: #e8eeff;
+    --mab-muted: #a8b4d6;
+    --mab-card: rgba(14, 19, 34, 0.74);
+    --mab-card-border: rgba(173, 193, 255, 0.2);
+    --mab-card-hover: rgba(127, 157, 255, 0.12);
+    --mab-hero-bg: radial-gradient(circle at 12% 0%, rgba(41, 64, 150, 0.55), transparent 60%), rgba(14, 19, 34, 0.7);
+    --mab-btn-fg: #060813;
+}
+
+html.light {
+    --bg: #ffffff;
+    --fg: #1d2440;
+    --sidebar-bg: #f4f6fd;
+    --sidebar-fg: #2b3456;
+    --sidebar-active: #3553c9;
+    --sidebar-spacer: #e3e8f7;
+    --sidebar-header-border-color: #3553c9;
+    --links: #3553c9;
+    --quote-bg: #f3f5fd;
+    --quote-border: #d9def0;
+    --table-header-bg: #e8ecfa;
+    --table-alternate-bg: #f6f8fe;
+    --table-border-color: #e1e6f5;
+    --mab-accent: #3553c9;
+    --mab-accent-2: #1d8a5c;
+    --mab-heading: #141a33;
+    --mab-muted: #4a5578;
+    --mab-card: #ffffff;
+    --mab-card-border: #d9def0;
+    --mab-card-hover: #f3f5fd;
+    --mab-hero-bg: radial-gradient(circle at 12% 0%, rgba(127, 157, 255, 0.25), transparent 60%), #f6f8ff;
+    --mab-btn-fg: #ffffff;
+}
+
+/* ---------- Page ---------- */
+
+html.navy body {
+    background: radial-gradient(circle at 18% -12%, #18295f, transparent 42%) fixed, var(--bg);
+}
+
+body {
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+.content {
+    line-height: 1.7;
+}
+
+.content h1,
+.content h2,
+.content h3 {
+    color: var(--mab-heading);
+    letter-spacing: -0.01em;
+}
+
+.content h1 {
+    font-size: 2.2em;
+}
+
+.content h2 {
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid var(--mab-card-border);
+}
+
+.content img {
+    max-width: 100%;
+    height: auto;
+    border: 1px solid var(--mab-card-border);
+    border-radius: 0.7rem;
+}
+
+.content table {
+    border-radius: 0.7rem;
+    overflow: hidden;
+}
+
+/* Logo in the top bar */
+.menu-title::before {
+    content: "";
+    display: inline-block;
+    width: 1.3em;
+    height: 1.3em;
+    margin-right: 0.45em;
+    vertical-align: -0.2em;
+    background: url("logo.svg") center / contain no-repeat;
+}
+
+.mab-demo-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    margin: 0 0.5em;
+    padding: 0.15em 0.75em;
+    border: 1px solid var(--mab-card-border);
+    border-radius: 999px;
+    color: var(--icons);
+    font-size: 0.85em;
+    text-decoration: none;
+}
+
+.mab-demo-link:hover {
+    color: var(--icons-hover);
+    border-color: var(--mab-accent);
+}
+
+@media (max-width: 620px) {
+    .mab-demo-link span {
+        display: none;
+    }
+}
+
+/* ---------- Landing page ---------- */
+
+.mab-hero {
+    margin: 1rem 0 2.5rem;
+    padding: 2.2rem 2rem;
+    border: 1px solid var(--mab-card-border);
+    border-radius: 1.4rem;
+    background: var(--mab-hero-bg);
+}
+
+.mab-hero .mab-hero-logo {
+    border: none;
+    border-radius: 50%;
+    box-shadow: 0 0 40px rgba(127, 157, 255, 0.35);
+}
+
+.mab-eyebrow,
+.mab-section-title {
+    color: var(--mab-accent);
+    font-size: 0.78em;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.mab-section-title {
+    margin-top: 2.5rem;
+}
+
+.mab-version {
+    margin-left: 0.5em;
+    padding: 0.1em 0.6em;
+    border: 1px solid var(--mab-card-border);
+    border-radius: 999px;
+    color: var(--mab-muted);
+    letter-spacing: 0.04em;
+    text-transform: none;
+}
+
+.content .mab-hero-title {
+    margin: 0.2em 0 0.4em;
+    font-size: 2.6em;
+    line-height: 1.15;
+}
+
+.mab-hero-lead {
+    max-width: 44em;
+    color: var(--mab-muted);
+    font-size: 1.1em;
+}
+
+.mab-hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-top: 1.5rem;
+}
+
+.content a.mab-btn,
+.content a.mab-btn:link,
+.content a.mab-btn:visited {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45em;
+    padding: 0.55em 1.15em;
+    border: 1px solid var(--mab-card-border);
+    border-radius: 999px;
+    color: var(--mab-heading);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.content a.mab-btn:hover {
+    border-color: var(--mab-accent);
+    background: var(--mab-card-hover);
+}
+
+.content a.mab-btn-primary,
+.content a.mab-btn-primary:link,
+.content a.mab-btn-primary:visited {
+    border-color: transparent;
+    background: linear-gradient(135deg, var(--mab-accent), var(--mab-accent-2));
+    color: var(--mab-btn-fg);
+}
+
+.content a.mab-btn-primary:hover {
+    background: linear-gradient(135deg, var(--mab-accent), var(--mab-accent-2));
+    filter: brightness(1.08);
+}
+
+.mab-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 0.9rem;
+}
+
+.content a.mab-card,
+.content a.mab-card:link,
+.content a.mab-card:visited {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 1.1rem 1.2rem;
+    border: 1px solid var(--mab-card-border);
+    border-radius: 1rem;
+    background: var(--mab-card);
+    color: var(--fg);
+    text-decoration: none;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.content a.mab-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--mab-accent);
+    background: var(--mab-card-hover);
+}
+
+.mab-card .bi {
+    color: var(--mab-accent);
+    font-size: 1.4em;
+}
+
+.mab-card strong {
+    color: var(--mab-heading);
+}
+
+.mab-card span {
+    color: var(--mab-muted);
+    font-size: 0.9em;
+    line-height: 1.5;
+}
+
+.mab-shots {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+
+.content .mab-shots a,
+.content .mab-shots a:link,
+.content .mab-shots a:visited {
+    color: var(--mab-muted);
+    font-size: 0.9em;
+    text-decoration: none;
+}
+
+.mab-shots img {
+    display: block;
+    aspect-ratio: 16 / 10;
+    object-fit: cover;
+    object-position: top;
+    margin-bottom: 0.4rem;
+}
+
+@media (max-width: 760px) {
+    .mab-shots {
+        grid-template-columns: 1fr;
+    }
+
+    .mab-hero {
+        padding: 1.5rem 1.2rem;
+    }
+
+    .content .mab-hero-title {
+        font-size: 2em;
+    }
+}
+
+/* ---------- Page footer: last update ---------- */
+
+.mab-updated {
+    margin-top: 3rem;
+    padding-top: 0.8rem;
+    border-top: 1px solid var(--mab-card-border);
+    color: var(--mab-muted);
+    font-size: 0.85em;
+}
+
+/* ---------- Formulas ---------- */
 
 .math-display {
     margin: 1em 0;
     overflow-x: auto;
 }
 
-/* Screenshots are wide: keep them inside the content column. */
-.content img {
-    max-width: 100%;
-    height: auto;
+/* ---------- Screenshot zoom ---------- */
+
+.content img.mab-zoomable {
+    cursor: zoom-in;
+}
+
+dialog.mab-lightbox {
+    max-width: 96vw;
+    max-height: 96vh;
+    padding: 0;
+    border: none;
+    background: transparent;
+}
+
+dialog.mab-lightbox::backdrop {
+    background: rgba(3, 5, 12, 0.88);
+}
+
+dialog.mab-lightbox img {
+    display: block;
+    max-width: 96vw;
+    max-height: 94vh;
+    border-radius: 0.7rem;
+    cursor: zoom-out;
 }

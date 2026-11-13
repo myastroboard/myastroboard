@@ -36,11 +36,16 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0  # full history: each page shows the date of its last change
 
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
           python-version: "3.15"
+
+      - name: Install Pillow (screenshots converted to WebP)
+        run: python -m pip install "$(grep -i '^pillow' requirements.txt)"
 
       - name: Install mdBook
         run: |

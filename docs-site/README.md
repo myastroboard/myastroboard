@@ -9,14 +9,20 @@ nothing in `docs/` is specific to the site.
 |---|---|
 | `book.toml` | mdBook settings (title, themes, search, edit link) |
 | `SUMMARY.md` | The site menu. **A page missing here is not published**: add every new `docs/*.md` page to it, under the same audience as in `docs/README.md` |
-| `theme/head.hbs` | Loads the bundled KaTeX and the site stylesheet |
-| `theme/math.js`, `theme/site.css` | Formula rendering and small style additions |
+| `landing.html` | Top of the home page (hero, "I want to..." cards, screenshots); `docs/README.md` follows it |
+| `404.md` | The "page not found" page |
+| `theme/head.hbs` | Link preview tags, and the bundled icons, KaTeX, stylesheet and scripts |
+| `theme/site.css` | The myastroboard.org palette on the mdBook "navy" (dark) and "light" themes, home page components |
+| `theme/site.js` | "Live demo" link in the top bar, zoom on screenshots |
+| `theme/math.js` | Formula rendering |
 | [`scripts/build_docs_site.py`](../scripts/build_docs_site.py) | Assembles the book, builds it, checks the result |
 
 The build script turns links that leave `docs/` into GitHub URLs, protects `$...$` / `$$...$$`
 formulas from Markdown, bundles KaTeX at a pinned version (checked against its npm integrity hash),
-replaces images hosted elsewhere (badges) by their text, and fails on a dead link, a missing
-anchor, or any asset loaded from another host.
+replaces images hosted elsewhere (badges) by their text, converts the screenshots to WebP, adds a
+"Last updated" line from each page's last commit, writes `sitemap.xml` and `robots.txt`, and fails on
+a dead link, a missing anchor, or any asset loaded from another host. It needs Pillow
+(`requirements.txt`) and the git history.
 
 ## Preview locally
 

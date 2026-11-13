@@ -70,3 +70,21 @@ def test_formula_pipe_is_escaped_for_tables():
     """A "|" inside a formula is escaped so it cannot split a Markdown table cell."""
     converted = build_docs_site.convert_page(r'| $|x|$ |', PAGE)
     assert 'data-tex="&#124;x&#124;"' in converted
+
+
+@pytest.mark.unit
+def test_landing_page_puts_the_index_after_the_hero_without_its_title():
+    """The home page is the landing template (with the version) followed by docs/README.md minus its H1."""
+    page = build_docs_site.landing_page('# MyAstroBoard Documentation\n\nIntro text.\n', '9.9.9')
+    assert 'v9.9.9' in page
+    assert page.index('mab-hero') < page.index('Intro text.')
+    assert '# MyAstroBoard Documentation' not in page
+
+
+@pytest.mark.unit
+def test_converted_images_point_to_webp_copies():
+    """References to converted screenshots switch to .webp; other images are left alone."""
+    text = '![a](img/shot.png) ![b](img/anim.gif) ![c](img/banner.png)'
+    assert build_docs_site.rewrite_images(text, {'shot.png', 'anim.gif'}) == (
+        '![a](img/shot.webp) ![b](img/anim.webp) ![c](img/banner.png)'
+    )
