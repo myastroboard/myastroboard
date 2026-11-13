@@ -1,0 +1,24 @@
+# mdBook configuration of the documentation site (docs.myastroboard.org).
+# The pages are docs/*.md; scripts/build_docs_site.py assembles them with SUMMARY.md and the
+# theme files below into docs-site/build/, then runs mdBook. See docs-site/README.md.
+
+[book]
+title = "MyAstroBoard Documentation"
+authors = ["MyAstroBoard contributors"]
+language = "en"
+src = "src"
+
+[output.html]
+default-theme = "light"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/myastroboard/myastroboard"
+edit-url-template = "https://github.com/myastroboard/myastroboard/edit/main/docs/{path}"
+site-url = "/"
+no-section-label = true
+
+[output.html.search]
+enable = true
+
+[output.html.fold]
+enable = true
+level = 1

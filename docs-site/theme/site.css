@@ -1,0 +1,12 @@
+/* Small additions to the mdBook theme for the MyAstroBoard documentation. */
+
+.math-display {
+    margin: 1em 0;
+    overflow-x: auto;
+}
+
+/* Screenshots are wide: keep them inside the content column. */
+.content img {
+    max-width: 100%;
+    height: auto;
+}

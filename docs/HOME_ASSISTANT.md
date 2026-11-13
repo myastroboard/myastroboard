@@ -49,7 +49,7 @@ integration below works the same whichever way MyAstroBoard is installed (broker
    - *MQTT connection*: pick the connection created above (the wifi button tests it).
    - Tick the modules you want (see [Modules](#modules)), switch **Enable connector** on, **Save**.
 4. **Home Assistant.** Settings -> Devices & services -> MQTT: within a minute a **MyAstroBoard**
-   device and one **MyAstroBoard - <location>** device per location preset appear. The card's
+   device and one **MyAstroBoard - `<location>`** device per location preset appear. The card's
    status line shows *Connected*, the last publish time and the number of devices and entities.
 
 Nothing has to be added to `configuration.yaml`.
