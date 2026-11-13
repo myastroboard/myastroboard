@@ -105,22 +105,20 @@ jobs:
                Skip a label that does not exist; never create one.
 
             ## Comment format
-            Write in the language of the issue (French or English; English if unsure).
+            Always write in English, whatever the language of the issue.
             Keep it short enough to fit on one screen. Use these sections, in order:
 
-            - First line, exactly (French issue):
-              `🤖 Première analyse automatique (Claude). Un mainteneur prendra le relais.`
-              or (English issue):
+            - First line, exactly:
               `🤖 First automated analysis (Claude). A maintainer will take over.`
-            - **Compréhension / Understanding**: one or two sentences restating the problem or request.
+            - **Understanding**: one or two sentences restating the problem or request.
             - **Type**: bug / enhancement / question / documentation.
-            - **Pistes dans le code / Code pointers**: 2 to 5 bullets, each a file or function
+            - **Code pointers**: 2 to 5 bullets, each a file or function
               with a permalink to the lines on the current commit, in the form
               `https://github.com/${{ github.repository }}/blob/${{ github.sha }}/<path>#L<start>-L<end>`,
               and a few words on why it is relevant. Only cite lines you actually read.
-            - **Hypothèse / Hypothesis** (bug) or **Approche possible / Possible approach**
-              (feature): short, with an explicit confidence level (low / medium / high).
-            - **Infos manquantes / Missing information** (only if needed): precise questions,
+            - **Hypothesis** (bug) or **Possible approach** (feature): short, with an
+              explicit confidence level (low / medium / high).
+            - **Missing information** (only if needed): precise questions,
               picked among what is relevant: Docker image version / tag, install method
               (Docker Compose, Portainer, Home Assistant app), container logs
               (`docker logs myastroboard`), the configuration involved, browser and
