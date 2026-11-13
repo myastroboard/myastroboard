@@ -20,8 +20,8 @@ from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-# Measured on the 1.8.2 image (two gunicorn workers): about 560 MB at rest and 620 MB
-# during the first SkyTonight calculation; a 512 MB limit gets a worker OOM-killed.
+# Measured on a fresh 1.8.2 install (two gunicorn workers): about 720 MB once the first
+# SkyTonight calculation has run; a 512 MB limit gets a worker OOM-killed.
 RECOMMENDED_MEMORY_MB = 1024
 
 # cgroup v1 reports "no limit" as a huge number (the page-aligned max int64)
