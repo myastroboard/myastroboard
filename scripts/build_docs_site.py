@@ -131,9 +131,12 @@ def install_katex(dest, local_tgz):
             if name in ('package/dist/katex.min.js', 'package/dist/katex.min.css', 'package/LICENSE') or (
                 name.startswith('package/dist/fonts/') and name.endswith('.woff2')
             ):
+                source = archive.extractfile(member)
+                if source is None:
+                    sys.exit(f'KaTeX archive: cannot read {name}')
                 target = dest / Path(name).relative_to('package/dist' if name.startswith('package/dist') else 'package')
                 target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes(archive.extractfile(member).read())
+                target.write_bytes(source.read())
 
 
 def prepare(katex_tgz):
@@ -190,7 +193,7 @@ def check_site(site):
 
 def main():
     """Build the site, then check it; exit non-zero on any problem."""
-    parser = argparse.ArgumentParser(description=__doc__.split('\n', 1)[0])
+    parser = argparse.ArgumentParser(description='Build the documentation site from docs/*.md with mdBook.')
     parser.add_argument('--mdbook', default='mdbook', help='mdBook executable (default: mdbook on PATH)')
     parser.add_argument('--katex-tgz', help='local copy of the KaTeX npm archive instead of downloading it')
     args = parser.parse_args()
