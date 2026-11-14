@@ -119,8 +119,8 @@ jobs:
                   body:         commentBody
                 });
 
-                await ensureLabel('needs-more-info', 'e4e669', 'Additional information is required');
-                await addLabels(['needs-more-info']);
+                await ensureLabel('needs-info', 'e4e669', 'Additional information is needed from the reporter');
+                await addLabels(['needs-info']);
               }
 
               // Auto-label based on the selected component

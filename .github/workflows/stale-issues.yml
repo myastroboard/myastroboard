@@ -1,0 +1,94 @@
+name: Stale Issues
+
+# Closes issues that wait for an answer from their reporter and never get one.
+#
+# Only issues labelled `needs-info` are concerned: nothing else is ever marked
+# stale or closed, and pull requests are left alone.
+#
+#   day 0   a maintainer (or the triage workflows) adds `needs-info`
+#   day 14  no activity: the bot adds `stale` and posts a reminder
+#   day 21  still no activity: the bot closes the issue as "not planned"
+#
+# Any comment resets the clock (actions/stale removes `stale` on activity).
+# When the reporter answers, the `author-replied` job removes `needs-info`, so
+# the issue leaves the stale flow for good, and reopens it if it was closed by
+# this workflow. Comment bodies are never read or interpolated.
+
+on:
+  schedule:
+    - cron: "30 3 * * *"
+  workflow_dispatch:
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  stale:
+    name: Mark and close unanswered issues
+    if: github.event_name != 'issue_comment'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Process needs-info issues
+        uses: actions/stale@v11
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          only-issue-labels: needs-info
+          days-before-issue-stale: 14
+          days-before-issue-close: 7
+          days-before-pr-stale: -1
+          days-before-pr-close: -1
+          stale-issue-label: stale
+          close-issue-reason: not_planned
+          remove-stale-when-updated: true
+          stale-issue-message: >-
+            This issue is waiting for more information from the reporter and has had
+            no activity for 14 days. It will be closed in 7 days unless someone
+            comments. If you can provide the requested details, just reply here.
+          close-issue-message: >-
+            Closed because the requested information was not provided within 21 days.
+            No problem: reply with the details at any time and the issue will be
+            reopened automatically.
+
+  author-replied:
+    name: Reporter answered
+    if: >-
+      github.event_name == 'issue_comment' &&
+      !github.event.issue.pull_request &&
+      github.event.comment.user.login == github.event.issue.user.login &&
+      (contains(github.event.issue.labels.*.name, 'needs-info') ||
+       contains(github.event.issue.labels.*.name, 'stale'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Remove waiting labels and reopen if auto-closed
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issue = context.payload.issue;
+            const labels = issue.labels.map((l) => l.name);
+            const base = { owner: context.repo.owner, repo: context.repo.repo, issue_number: issue.number };
+
+            for (const name of ['needs-info', 'stale']) {
+              if (labels.includes(name)) {
+                await github.rest.issues.removeLabel({ ...base, name });
+              }
+            }
+
+            // Reopen only what this workflow closed: still labelled `stale`,
+            // closed as "not planned". An issue a maintainer closed is left closed.
+            if (issue.state === 'closed' && issue.state_reason === 'not_planned' && labels.includes('stale')) {
+              await github.rest.issues.update({ ...base, state: 'open' });
+              await github.rest.issues.createComment({
+                ...base,
+                body: 'Thanks for the update, the issue is reopened. A maintainer will take a look.',
+              });
+            }
