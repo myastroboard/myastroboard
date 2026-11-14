@@ -1,0 +1,44 @@
+name: Labels
+
+# Applies .github/labels.yml to the repository labels: creates the missing ones
+# and fixes colors and descriptions. A pull request that touches the file gets
+# a dry run, so the planned changes show in its log before the merge.
+#
+# skip-delete: a label created by hand in the GitHub UI is kept, never removed
+# from the issues that carry it. Delete an obsolete label by hand.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/labels.yml
+      - .github/workflows/labels.yml
+  pull_request:
+    paths:
+      - .github/labels.yml
+      - .github/workflows/labels.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  sync:
+    name: Sync labels
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Apply labels.yml
+        uses: crazy-max/ghaction-github-labeler@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          yaml-file: .github/labels.yml
+          skip-delete: true
+          dry-run: ${{ github.event_name == 'pull_request' }}

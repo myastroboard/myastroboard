@@ -38,29 +38,30 @@ body:
   - type: dropdown
     id: category
     attributes:
-      label: Feature Category
+      label: Component
       description: What area of the application does this feature relate to?
       options:
         - Astrophotography
-        - Weather & Conditions
+        - SkyTonight
         - Astrodex
         - Plan my Night
-        - Astronomy Calculations
+        - Observation Log
+        - Catalogues
+        - Equipment
+        - Weather & Conditions
+        - Seeing Forecast
+        - Sun & Moon
         - Events / Calendar
         - Aurora Borealis
-        - Spaceflight / Astronauts
-        - ISS
+        - Spaceflight / ISS
+        - Astronomy Calculations
         - Observatory
-        - Connectors
-        - Target Management
-        - Catalogues
-        - Configuration
-        - User Interface
-        - Mobile/Responsive
-        - Notifications/Alerts
+        - Connectors (MQTT, Home Assistant, AllSky, MyAstroShine)
+        - Notifications
+        - Settings & Accounts
+        - UI / Mobile
         - Performance
-        - Documentation
-        - Integration
+        - Installation / Docker
         - Other
     validations:
       required: true

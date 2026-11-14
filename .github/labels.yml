@@ -1,0 +1,144 @@
+# Every label of the repository, applied by .github/workflows/labels.yml.
+# Edit labels here, not in the GitHub UI: the next sync overwrites colors and
+# descriptions. Rename a label with `from_name` so issues keep it.
+#
+# One color per family, so the kind of a label reads at a glance:
+#   type          strong, distinct hues   bug, enhancement, documentation, question
+#   breaking      black                   Breaking change
+#   status        yellow / orange         needs-info, stale, no-triage
+#   resolution    grey                    duplicate, invalid, wontfix
+#   community     green                   good first issue, help wanted
+#   component     light blue              component: *
+#   dependencies  lavender                dependencies + one per ecosystem (Dependabot)
+#
+# The component list mirrors the "Component" dropdown of both issue templates,
+# mapped in .github/workflows/issue-automation.yml.
+
+# Type
+- name: bug
+  color: d73a4a
+  description: Something isn't working
+- name: enhancement
+  color: 1d76db
+  description: New feature or request
+- name: documentation
+  color: 5319e7
+  description: Improvements or additions to documentation
+- name: question
+  color: cc317c
+  description: Further information is requested
+
+# Breaking
+- name: Breaking change
+  color: "000000"
+  description: Breaking change in this PR/Commit
+
+# Status
+- name: needs-info
+  color: fbca04
+  description: Additional information is needed from the reporter
+- name: stale
+  color: e99d42
+  description: No answer to a needs-info request, closed soon
+- name: no-triage
+  color: fef2c0
+  description: Skip the automated Claude triage
+
+# Resolution
+- name: duplicate
+  color: cfd3d7
+  description: This issue or pull request already exists
+- name: invalid
+  color: cfd3d7
+  description: This doesn't seem right
+- name: wontfix
+  color: cfd3d7
+  description: This will not be worked on
+
+# Community
+- name: good first issue
+  color: 0e8a16
+  description: Good for newcomers
+- name: help wanted
+  color: 008672
+  description: Extra attention is needed
+
+# Component
+- name: "component: astrophotography"
+  color: c5def5
+  description: Astrophotography tab, imaging conditions and best window
+- name: "component: skytonight"
+  color: c5def5
+  description: SkyTonight targets, sky map and scheduler
+- name: "component: astrodex"
+  color: c5def5
+  description: Astrodex collection and pictures
+- name: "component: plan-my-night"
+  color: c5def5
+  description: Plan My Night timeline
+- name: "component: observation-log"
+  color: c5def5
+  description: Observation Log sessions and entries
+- name: "component: catalogues"
+  color: c5def5
+  description: Catalogue data and catalogue browser
+- name: "component: equipment"
+  color: c5def5
+  description: Equipment, combinations and field of view
+- name: "component: weather"
+  color: c5def5
+  description: Weather forecast and observation conditions
+- name: "component: seeing"
+  color: c5def5
+  description: Seeing forecast
+- name: "component: sun-moon"
+  color: c5def5
+  description: Sun and Moon information
+- name: "component: events"
+  color: c5def5
+  description: Astronomical events and calendar
+- name: "component: aurora"
+  color: c5def5
+  description: Aurora forecast
+- name: "component: spaceflight"
+  color: c5def5
+  description: Launches, astronauts, ISS and CSS passes
+- name: "component: calculations"
+  color: c5def5
+  description: Astronomy calculations and ephemerides
+- name: "component: observatory"
+  color: c5def5
+  description: Observatory tab
+- name: "component: connectors"
+  color: c5def5
+  description: MQTT / Home Assistant, AllSky, MyAstroShine
+  from_name: connector
+- name: "component: notifications"
+  color: c5def5
+  description: Push notifications and alerts
+- name: "component: config"
+  color: c5def5
+  description: Settings, locations, users and accounts
+- name: "component: ui"
+  color: c5def5
+  description: Layout, themes, mobile and PWA
+- name: "component: performance"
+  color: c5def5
+  description: Speed, memory and resource usage
+- name: "component: installation"
+  color: c5def5
+  description: Docker, Home Assistant app, upgrades
+
+# Dependencies (names used by .github/dependabot.yml)
+- name: dependencies
+  color: d4c5f9
+  description: Dependency update
+- name: python
+  color: d4c5f9
+  description: Python dependency
+- name: docker
+  color: d4c5f9
+  description: Docker image dependency
+- name: github-actions
+  color: d4c5f9
+  description: GitHub Actions dependency

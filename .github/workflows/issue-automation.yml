@@ -37,16 +37,6 @@ jobs:
             const isEmpty = (text) =>
               !text || text === '_No response_' || text.replace(/\s/g, '').length < 5;
 
-            const ensureLabel = async (name, color, description = '') => {
-              try {
-                await github.rest.issues.createLabel({
-                  owner: context.repo.owner,
-                  repo:  context.repo.repo,
-                  name, color, description
-                });
-              } catch (_) { /* label already exists */ }
-            };
-
             const addLabels = async (labels) => {
               await github.rest.issues.addLabels({
                 owner:        context.repo.owner,
@@ -54,6 +44,38 @@ jobs:
                 issue_number: issue.number,
                 labels
               });
+            };
+
+            // One map for bugs and features: the "Component" dropdown of both
+            // templates. Every label is declared in .github/labels.yml.
+            const componentMap = {
+              'Astrophotography':       'component: astrophotography',
+              'SkyTonight':             'component: skytonight',
+              'Astrodex':               'component: astrodex',
+              'Plan my Night':          'component: plan-my-night',
+              'Observation Log':        'component: observation-log',
+              'Catalogues':             'component: catalogues',
+              'Equipment':              'component: equipment',
+              'Weather & Conditions':   'component: weather',
+              'Seeing Forecast':        'component: seeing',
+              'Sun & Moon':             'component: sun-moon',
+              'Events / Calendar':      'component: events',
+              'Aurora Borealis':        'component: aurora',
+              'Spaceflight / ISS':      'component: spaceflight',
+              'Astronomy Calculations': 'component: calculations',
+              'Observatory':            'component: observatory',
+              'Connectors (MQTT, Home Assistant, AllSky, MyAstroShine)': 'component: connectors',
+              'Notifications':          'component: notifications',
+              'Settings & Accounts':    'component: config',
+              'UI / Mobile':            'component: ui',
+              'Performance':            'component: performance',
+              'Installation / Docker':  'component: installation',
+            };
+
+            // Exact match on the selected option, never a search of the whole body.
+            const labelComponent = async () => {
+              const label = componentMap[getSection('Component')];
+              if (label) await addLabels([label]);
             };
 
             // ── BUG REPORT ───────────────────────────────────────────────────
@@ -119,77 +141,15 @@ jobs:
                   body:         commentBody
                 });
 
-                await ensureLabel('needs-more-info', 'e4e669', 'Additional information is required');
-                await addLabels(['needs-more-info']);
+                await addLabels(['needs-info']);
               }
 
-              // Auto-label based on the selected component
-              const componentMap = {
-                'Astrophotography':         'component: astrophotography',
-                'Weather Forecast':         'component: weather',
-                'Seeing Forecast':          'component: seeing',
-                'Astrodex':                 'component: astrodex',
-                'Plan my Night':            'component: plan-my-night',
-                'SkyTonight':               'component: skytonight',
-                'Astronomy Calculations':   'component: calculations',
-                'Observation Conditions':   'component: conditions',
-                'Sun & Moon Information':   'component: sun-moon',
-                'Configuration Interface':  'component: config',
-                'Catalogue Browser':        'component: catalogues',
-                'Events / Calendar':        'component: events',
-                'Aurora Borealis':          'component: aurora',
-                'Spaceflight / Astronauts': 'component: spaceflight',
-                'ISS':                      'component: iss',
-                'Observatory':              'component: observatory',
-                'Connectors':               'component: connectors',
-                'Docker/Installation':      'component: docker',
-                'UI/UX':                    'component: ui',
-                'Other':                    'component: other'
-              };
-
-              const componentContent = getSection('Component');
-              for (const [name, label] of Object.entries(componentMap)) {
-                if (componentContent.includes(name)) {
-                  await ensureLabel(label, 'd93f0b');
-                  await addLabels([label]);
-                  break;
-                }
-              }
+              await labelComponent();
             }
 
             // ── FEATURE REQUEST ──────────────────────────────────────────────
             if (isFeature) {
-              const categoryMap = {
-                'Astrophotography':         'category: astrophotography',
-                'Weather & Conditions':     'category: weather',
-                'Astrodex':                 'category: astrodex',
-                'Plan my Night':            'category: plan-my-night',
-                'Astronomy Calculations':   'category: calculations',
-                'Target Management':        'category: targets',
-                'Catalogues':               'category: catalogues',
-                'Events / Calendar':        'category: events',
-                'Aurora Borealis':          'category: aurora',
-                'Spaceflight / Astronauts': 'category: spaceflight',
-                'ISS':                      'category: iss',
-                'Observatory':              'category: observatory',
-                'Connectors':               'category: connectors',
-                'Configuration':            'category: config',
-                'User Interface':           'category: ui',
-                'Mobile/Responsive':        'category: mobile',
-                'Notifications/Alerts':     'category: notifications',
-                'Performance':              'category: performance',
-                'Documentation':            'category: docs',
-                'Integration':              'category: integration',
-                'Other':                    'category: other',
-              };
-
-              for (const [cat, label] of Object.entries(categoryMap)) {
-                if (body.includes(cat)) {
-                  await ensureLabel(label, '0075ca');
-                  await addLabels([label]);
-                  break;
-                }
-              }
+              await labelComponent();
             }
 
             // ── Welcome message (first-time contributor) ─────────────────────
