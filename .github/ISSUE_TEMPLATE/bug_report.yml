@@ -55,24 +55,26 @@ body:
       description: Which component is affected?
       options:
         - Astrophotography
-        - Sun & Moon Information
-        - Events / Calendar
-        - Weather Forecast
-        - Seeing Forecast
+        - SkyTonight
         - Astrodex
         - Plan my Night
-        - SkyTonight
+        - Observation Log
+        - Catalogues
+        - Equipment
+        - Weather & Conditions
+        - Seeing Forecast
+        - Sun & Moon
+        - Events / Calendar
         - Aurora Borealis
-        - ISS
-        - Spaceflight / Astronauts
-        - Observatory
-        - Connectors
+        - Spaceflight / ISS
         - Astronomy Calculations
-        - Observation Conditions
-        - Configuration Interface
-        - Catalogue Browser
-        - Docker/Installation
-        - UI/UX
+        - Observatory
+        - Connectors (MQTT, Home Assistant, AllSky, MyAstroShine)
+        - Notifications
+        - Settings & Accounts
+        - UI / Mobile
+        - Performance
+        - Installation / Docker
         - Other
     validations:
       required: true
