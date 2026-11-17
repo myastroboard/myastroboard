@@ -12,7 +12,8 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
-- None.
+- Interface texts that still sent you to "Parameters -> Advanced" now name the current screens (App settings ->
+  Configuration or Connectors), and the My settings -> Notifications messages are translated in every language.
 
 ### Breaking changes
 
