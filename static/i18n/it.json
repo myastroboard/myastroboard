@@ -89,7 +89,8 @@
     "observatory": "Osservatorio",
     "session_analytics": "Il tuo cielo",
     "wishlist": "Lista dei desideri",
-    "progress": "Progressi"
+    "progress": "Progressi",
+    "subtab_menu": "Sezioni"
   },
   "about": {
     "title": "Informazioni su MyAstroBoard",
@@ -3407,7 +3408,6 @@
     "equipment_kicker": "L'attrezzatura che ha lavorato di più",
     "progress_heading": "I tuoi progressi",
     "list_catalogues": "Cataloghi",
-    "gained": "(+{count} quest'anno)",
     "previous_objects": "{count} oggetti",
     "mosaic_heading": "Il mio {year} in immagini",
     "share": "Condividi questa schermata",
@@ -3423,6 +3423,10 @@
     "highlight_title": "Il tuo anno astro {year} è pronto",
     "highlight_text": "Qualche schermata sul tuo anno sotto il cielo, ognuna pronta da condividere.",
     "highlight_open": "Guardalo",
-    "highlight_dismiss": "Nascondi fino all'anno prossimo"
+    "highlight_dismiss": "Nascondi fino all'anno prossimo",
+    "gained_short": "+{count}",
+    "download_all": "Scarica tutto (ZIP)",
+    "share_all": "Condividi tutto",
+    "preparing": "Preparazione delle immagini..."
   }
 }

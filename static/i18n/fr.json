@@ -89,7 +89,8 @@
     "observatory": "Observatoire",
     "session_analytics": "Votre ciel",
     "wishlist": "Liste de souhaits",
-    "progress": "Progression"
+    "progress": "Progression",
+    "subtab_menu": "Rubriques"
   },
   "about": {
     "title": "À propos de MyAstroBoard",
@@ -3395,7 +3396,7 @@
     "fact_objects": "Objets",
     "fact_new": "Nouveaux cette année",
     "fact_favourite": "Type préféré",
-    "fact_nights_on_it": "Nuits dessus",
+    "fact_nights_on_it": "Nuits consacrées",
     "fact_rating": "Votre note",
     "fact_hours": "Intégration",
     "fact_combinations": "Configurations utilisées",
@@ -3407,7 +3408,6 @@
     "equipment_kicker": "Le matériel qui a le plus travaillé",
     "progress_heading": "Votre progression",
     "list_catalogues": "Catalogues",
-    "gained": "(+{count} cette année)",
     "previous_objects": "{count} objets",
     "mosaic_heading": "Mon {year} en images",
     "share": "Partager cet écran",
@@ -3423,6 +3423,10 @@
     "highlight_title": "Votre année astro {year} est prête",
     "highlight_text": "Quelques écrans sur votre année sous le ciel, chacun prêt à partager.",
     "highlight_open": "La voir",
-    "highlight_dismiss": "Masquer jusqu'à l'an prochain"
+    "highlight_dismiss": "Masquer jusqu'à l'an prochain",
+    "gained_short": "+{count}",
+    "download_all": "Tout télécharger (ZIP)",
+    "share_all": "Tout partager",
+    "preparing": "Préparation des images..."
   }
 }

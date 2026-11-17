@@ -89,7 +89,8 @@
     "observatory": "Observatorium",
     "session_analytics": "Ihr Himmel",
     "wishlist": "Wunschliste",
-    "progress": "Fortschritt"
+    "progress": "Fortschritt",
+    "subtab_menu": "Bereiche"
   },
   "about": {
     "title": "Über MyAstroBoard",
@@ -3407,7 +3408,6 @@
     "equipment_kicker": "Die fleißigste Ausrüstung",
     "progress_heading": "Ihr Fortschritt",
     "list_catalogues": "Kataloge",
-    "gained": "(+{count} in diesem Jahr)",
     "previous_objects": "{count} Objekte",
     "mosaic_heading": "Mein {year} in Bildern",
     "share": "Diesen Bildschirm teilen",
@@ -3423,6 +3423,10 @@
     "highlight_title": "Ihr Astrojahr {year} ist fertig",
     "highlight_text": "Ein paar Bildschirme über Ihr Jahr unter dem Himmel, jeder bereit zum Teilen.",
     "highlight_open": "Ansehen",
-    "highlight_dismiss": "Bis nächstes Jahr ausblenden"
+    "highlight_dismiss": "Bis nächstes Jahr ausblenden",
+    "gained_short": "+{count}",
+    "download_all": "Alle herunterladen (ZIP)",
+    "share_all": "Alle teilen",
+    "preparing": "Bilder werden vorbereitet..."
   }
 }

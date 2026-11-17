@@ -61,7 +61,9 @@ otherwise.
   figure, `facts` (each with an `id` so it can be unchecked), an optional `list` and `paragraph`,
   optional `mosaicUrls` (several same-origin pictures assembled into one square-tiled montage when
   there is no `imageUrl`) and `onClose` (called when the modal closes, so a caller can reopen its own
-  view).
+  view), `bars` (labelled progress bars, each with a value, a total and an optional note), and
+  `fill` (a card without picture scales its text up to fill the card). A `list` is numbered unless
+  it says `numbered: false`.
 - `drawShareCard(canvas, model, options, image)` - the drawing. The text block is planned first
   (fonts shrink to fit, long lines are clamped), then the picture gets the remaining height.
 - `shareAstrodexPicture`, `shareObservationSession`, `shareTonight`, `shareEvent` - build a model

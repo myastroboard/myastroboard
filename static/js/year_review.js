@@ -203,14 +203,14 @@ function buildYearReviewScreens(payload) {
                     value: previousValue,
                 },
             ],
-            list: {
+            bars: {
                 title: _yrT('year_review.list_catalogues', 'Catalogues'),
-                items: catalogues.map((row) => {
-                    const base = `${progressCatalogueLabel(row.catalogue)}: ${row.captured} / ${row.total}`;
-                    return row.gained > 0
-                        ? `${base} ${_yrT('year_review.gained', '(+{count} this year)', { count: row.gained })}`
-                        : base;
-                }),
+                items: catalogues.map((row) => ({
+                    label: progressCatalogueLabel(row.catalogue),
+                    value: row.captured,
+                    total: row.total,
+                    note: row.gained > 0 ? _yrT('year_review.gained_short', '+{count}', { count: row.gained }) : '',
+                })),
             },
         });
     }
@@ -234,7 +234,154 @@ function buildYearReviewScreens(payload) {
         });
     }
 
+    // Text-only screens grow their text to fill the card; screens with a picture keep the
+    // usual layout (the engine only scales a card that has no picture).
+    screens.forEach((screen) => {
+        screen.fill = true;
+    });
     return screens;
+}
+
+// ── Download or share every screen at once ──────────────────────────────────
+
+const _YR_CRC_TABLE = (() => {
+    const table = new Uint32Array(256);
+    for (let n = 0; n < 256; n += 1) {
+        let c = n;
+        for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+        table[n] = c >>> 0;
+    }
+    return table;
+})();
+
+function _yrCrc32(bytes) {
+    let crc = 0xffffffff;
+    for (let index = 0; index < bytes.length; index += 1) {
+        crc = _YR_CRC_TABLE[(crc ^ bytes[index]) & 0xff] ^ (crc >>> 8);
+    }
+    return (crc ^ 0xffffffff) >>> 0;
+}
+
+/**
+ * A ZIP archive of already-compressed files, stored without compression (method 0): PNGs
+ * do not shrink further, and this avoids a dependency for one button.
+ * @param {Array<{name: string, bytes: Uint8Array}>} files - ASCII names
+ * @returns {Blob}
+ */
+function _yrZip(files) {
+    const now = new Date();
+    const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | Math.floor(now.getSeconds() / 2);
+    const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+    const encoder = new TextEncoder();
+    const parts = [];
+    const central = [];
+    let offset = 0;
+
+    files.forEach((file) => {
+        const name = encoder.encode(file.name);
+        const crc = _yrCrc32(file.bytes);
+        const local = new DataView(new ArrayBuffer(30));
+        local.setUint32(0, 0x04034b50, true);
+        local.setUint16(4, 20, true);
+        local.setUint16(10, dosTime, true);
+        local.setUint16(12, dosDate, true);
+        local.setUint32(14, crc, true);
+        local.setUint32(18, file.bytes.length, true);
+        local.setUint32(22, file.bytes.length, true);
+        local.setUint16(26, name.length, true);
+        parts.push(local.buffer, name, file.bytes);
+
+        const entry = new DataView(new ArrayBuffer(46));
+        entry.setUint32(0, 0x02014b50, true);
+        entry.setUint16(4, 20, true);
+        entry.setUint16(6, 20, true);
+        entry.setUint16(12, dosTime, true);
+        entry.setUint16(14, dosDate, true);
+        entry.setUint32(16, crc, true);
+        entry.setUint32(20, file.bytes.length, true);
+        entry.setUint32(24, file.bytes.length, true);
+        entry.setUint16(28, name.length, true);
+        entry.setUint32(42, offset, true);
+        central.push(entry.buffer, name);
+        offset += 30 + name.length + file.bytes.length;
+    });
+
+    const centralSize = central.reduce((total, part) => total + part.byteLength, 0);
+    const end = new DataView(new ArrayBuffer(22));
+    end.setUint32(0, 0x06054b50, true);
+    end.setUint16(8, files.length, true);
+    end.setUint16(10, files.length, true);
+    end.setUint32(12, centralSize, true);
+    end.setUint32(16, offset, true);
+    return new Blob([...parts, ...central, end.buffer], { type: 'application/zip' });
+}
+
+/** Every screen rendered as a PNG file, in order, with the viewer's format and theme. */
+async function _yrRenderAll() {
+    const files = [];
+    for (let index = 0; index < yearReviewState.screens.length; index += 1) {
+        const screen = yearReviewState.screens[index];
+        const canvas = document.createElement('canvas');
+        drawShareCard(canvas, screen, YEAR_REVIEW_OPTIONS, await _yrImageFor(screen));
+        const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+        if (!blob) continue;
+        const name = `${String(index + 1).padStart(2, '0')}-${screen.filename || screen.id}.png`;
+        files.push(new File([blob], name, { type: 'image/png' }));
+    }
+    return files;
+}
+
+function _yrCanShareFiles() {
+    if (typeof File !== 'function' || typeof navigator.canShare !== 'function') return false;
+    const probe = () => new File([new Blob()], 'probe.png', { type: 'image/png' });
+    try {
+        return navigator.canShare({ files: [probe(), probe()] });
+    } catch (_error) {
+        return false;
+    }
+}
+
+/** Run *task* with the button disabled and showing that the images are being prepared. */
+async function _yrBusy(button, task) {
+    const label = Array.from(button.childNodes);
+    button.disabled = true;
+    DOMUtils.clear(button);
+    button.appendChild(DOMUtils.createSpinnerWrapper(_yrT('year_review.preparing', 'Preparing the images...'), ''));
+    try {
+        await task();
+    } catch (error) {
+        // The user closing the share sheet is not an error.
+        if (error && error.name !== 'AbortError') console.error('Year in review export failed:', error);
+    } finally {
+        DOMUtils.clear(button);
+        DOMUtils.append(button, ...label);
+        button.disabled = false;
+    }
+}
+
+async function _yrDownloadAll() {
+    const files = await _yrRenderAll();
+    if (!files.length) return;
+    const entries = await Promise.all(
+        files.map(async (file) => ({ name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) }))
+    );
+    const url = URL.createObjectURL(_yrZip(entries));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `my-astro-year-${yearReviewState.payload.year}.zip`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+}
+
+async function _yrShareAll() {
+    const files = await _yrRenderAll();
+    if (!files.length) return;
+    await navigator.share({
+        files,
+        title: _yrT('year_review.title', 'My astro year {year}', { year: yearReviewState.payload.year }),
+    });
 }
 
 // ── Viewer ──────────────────────────────────────────────────────────────────
@@ -361,6 +508,26 @@ function _yrRender(bodyEl) {
         openShareCard({ ...screen, onClose: () => _yrShow(index) });
     });
     actions.appendChild(share);
+    const downloadAll = document.createElement('button');
+    downloadAll.type = 'button';
+    downloadAll.className = 'btn btn-outline-primary';
+    DOMUtils.append(
+        downloadAll,
+        DOMUtils.createIcon('bi bi-file-earmark-zip icon-inline'),
+        ` ${_yrT('year_review.download_all', 'Download all (ZIP)')}`
+    );
+    downloadAll.addEventListener('click', () => _yrBusy(downloadAll, _yrDownloadAll));
+    actions.appendChild(downloadAll);
+    // The system share sheet takes several pictures at once on most phones, which posts
+    // the whole review as one carousel.
+    if (_yrCanShareFiles()) {
+        const shareAll = document.createElement('button');
+        shareAll.type = 'button';
+        shareAll.className = 'btn btn-outline-primary';
+        DOMUtils.append(shareAll, DOMUtils.createIcon('bi bi-images icon-inline'), ` ${_yrT('year_review.share_all', 'Share all')}`);
+        shareAll.addEventListener('click', () => _yrBusy(shareAll, _yrShareAll));
+        actions.appendChild(shareAll);
+    }
     const privacy = document.createElement('p');
     privacy.className = 'small text-muted mb-0';
     privacy.textContent = _yrT(

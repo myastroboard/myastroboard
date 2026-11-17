@@ -4,6 +4,13 @@ MyAstroBoard works in any modern mobile browser, and can be installed as an app 
 App) for a full-screen window, an icon on the home screen, an offline page, and push
 notifications.
 
+## Navigation
+
+On a phone (narrower than 768 pixels), each row of sub-tabs is a single menu button: it shows the
+sub-tab you are on, with its icon, and the triangle on its right opens the list of every sub-tab of
+that section. Wider screens keep the row of pills. Sub-tabs hidden by a setting or a role (Progress
+when badges are off, admin pages) are left out of the list as they are of the row.
+
 ## Requirements
 
 Browsers only allow installation, offline support and notifications on a **secure address**:

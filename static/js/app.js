@@ -235,6 +235,7 @@ async function initializeApp() {
     setupNavLinkHrefs();
     setupMainTabs();
     setupSubTabs();
+    if (typeof initSubtabMenus === 'function') initSubtabMenus();
     await loadTimezones();
     await loadConfiguration();  // Wait for config to load before loading catalogues
     if (typeof loadAppSettings === 'function' && currentUser?.role === 'admin') loadAppSettings();
