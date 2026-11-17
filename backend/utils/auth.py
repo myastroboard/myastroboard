@@ -101,6 +101,9 @@ ALLOWED_THEME_MODES = {'auto', 'light', 'dark', 'red'}
 ALLOWED_FIRST_DAY_OF_WEEK = {'monday', 'sunday'}
 ALLOWED_LANGUAGES = set(SUPPORTED_LANGUAGES)
 ALLOWED_EXPERIENCE_LEVELS = {'beginner', 'intermediate', 'advanced'}
+# Upper bound on the stored "badges already seen" list: far above the number of badges, so
+# it only rejects junk, never a real list.
+MAX_ACHIEVEMENTS_SEEN = 200
 
 DEFAULT_USER_PREFERENCES = {
     'startup_main_tab': 'forecast-astro',
@@ -116,6 +119,12 @@ DEFAULT_USER_PREFERENCES = {
     # v1.6: publish this user's own Astrodex / plan activity through the MQTT connector.
     # Off by default and user-scoped: an admin enables the connector, never another user's data.
     'mqtt_publish_enabled': False,
+    # v1.9 My Progress: badges can be turned off; the ids of the badges already pointed
+    # out (so a new one is announced once); the year whose end-of-year review highlight
+    # the user dismissed.
+    'achievements_enabled': True,
+    'achievements_seen': [],
+    'year_review_dismissed': None,
     'wizard': {
         'completed': False,
         'skipped': False,
@@ -540,6 +549,25 @@ class UserManager:
         mqtt_publish_enabled = preferences.get('mqtt_publish_enabled')
         if mqtt_publish_enabled is not None and not isinstance(mqtt_publish_enabled, bool):
             return False, "Invalid mqtt_publish_enabled: must be a boolean"
+
+        achievements_enabled = preferences.get('achievements_enabled')
+        if achievements_enabled is not None and not isinstance(achievements_enabled, bool):
+            return False, "Invalid achievements_enabled: must be a boolean"
+
+        achievements_seen = preferences.get('achievements_seen')
+        if achievements_seen is not None:
+            if not isinstance(achievements_seen, list) or len(achievements_seen) > MAX_ACHIEVEMENTS_SEEN:
+                return False, "Invalid achievements_seen: must be a list of badge ids"
+            if not all(isinstance(badge_id, str) and 0 < len(badge_id) <= 64 for badge_id in achievements_seen):
+                return False, "Invalid achievements_seen: must be a list of badge ids"
+
+        year_review_dismissed = preferences.get('year_review_dismissed')
+        if year_review_dismissed is not None and (
+            not isinstance(year_review_dismissed, int)
+            or isinstance(year_review_dismissed, bool)
+            or not 1900 <= year_review_dismissed <= 2200
+        ):
+            return False, "Invalid year_review_dismissed: must be a year"
 
         wizard = preferences.get('wizard')
         if wizard is not None:

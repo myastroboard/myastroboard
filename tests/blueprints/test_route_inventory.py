@@ -206,6 +206,12 @@ EXPECTED_ROUTES = {
     ('/api/session-analytics/sky-coverage', ('GET',)),
     ('/api/session-analytics/conditions', ('GET',)),
     ('/api/session-analytics/best-months', ('GET',)),
+    # --- my progress (v1.9) ---
+    ('/api/session-analytics/year-review', ('GET',)),
+    ('/api/achievements', ('GET',)),
+    ('/api/achievements/seen', ('POST',)),
+    ('/api/achievements/challenges', ('GET',)),
+    ('/api/achievements/missing-tonight', ('GET',)),
     # --- wishlist (v1.5) ---
     ('/api/wishlist', ('GET',)),
     ('/api/wishlist', ('POST',)),

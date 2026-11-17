@@ -425,7 +425,7 @@ and can be turned off.
 |---|---|
 | **Why** | Your Sky already computes how an observer is doing, as a dashboard to consult. The same figures told as a dated story, and as milestones to reach, give a reason to go back out and something to show. Mostly a new presentation of existing aggregations. |
 | **Effort** | Medium |
-| **Status** | 🗓️ Planned - next in line |
+| **Status** | ✅ Implemented (year in review, achievements and challenges) |
 
 #### Year in review
 
@@ -750,7 +750,7 @@ Also:
 | v1.6 | MQTT Publisher & Home Assistant Integration + Astrodex Stream | All | Medium | ✅ Implemented |
 | v1.7 | Database storage (SQLite, relational, Alembic migrations, verified 1.6 import) | All | High | ✅ Implemented |
 | v1.8 | See and Show (framing simulator, share cards, guided tour) | All | Medium | ✅ Implemented |
-| v1.9 | My Progress (year in review, achievements and challenges) | All | Medium | 🗓️ Planned |
+| v1.9 | My Progress (year in review, achievements and challenges) | All | Medium | ✅ Implemented |
 | v1.10 | Effortless Log (FITS import, imaging projects, exports, moon-aware advice) | Advanced | High | 💡 Idea |
 | v1.11 | Open to the Outside (7-night outlook, public page, transients, planetary and lunar) | All | High | 💡 Idea |
 | v2.0 | Interactive Sky Chart + mosaic planner | All | High | 💡 Idea |

@@ -88,7 +88,8 @@
     "about": "Über",
     "observatory": "Observatorium",
     "session_analytics": "Ihr Himmel",
-    "wishlist": "Wunschliste"
+    "wishlist": "Wunschliste",
+    "progress": "Fortschritt"
   },
   "about": {
     "title": "Über MyAstroBoard",
@@ -1028,7 +1029,9 @@
     "2fa_confirmed_at": "Aktiv seit {date}",
     "2fa_disable_confirm_password": "Mit deinem aktuellen Passwort bestätigen",
     "trusted_networks_broad_confirm": "Das Netzwerk '{network}' deckt einen ungewöhnlich großen Adressbereich ab - das ist oft ein Tippfehler im Präfix (z. B. /2 statt /24). Trotzdem hinzufügen?",
-    "2fa_already_enabled": "Die Zwei-Faktor-Authentifizierung ist bereits aktiv. Deaktiviere sie zuerst, bevor du sie erneut einrichtest."
+    "2fa_already_enabled": "Die Zwei-Faktor-Authentifizierung ist bereits aktiv. Deaktiviere sie zuerst, bevor du sie erneut einrichtest.",
+    "pref_achievements_enabled": "Abzeichen und Herausforderungen anzeigen",
+    "pref_achievements_enabled_info": "Fügt dem Astrodex einen Tab \"Fortschritt\" hinzu, mit Abzeichen aus Ihrem Beobachtungsjournal, saisonalen Herausforderungen und dem Messier-Marathon."
   },
   "astrodex": {
     "title": "Astrodex - Ich muss sie alle fangen!",
@@ -3240,5 +3243,186 @@
     "banner_install": "Eigene Instanz installieren",
     "read_only": "Schreibgeschützte Demo: Änderungen werden nicht gespeichert. Installieren Sie Ihr eigenes MyAstroBoard, um Ihre Daten zu behalten.",
     "signin_refused": "Dieses Konto kann sich in der Demo nicht anmelden. Bereiten Sie die Demo mit deaktiviertem DEMO_MODE vor, siehe docs/DEMO_MODE.md."
+  },
+  "progress": {
+    "title": "Ihr Fortschritt",
+    "intro": "Erreichte Etappen nach dem, was Sie wirklich erfasst haben, und was als Nächstes ansteht.",
+    "disabled": "Abzeichen und Herausforderungen sind ausgeschaltet. Sie können sie unter Meine Einstellungen -> Anpassen wieder einschalten.",
+    "next_title": "Als Nächstes in Reichweite",
+    "challenges_title": "Herausforderungen",
+    "badges_title": "Abzeichen",
+    "badges_note": "Abzeichen werden aus Ihrem Journal und Ihrem Astrodex in ihrem aktuellen Stand gelesen: Werden die Einträge gelöscht, auf denen ein Abzeichen beruht, verschwindet es wieder.",
+    "stat_badges": "Erhaltene Abzeichen",
+    "stat_badges_hint": "Berechnet aus dem, was Sie wirklich erfasst haben",
+    "stat_objects": "Aufgenommene Objekte",
+    "stat_objects_hint": "Journal und Astrodex zusammen",
+    "next_none": "Alle begonnenen Abzeichen sind erreicht. Wählen Sie unten eine Herausforderung, um ein neues zu beginnen.",
+    "next_start": "Erfassen Sie Ihre erste Nacht oder fügen Sie Ihrem Astrodex ein Objekt hinzu: Ihre ersten Abzeichen folgen.",
+    "visible_tonight": "Heute Nacht sichtbar",
+    "missing_title": "Noch offen, heute Nacht sichtbar: {catalogue}",
+    "missing_intro": "Objekte dieses Katalogs, die Sie noch nicht aufgenommen haben und die heute Nacht innerhalb Ihrer SkyTonight-Grenzen beobachtbar sind, die am längsten sichtbaren zuerst.",
+    "missing_none": "Von diesem Katalog ist heute Nacht von hier aus nichts mehr beobachtbar.",
+    "hours_tonight": "{hours} h heute Nacht",
+    "transit_at": "Am höchsten um {time}",
+    "load_error": "Ihr Fortschritt konnte nicht geladen werden.",
+    "counter_hours": "{current} h / {target} h",
+    "new": "Neu",
+    "earned": "Erhalten",
+    "earned_on": "Erhalten am {date}",
+    "captured": "Aufgenommen",
+    "not_captured": "Noch nicht aufgenommen",
+    "share_title": "Dieses Abzeichen teilen",
+    "share_kicker": "Abzeichen",
+    "share_earned": "Erhalten am",
+    "share_constellations": "Sternbilder",
+    "season_intro": "{season}: die hellsten Messier- und Caldwell-Objekte, die in dieser Jahreszeit von {location} aus gut stehen, innerhalb Ihrer SkyTonight-Höhengrenzen.",
+    "season_winter": "Winter",
+    "season_spring": "Frühling",
+    "season_summer": "Sommer",
+    "season_autumn": "Herbst",
+    "challenge_galaxy": "Galaxien der Saison",
+    "challenge_nebula": "Nebel der Saison",
+    "challenge_cluster": "Sternhaufen der Saison",
+    "challenges_error": "Die Herausforderungen konnten für Ihren Standort nicht berechnet werden.",
+    "challenges_none": "Für Ihren Standort lässt sich gerade keine Herausforderung berechnen.",
+    "marathon_title": "Messier-Marathon {year}",
+    "marathon_when": "Nacht vom {date}, Mond zu {moon} % beleuchtet - in {days} Tagen.",
+    "marathon_tonight": "Heute Nacht ist es so weit: Mond zu {moon} % beleuchtet.",
+    "marathon_past": "Nacht vom {date}, Mond zu {moon} % beleuchtet.",
+    "marathon_reach": "Von Ihrem Standort aus sind in dieser Nacht {reachable} der {total} Messier-Objekte erreichbar, bis hinunter auf {altitude} Grad Höhe, zwischen {start} und {end}. {captured} davon sind schon in Ihrem Journal.",
+    "marathon_order": "Empfohlene Reihenfolge für Ihre Breite",
+    "marathon_unreachable": "In dieser Nacht von hier aus nicht erreichbar: {names}.",
+    "group_firsts": "Erste Male",
+    "group_catalogues": "Kataloge",
+    "group_endurance": "Ausdauer",
+    "group_sky": "Quer über den Himmel",
+    "group_conditions": "Bedingungen",
+    "class_galaxy": "Galaxien",
+    "class_nebula": "Nebel",
+    "class_cluster": "Sternhaufen",
+    "class_comet": "Kometen",
+    "class_planet": "Planeten",
+    "class_moon": "Der Mond",
+    "class_sun": "Die Sonne",
+    "class_star": "Sterne",
+    "class_other": "Andere Objekte",
+    "badges": {
+      "first_galaxy": {
+        "name": "Erste Galaxie",
+        "description": "Nehmen Sie Ihre erste Galaxie auf."
+      },
+      "first_nebula": {
+        "name": "Erster Nebel",
+        "description": "Nehmen Sie Ihren ersten Nebel auf."
+      },
+      "first_cluster": {
+        "name": "Erster Sternhaufen",
+        "description": "Nehmen Sie Ihren ersten Sternhaufen auf."
+      },
+      "first_comet": {
+        "name": "Erster Komet",
+        "description": "Nehmen Sie Ihren ersten Kometen auf."
+      },
+      "first_planet": {
+        "name": "Erster Planet",
+        "description": "Nehmen Sie Ihren ersten Planeten auf."
+      },
+      "dark_site": {
+        "name": "Dunkler Himmel",
+        "description": "Beobachten Sie eine Nacht unter einem Himmel der Bortle-Klasse 3 oder dunkler (SQM 21,3 oder mehr)."
+      },
+      "new_moon_night": {
+        "name": "Neumondnacht",
+        "description": "Beobachten Sie eine Nacht, in der der Mond höchstens zu 5 % beleuchtet ist."
+      }
+    },
+    "rules": {
+      "catalogue_count": {
+        "name": "{catalogue} {count}",
+        "description": "Nehmen Sie {count} Objekte des Katalogs {catalogue} auf."
+      },
+      "catalogue_complete": {
+        "name": "{catalogue} komplett",
+        "description": "Nehmen Sie alle {count} Objekte des Katalogs {catalogue} auf."
+      },
+      "integration_hours": {
+        "name": "{count} Stunden Licht",
+        "description": "Sammeln Sie insgesamt {count} Stunden Belichtungszeit."
+      },
+      "single_target_hours": {
+        "name": "{count} Stunden auf einem Ziel",
+        "description": "Sammeln Sie {count} Stunden Belichtungszeit auf einem einzigen Objekt."
+      },
+      "multi_night_session": {
+        "name": "Mehrere Nächte, eine Sitzung",
+        "description": "Erfassen Sie eine Sitzung über {count} Nächte oder mehr."
+      },
+      "seasons": {
+        "name": "Vier Jahreszeiten",
+        "description": "Nehmen Sie in jeder Jahreszeit etwas auf."
+      },
+      "constellations": {
+        "name": "{count} Sternbilder",
+        "description": "Nehmen Sie Objekte in {count} verschiedenen Sternbildern auf."
+      },
+      "hemispheres": {
+        "name": "Beide Hemisphären",
+        "description": "Nehmen Sie Objekte auf beiden Seiten des Himmelsäquators auf."
+      }
+    },
+    "remaining": {
+      "catalogue_count": "Noch {remaining} {catalogue}-Objekte für dieses Abzeichen.",
+      "integration_hours": "Noch {remaining} Stunden Belichtungszeit für dieses Abzeichen.",
+      "single_target_hours": "Noch {remaining} Stunden auf Ihrem meistfotografierten Ziel.",
+      "multi_night_session": "Erfassen Sie eine zweite Nacht in derselben Sitzung.",
+      "seasons": "Noch {remaining} Jahreszeiten.",
+      "constellations": "Noch {remaining} Sternbilder für dieses Abzeichen.",
+      "hemispheres": "Nehmen Sie ein Objekt auf der anderen Seite des Himmelsäquators auf."
+    }
+  },
+  "year_review": {
+    "open": "Mein Astrojahr",
+    "title": "Mein Astrojahr {year}",
+    "kicker": "Mein Astrojahr {year}",
+    "year_subheading": "Ein Jahr unter dem Himmel",
+    "hero_integration": "gesammeltes Licht",
+    "hero_objects": "aufgenommene Objekte",
+    "hero_on_target": "auf diesem Ziel",
+    "hero_that_night": "in dieser Nacht gesammelt",
+    "hero_share": "des Lichts des Jahres",
+    "fact_nights": "Nächte draußen",
+    "fact_sessions": "Sitzungen",
+    "fact_objects": "Objekte",
+    "fact_new": "Neu in diesem Jahr",
+    "fact_favourite": "Lieblingsart",
+    "fact_nights_on_it": "Nächte darauf",
+    "fact_rating": "Ihre Bewertung",
+    "fact_hours": "Belichtung",
+    "fact_combinations": "Genutzte Setups",
+    "fact_previous": "Im Jahr {year}",
+    "fact_pictures": "Bilder",
+    "targets_heading": "Ihre Ziele",
+    "target_kicker": "Ziel des Jahres {year}",
+    "night_kicker": "Beste Nacht {year}",
+    "equipment_kicker": "Die fleißigste Ausrüstung",
+    "progress_heading": "Ihr Fortschritt",
+    "list_catalogues": "Kataloge",
+    "gained": "(+{count} in diesem Jahr)",
+    "previous_objects": "{count} Objekte",
+    "mosaic_heading": "Mein {year} in Bildern",
+    "share": "Diesen Bildschirm teilen",
+    "share_title": "Diesen Bildschirm teilen",
+    "counter": "{index} / {total}",
+    "previous": "Vorheriger Bildschirm",
+    "next": "Nächster Bildschirm",
+    "go_to": "Bildschirm {index}",
+    "year_label": "Jahr",
+    "privacy": "Nur Sie sehen Ihren Rückblick. Er wird in Ihrem Browser aus Ihrem eigenen Journal gezeichnet und zeigt nie Ihren Standort.",
+    "empty": "Für {year} gibt es noch nichts in Ihrem Journal oder Ihrem Astrodex. Erfassen Sie eine Nacht oder fügen Sie ein Bild hinzu, dann entsteht Ihr Rückblick von selbst.",
+    "load_error": "Ihr Jahresrückblick konnte nicht geladen werden.",
+    "highlight_title": "Ihr Astrojahr {year} ist fertig",
+    "highlight_text": "Ein paar Bildschirme über Ihr Jahr unter dem Himmel, jeder bereit zum Teilen.",
+    "highlight_open": "Ansehen",
+    "highlight_dismiss": "Bis nächstes Jahr ausblenden"
   }
 }

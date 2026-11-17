@@ -22,6 +22,9 @@
  *     facts?: [{ id, label, value }],     each can be unchecked by the user
  *     list?: { title, items: string[] },
  *     paragraph?: string,
+ *     mosaicUrls?: string[],              several same-origin pictures, drawn as one montage
+ *                                         when there is no imageUrl
+ *     onClose?: Function,                 called when the share modal is closed
  *   }
  */
 
@@ -464,6 +467,54 @@ function _shLoadImage(url) {
     });
 }
 
+/**
+ * Assemble several pictures into one square-tiled montage, used as the card's picture.
+ * Each tile is centre-cropped to a square: a montage is a contact sheet, and uneven tiles
+ * would leave it full of holes. The single-picture card still never crops.
+ * @param {HTMLImageElement[]} images
+ * @returns {HTMLCanvasElement|null} carries naturalWidth / naturalHeight like an image
+ */
+function _shComposeMosaic(images) {
+    const tiles = (images || []).filter(Boolean);
+    if (!tiles.length) return null;
+    const columns = tiles.length <= 1 ? 1 : tiles.length <= 4 ? 2 : 3;
+    const rows = Math.ceil(tiles.length / columns);
+    const size = 540;
+    const gap = 8;
+    const canvas = document.createElement('canvas');
+    canvas.width = columns * size + (columns - 1) * gap;
+    canvas.height = rows * size + (rows - 1) * gap;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    tiles.forEach((image, index) => {
+        const side = Math.min(image.naturalWidth, image.naturalHeight);
+        const sx = (image.naturalWidth - side) / 2;
+        const sy = (image.naturalHeight - side) / 2;
+        const x = (index % columns) * (size + gap);
+        const y = Math.floor(index / columns) * (size + gap);
+        ctx.drawImage(image, sx, sy, side, side, x, y, size, size);
+    });
+    canvas.naturalWidth = canvas.width;
+    canvas.naturalHeight = canvas.height;
+    return canvas;
+}
+
+/**
+ * The picture a model draws: its own picture, else a montage of its mosaic pictures.
+ * @param {Object} model
+ * @returns {Promise<HTMLImageElement|HTMLCanvasElement|null>}
+ */
+async function loadShareCardImage(model) {
+    if (!model) return null;
+    if (model.imageUrl) return _shLoadImage(model.imageUrl);
+    if (Array.isArray(model.mosaicUrls) && model.mosaicUrls.length) {
+        const images = await Promise.all(model.mosaicUrls.map(_shLoadImage));
+        return _shComposeMosaic(images);
+    }
+    return null;
+}
+
 function _shCanvasToBlob(canvas) {
     return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
 }
@@ -538,10 +589,10 @@ async function openShareCard(model) {
     titleEl.textContent = model.title || _shT('share.title', 'Share');
     DOMUtils.clear(bodyEl);
     bodyEl.appendChild(DOMUtils.createSpinnerWrapper(_shT('common.loading', 'Loading...')));
-    openModal(modalEl, { backdrop: true });
+    openModal(modalEl, { backdrop: true, onHidden: typeof model.onClose === 'function' ? model.onClose : null });
 
     const [image] = await Promise.all([
-        _shLoadImage(model.imageUrl),
+        loadShareCardImage(model),
         document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve(),
     ]);
 

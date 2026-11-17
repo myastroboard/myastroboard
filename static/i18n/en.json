@@ -88,7 +88,8 @@
     "about": "About",
     "observatory": "Observatory",
     "session_analytics": "Your Sky",
-    "wishlist": "Wishlist"
+    "wishlist": "Wishlist",
+    "progress": "Progress"
   },
   "about": {
     "title": "About MyAstroBoard",
@@ -1028,7 +1029,9 @@
     "2fa_confirmed_at": "Active since {date}",
     "2fa_disable_confirm_password": "Confirm with your current password",
     "trusted_networks_broad_confirm": "The network '{network}' covers an unusually large range of addresses - this is often a typo in the prefix (e.g. /2 instead of /24). Add it anyway?",
-    "2fa_already_enabled": "Two-factor authentication is already active. Disable it first before setting it up again."
+    "2fa_already_enabled": "Two-factor authentication is already active. Disable it first before setting it up again.",
+    "pref_achievements_enabled": "Show badges and challenges",
+    "pref_achievements_enabled_info": "Adds a \"Progress\" tab to Astrodex with badges earned from your log, seasonal challenges and the Messier marathon."
   },
   "astrodex": {
     "title": "Astrodex - Gotta Catch 'Em All!",
@@ -3240,5 +3243,186 @@
     "banner_install": "Install your own",
     "read_only": "Read-only demo: changes are not saved. Install your own MyAstroBoard to keep your data.",
     "signin_refused": "This account cannot sign in on the demo. Prepare the demo with DEMO_MODE off, see docs/DEMO_MODE.md."
+  },
+  "progress": {
+    "title": "Your progress",
+    "intro": "Milestones reached from what you actually logged, and what to aim for next.",
+    "disabled": "Badges and challenges are turned off. You can turn them back on in My settings -> Customize.",
+    "next_title": "Next within reach",
+    "challenges_title": "Challenges",
+    "badges_title": "Badges",
+    "badges_note": "Badges are read from your logbook and your Astrodex as they are now: deleting the entries a badge rests on takes it back.",
+    "stat_badges": "Badges earned",
+    "stat_badges_hint": "Computed from what you actually logged",
+    "stat_objects": "Objects captured",
+    "stat_objects_hint": "Logbook and Astrodex together",
+    "next_none": "Every badge you have started is earned. Pick a challenge below to start a new one.",
+    "next_start": "Log your first night or add an object to your Astrodex: your first badges will follow.",
+    "visible_tonight": "Visible tonight",
+    "missing_title": "Still to capture, visible tonight: {catalogue}",
+    "missing_intro": "Objects of this catalogue you have not captured yet, observable tonight within your SkyTonight constraints, longest first.",
+    "missing_none": "Nothing left in this catalogue is observable from here tonight.",
+    "hours_tonight": "{hours} h tonight",
+    "transit_at": "Highest at {time}",
+    "load_error": "Could not load your progress.",
+    "counter_hours": "{current} h / {target} h",
+    "new": "New",
+    "earned": "Earned",
+    "earned_on": "Earned on {date}",
+    "captured": "Captured",
+    "not_captured": "Not captured yet",
+    "share_title": "Share this badge",
+    "share_kicker": "Achievement",
+    "share_earned": "Earned on",
+    "share_constellations": "constellations",
+    "season_intro": "{season}: the brightest Messier and Caldwell objects well placed from {location} this season, at your SkyTonight altitude limits.",
+    "season_winter": "Winter",
+    "season_spring": "Spring",
+    "season_summer": "Summer",
+    "season_autumn": "Autumn",
+    "challenge_galaxy": "Galaxies of the season",
+    "challenge_nebula": "Nebulae of the season",
+    "challenge_cluster": "Star clusters of the season",
+    "challenges_error": "The challenges could not be computed for your location.",
+    "challenges_none": "No challenge can be computed for your location right now.",
+    "marathon_title": "Messier marathon {year}",
+    "marathon_when": "Night of {date}, Moon {moon}% lit - in {days} days.",
+    "marathon_tonight": "Tonight is the night: Moon {moon}% lit.",
+    "marathon_past": "Night of {date}, Moon {moon}% lit.",
+    "marathon_reach": "From your site, {reachable} of the {total} Messier objects can be caught that night, down to {altitude} degrees, between {start} and {end}. {captured} of them are already in your log.",
+    "marathon_order": "Suggested order for your latitude",
+    "marathon_unreachable": "Out of reach from here that night: {names}.",
+    "group_firsts": "Firsts",
+    "group_catalogues": "Catalogues",
+    "group_endurance": "Endurance",
+    "group_sky": "Across the sky",
+    "group_conditions": "Conditions",
+    "class_galaxy": "Galaxies",
+    "class_nebula": "Nebulae",
+    "class_cluster": "Star clusters",
+    "class_comet": "Comets",
+    "class_planet": "Planets",
+    "class_moon": "The Moon",
+    "class_sun": "The Sun",
+    "class_star": "Stars",
+    "class_other": "Other objects",
+    "badges": {
+      "first_galaxy": {
+        "name": "First galaxy",
+        "description": "Capture your first galaxy."
+      },
+      "first_nebula": {
+        "name": "First nebula",
+        "description": "Capture your first nebula."
+      },
+      "first_cluster": {
+        "name": "First star cluster",
+        "description": "Capture your first star cluster."
+      },
+      "first_comet": {
+        "name": "First comet",
+        "description": "Capture your first comet."
+      },
+      "first_planet": {
+        "name": "First planet",
+        "description": "Capture your first planet."
+      },
+      "dark_site": {
+        "name": "Dark sky",
+        "description": "Observe a night under a Bortle 3 sky or darker (SQM 21.3 or more)."
+      },
+      "new_moon_night": {
+        "name": "New Moon night",
+        "description": "Observe a night with the Moon at most 5% lit."
+      }
+    },
+    "rules": {
+      "catalogue_count": {
+        "name": "{catalogue} {count}",
+        "description": "Capture {count} objects of the {catalogue} catalogue."
+      },
+      "catalogue_complete": {
+        "name": "{catalogue} complete",
+        "description": "Capture all {count} objects of the {catalogue} catalogue."
+      },
+      "integration_hours": {
+        "name": "{count} hours of light",
+        "description": "Collect {count} hours of integration in total."
+      },
+      "single_target_hours": {
+        "name": "{count} hours on one target",
+        "description": "Collect {count} hours of integration on a single object."
+      },
+      "multi_night_session": {
+        "name": "Several nights, one session",
+        "description": "Log a session spanning {count} nights or more."
+      },
+      "seasons": {
+        "name": "Four seasons",
+        "description": "Capture something in every season of the year."
+      },
+      "constellations": {
+        "name": "{count} constellations",
+        "description": "Capture objects in {count} different constellations."
+      },
+      "hemispheres": {
+        "name": "Both hemispheres",
+        "description": "Capture objects on both sides of the celestial equator."
+      }
+    },
+    "remaining": {
+      "catalogue_count": "{remaining} more {catalogue} objects for this badge.",
+      "integration_hours": "{remaining} more hours of integration for this badge.",
+      "single_target_hours": "{remaining} more hours on your most imaged target.",
+      "multi_night_session": "Log a second night in the same session.",
+      "seasons": "{remaining} more seasons to cover.",
+      "constellations": "{remaining} more constellations for this badge.",
+      "hemispheres": "Capture an object on the other side of the celestial equator."
+    }
+  },
+  "year_review": {
+    "open": "My astro year",
+    "title": "My astro year {year}",
+    "kicker": "My astro year {year}",
+    "year_subheading": "A year under the sky",
+    "hero_integration": "of light collected",
+    "hero_objects": "objects captured",
+    "hero_on_target": "on this target",
+    "hero_that_night": "collected that night",
+    "hero_share": "of the light of the year",
+    "fact_nights": "Nights out",
+    "fact_sessions": "Sessions",
+    "fact_objects": "Objects",
+    "fact_new": "New this year",
+    "fact_favourite": "Favourite kind",
+    "fact_nights_on_it": "Nights on it",
+    "fact_rating": "Your rating",
+    "fact_hours": "Integration",
+    "fact_combinations": "Setups used",
+    "fact_previous": "In {year}",
+    "fact_pictures": "Pictures",
+    "targets_heading": "Your targets",
+    "target_kicker": "Target of the year {year}",
+    "night_kicker": "Best night of {year}",
+    "equipment_kicker": "Hardest-working equipment",
+    "progress_heading": "Your progress",
+    "list_catalogues": "Catalogues",
+    "gained": "(+{count} this year)",
+    "previous_objects": "{count} objects",
+    "mosaic_heading": "My {year} in pictures",
+    "share": "Share this screen",
+    "share_title": "Share this screen",
+    "counter": "{index} / {total}",
+    "previous": "Previous screen",
+    "next": "Next screen",
+    "go_to": "Screen {index}",
+    "year_label": "Year",
+    "privacy": "Only you can see your review. It is drawn in your browser from your own log, and never shows your location.",
+    "empty": "Nothing in your logbook or your Astrodex for {year} yet. Log a night or add a picture, and your review will build itself.",
+    "load_error": "Could not load your year in review.",
+    "highlight_title": "Your astro year {year} is ready",
+    "highlight_text": "A few screens about your year under the sky, each one ready to share.",
+    "highlight_open": "See it",
+    "highlight_dismiss": "Hide until next year"
   }
 }

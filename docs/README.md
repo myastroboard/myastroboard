@@ -34,6 +34,7 @@ The pages are grouped by who reads them: **using** MyAstroBoard, **running** an 
 - [Astrodex](ASTRODEX.md) - your collection of imaged objects, pictures, Photo Map, Catalogue Collection
 - [Your Sky and Wishlist](SESSION_ANALYTICS.md) - progress, sky coverage, best months, what to image next
 - [Share Cards](SHARE_CARDS.md) - ready-to-post images of a picture, a session, tonight's sky or an event
+- [My Progress](MY_PROGRESS.md) - year in review, badges, seasonal challenges, Messier marathon
 
 ### Equipment
 
@@ -86,6 +87,7 @@ The pages are grouped by who reads them: **using** MyAstroBoard, **running** an 
 | Astrodex | Plan my night | [PLAN_MY_NIGHT.md](PLAN_MY_NIGHT.md) |
 | Astrodex | Observation Log | [OBSERVATION_LOG.md](OBSERVATION_LOG.md) |
 | Astrodex | Your Sky, Wishlist | [SESSION_ANALYTICS.md](SESSION_ANALYTICS.md) |
+| Astrodex | Progress, My astro year | [MY_PROGRESS.md](MY_PROGRESS.md) |
 | Spaceflight | Launches, Astronauts, Space Events, Orbital Stations | [SPACEFLIGHT.md](SPACEFLIGHT.md) |
 | Observatory | (appears with a connector) | [OBSERVATORY.md](OBSERVATORY.md) |
 | Equipment | Combinations, FOV Calculator, Telescopes, Cameras, Mounts, Filters, Accessories | [EQUIPMENT.md](EQUIPMENT.md) |

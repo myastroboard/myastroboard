@@ -297,6 +297,16 @@ All self-scoped: a user only ever sees aggregates of their own Observation Log a
 - `DELETE /api/wishlist/<item_id>` (user) - Remove one item
 - `POST /api/wishlist/archive-captured` (user) - Remove every item currently derived as captured
 
+## My Progress (see docs/MY_PROGRESS.md)
+
+Self-scoped and computed on read from the user's own Observation Log and Astrodex.
+
+- `GET /api/session-analytics/year-review` - Every screen of one year in review (totals, target of the year, best night, equipment, catalogue progress, picture montage); optional `year` (default: the year just ending, or the latest year with data)
+- `GET /api/achievements` - Badges with progress and earned date, next milestones within reach, catalogue counters with picture filenames
+- `POST /api/achievements/seen` - Body `{"ids": [...]}`; remembers the earned badges the user has seen (preference `achievements_seen`)
+- `GET /api/achievements/challenges` - Seasonal challenges and the next Messier marathon for the active location
+- `GET /api/achievements/missing-tonight` - Objects of a badge catalogue (`catalogue`) not captured yet and observable tonight; optional `limit` (max 30)
+
 ## Equipment
 
 - `GET /api/equipment/telescopes`

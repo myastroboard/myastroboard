@@ -35,7 +35,7 @@ database `myastroboard.db` ([details](DATABASE.md)), pictures and attachments as
 |---|---|---|
 | Account: username, password hash, role, creation date, last login | database, `users` table | Passwords are hashed (werkzeug); never stored in clear. |
 | Two-factor secret (if enabled) | database, `users` table | TOTP seed, needed to verify codes. |
-| Preferences (language, time format, default/active location...) | database, `users` table | |
+| Preferences (language, time format, default/active location...) | database, `users` table | Includes the badges already seen and the dismissed year in review (v1.9); badges and the year in review themselves are computed on read, never stored ([details](MY_PROGRESS.md)). |
 | Web Push subscriptions | database, `users` table | Browser push endpoint + keys, only if the user enabled notifications. |
 | Observing locations: name, latitude, longitude, timezone | database, configuration | A location is often the user's home: treat coordinates as personal data. |
 | Astrodex: observed objects, notes, optional picture coordinates | database, `astrodex_items` / `astrodex_pictures` | See [Photo metadata](#photo-metadata) below. |

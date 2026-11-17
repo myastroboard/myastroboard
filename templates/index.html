@@ -64,6 +64,7 @@
     <link rel="stylesheet" href="{{ base }}/static/css/bs_plan_my_night.css?v={{ version }}" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="{{ base }}/static/css/bs_observation_log.css?v={{ version }}" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="{{ base }}/static/css/bs_session_analytics.css?v={{ version }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="{{ base }}/static/css/bs_progress.css?v={{ version }}" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="{{ base }}/static/css/bs_equipment.css?v={{ version }}" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="{{ base }}/static/css/bs_metrics.css?v={{ version }}" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="{{ base }}/static/css/bs_events.css?v={{ version }}" media="print" onload="this.media='all'">
@@ -84,6 +85,7 @@
         <link rel="stylesheet" href="{{ base }}/static/css/bs_plan_my_night.css?v={{ version }}">
         <link rel="stylesheet" href="{{ base }}/static/css/bs_observation_log.css?v={{ version }}">
         <link rel="stylesheet" href="{{ base }}/static/css/bs_session_analytics.css?v={{ version }}">
+        <link rel="stylesheet" href="{{ base }}/static/css/bs_progress.css?v={{ version }}">
         <link rel="stylesheet" href="{{ base }}/static/css/bs_equipment.css?v={{ version }}">
         <link rel="stylesheet" href="{{ base }}/static/css/bs_metrics.css?v={{ version }}">
         <link rel="stylesheet" href="{{ base }}/static/css/bs_events.css?v={{ version }}">
@@ -268,6 +270,8 @@
 
         <!-- Astrophotography forecast Section -->
         <div id="forecast-astro-tab" class="main-tab-content active">
+            <!-- Year in review highlight (v1.9): shown by year_review.js from 1 December to 15 January -->
+            <div id="year-review-highlight" class="year-review-highlight d-none" role="status"></div>
             <!-- forecast Sub-tabs links -->
             <div class="shadow p-2 mb-3 rounded bg-sub-container">
                 <ul class="nav nav-pills sub-tabs" id="forecast-astro-subtabs">
@@ -728,6 +732,11 @@
                             <i class="bi bi-compass-fill text-info icon-inline" aria-hidden="true"></i> <span data-i18n="navbar.session_analytics">Your Sky</span>
                         </a>
                     </li>
+                    <li class="nav-item progress-nav-item">
+                        <a class="nav-link sub-tab-btn" href="#" data-subtab="progress">
+                            <i class="bi bi-trophy-fill text-warning icon-inline" aria-hidden="true"></i> <span data-i18n="navbar.progress">Progress</span>
+                        </a>
+                    </li>
                     <li class="nav-item">
                         <a class="nav-link sub-tab-btn" href="#" data-subtab="wishlist">
                             <i class="bi bi-bookmark-star-fill text-warning icon-inline" aria-hidden="true"></i> <span data-i18n="navbar.wishlist">Wishlist</span>
@@ -902,9 +911,14 @@
             <!-- Session Analytics Sub-tab (v1.5) -->
             <div id="analytics-subtab" class="sub-tab-content">
                 <div class="shadow p-2 mb-3 rounded bg-sub-container">
-                    <h2>
-                        <i class="bi bi-graph-up-arrow text-info icon-inline" aria-hidden="true"></i> <span data-i18n="session_analytics.title">Your observing record</span>
-                    </h2>
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+                        <h2>
+                            <i class="bi bi-graph-up-arrow text-info icon-inline" aria-hidden="true"></i> <span data-i18n="session_analytics.title">Your observing record</span>
+                        </h2>
+                        <button type="button" class="btn btn-sm btn-outline-primary" data-action="open-year-review">
+                            <i class="bi bi-calendar-heart icon-inline" aria-hidden="true"></i> <span data-i18n="year_review.open">My astro year</span>
+                        </button>
+                    </div>
                     <p class="text-muted small mb-2" data-i18n="session_analytics.intro">What your logbook says about the nights you have spent under the sky.</p>
                     <div id="session-analytics-stats"></div>
                 </div>
@@ -938,6 +952,49 @@
                     </h3>
                     <p class="text-muted small mb-2" data-i18n="session_analytics.conditions_intro">How you rated your own results under the conditions you recorded. Descriptive only - it reports what your log contains, it does not predict anything.</p>
                     <div id="session-analytics-conditions"></div>
+                </div>
+            </div>
+
+            <!-- Progress Sub-tab (v1.9): badges, next milestones, challenges -->
+            <div id="progress-subtab" class="sub-tab-content">
+                <div id="progress-disabled" class="shadow p-2 mb-3 rounded bg-sub-container d-none">
+                    <p class="text-muted mb-0" data-i18n="progress.disabled">Badges and challenges are turned off. You can turn them back on in My settings -> Customize.</p>
+                </div>
+                <div id="progress-content">
+                    <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+                            <h2>
+                                <i class="bi bi-trophy-fill text-warning icon-inline" aria-hidden="true"></i> <span data-i18n="progress.title">Your progress</span>
+                            </h2>
+                            <button type="button" id="progress-year-review-btn" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-calendar-heart icon-inline" aria-hidden="true"></i> <span data-i18n="year_review.open">My astro year</span>
+                            </button>
+                        </div>
+                        <p class="text-muted small mb-2" data-i18n="progress.intro">Milestones reached from what you actually logged, and what to aim for next.</p>
+                        <div id="progress-stats"></div>
+                    </div>
+
+                    <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                        <h3 class="session-analytics-section-title">
+                            <i class="bi bi-flag-fill text-success icon-inline" aria-hidden="true"></i> <span data-i18n="progress.next_title">Next within reach</span>
+                        </h3>
+                        <div id="progress-next"></div>
+                    </div>
+
+                    <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                        <h3 class="session-analytics-section-title">
+                            <i class="bi bi-signpost-split-fill text-info icon-inline" aria-hidden="true"></i> <span data-i18n="progress.challenges_title">Challenges</span>
+                        </h3>
+                        <div id="progress-challenges"></div>
+                    </div>
+
+                    <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                        <h3 class="session-analytics-section-title">
+                            <i class="bi bi-award-fill text-warning icon-inline" aria-hidden="true"></i> <span data-i18n="progress.badges_title">Badges</span>
+                        </h3>
+                        <p class="text-muted small mb-2" data-i18n="progress.badges_note">Badges are read from your logbook and your Astrodex as they are now: deleting the entries a badge rests on takes it back.</p>
+                        <div id="progress-badges"></div>
+                    </div>
                 </div>
             </div>
 
@@ -1364,6 +1421,13 @@
                                     <label class="form-check-label" for="pref-recommendations-enabled" data-i18n="settings.pref_recommendations_enabled">Show "Tonight for you" panel</label>
                                 </div>
                                 <div class="form-text" data-i18n="settings.pref_recommendations_enabled_info">Shows a "Tonight for you" panel of recommended targets at the top of the SkyTonight Deep Sky Objects tab.</div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check form-switch mt-4">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="pref-achievements-enabled" checked>
+                                    <label class="form-check-label" for="pref-achievements-enabled" data-i18n="settings.pref_achievements_enabled">Show badges and challenges</label>
+                                </div>
+                                <div class="form-text" data-i18n="settings.pref_achievements_enabled_info">Adds a "Progress" tab to Astrodex with badges earned from your log, seasonal challenges and the Messier marathon.</div>
                             </div>
                             <div class="col-md-4 d-none" id="pref-mqtt-publish-wrapper">
                                 <div class="form-check form-switch mt-4">
@@ -3805,6 +3869,8 @@
     <script src="{{ base }}/static/js/observation_sessions.js?v={{ version }}"></script>
     <script src="{{ base }}/static/js/session_analytics.js?v={{ version }}"></script>
     <script src="{{ base }}/static/js/wishlist.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/progress.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/year_review.js?v={{ version }}"></script>
     <script src="{{ base }}/static/js/config.js?v={{ version }}"></script>
     <script src="{{ base }}/static/js/locations.js?v={{ version }}"></script>
     <script src="{{ base }}/static/js/astrodex_map.js?v={{ version }}"></script>

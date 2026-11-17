@@ -267,6 +267,11 @@ async function initializeApp() {
     // Load initial page from user preferences (or fallback defaults)
     applyUserStartupPreferences();
 
+    // v1.9 My Progress: hide the Progress tab when badges are off, and offer the year in
+    // review around the end of the year.
+    if (typeof applyProgressVisibility === 'function') applyProgressVisibility();
+    if (typeof initYearReviewHighlight === 'function') initYearReviewHighlight();
+
     // Start background notification poller (runs every 5 min, tab-independent)
     if (typeof startNotificationPoller === 'function') startNotificationPoller();
 
@@ -542,6 +547,9 @@ function switchSubTab(parentTab, subtabName, options = {}) {
         case 'analytics':
             if (typeof loadSessionAnalytics === 'function') loadSessionAnalytics();
             break; // Astrodex tab (v1.5)
+        case 'progress':
+            if (typeof loadProgress === 'function') loadProgress();
+            break; // Astrodex tab (v1.9)
         case 'wishlist':
             if (typeof loadWishlist === 'function') loadWishlist();
             break; // Astrodex tab (v1.5)

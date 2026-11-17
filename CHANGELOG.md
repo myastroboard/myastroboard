@@ -8,7 +8,9 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Features
 
-- None.
+- My Progress: a "My astro year" review of any year, screen by screen and each one shareable, highlighted
+  from 1 December to 15 January; badges earned from your log, seasonal challenges and a Messier marathon
+  planner for your latitude in Astrodex -> Progress ([docs/MY_PROGRESS.md](docs/MY_PROGRESS.md)).
 
 ### Fixes
 

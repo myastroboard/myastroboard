@@ -1,0 +1,403 @@
+/* My Progress (v1.9) - the Astrodex "Progress" sub-tab (static/js/progress.js) and the
+   year in review viewer (static/js/year_review.js).
+
+   Everything takes its colour from the theme tokens of bs_variables.css; the two local
+   tokens below are the only state colours, and the red night-vision theme folds them into
+   its own red ramp. The review screens themselves are canvases drawn by the share card
+   engine with their own fixed palette, so nothing here colours them. */
+
+:root {
+    --progress-earned: var(--accent-2);
+    --progress-captured: var(--success-500);
+}
+
+html[data-theme="red"] {
+    --progress-earned: var(--accent-2);
+    --progress-captured: var(--accent-1);
+}
+
+/* ── Shared ─────────────────────────────────────────────────────────────── */
+
+.progress-empty {
+    padding: var(--space-3) 0;
+}
+
+.progress-badge-bar {
+    height: 0.4rem;
+    margin: var(--space-1) 0;
+    background-color: var(--surface-border);
+}
+
+.progress-badge-bar .progress-bar {
+    background-color: var(--accent-1);
+}
+
+.progress-next-counter {
+    margin-left: auto;
+    padding-left: var(--space-2);
+    font-size: 0.85rem;
+    font-weight: var(--font-semibold);
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+/* ── Next within reach ──────────────────────────────────────────────────── */
+
+.progress-next-list {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+}
+
+@media (min-width: 992px) {
+    .progress-next-list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+.progress-next-item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--border-radius-card);
+    background: var(--surface-card);
+}
+
+.progress-next-body {
+    flex: 1 1 12rem;
+    min-width: 0;
+}
+
+.progress-next-title {
+    display: flex;
+    align-items: baseline;
+    font-weight: var(--font-semibold);
+    color: var(--text-color);
+}
+
+/* ── Badges ─────────────────────────────────────────────────────────────── */
+
+.progress-group-title {
+    margin: var(--space-4) 0 var(--space-2);
+    font-size: 0.95rem;
+    font-weight: var(--font-semibold);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.progress-group-title:first-child {
+    margin-top: 0;
+}
+
+.progress-badge-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(13.5rem, 1fr));
+    gap: var(--space-3);
+}
+
+@media (max-width: 420px) {
+    .progress-badge-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.progress-badge {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--border-radius-card);
+    background: var(--surface-card);
+    color: var(--text-color);
+}
+
+.progress-badge.is-earned {
+    border-color: color-mix(in srgb, var(--progress-earned) 55%, transparent);
+}
+
+.progress-badge-top {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.progress-badge-icon {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.4rem;
+    height: 2.4rem;
+    border-radius: 50%;
+    font-size: 1.15rem;
+    color: var(--text-muted);
+    background: var(--surface-border);
+}
+
+.progress-badge-icon.is-earned {
+    color: var(--progress-earned);
+    background: color-mix(in srgb, var(--progress-earned) 16%, transparent);
+}
+
+.progress-badge-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-2);
+    min-width: 0;
+}
+
+.progress-badge-name {
+    font-weight: var(--font-semibold);
+    overflow-wrap: anywhere;
+}
+
+.progress-badge-new {
+    font-size: 0.7rem;
+}
+
+.progress-badge-description {
+    flex: 1 1 auto;
+}
+
+.progress-badge-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+}
+
+.progress-badge-footer .progress-badge-bar {
+    flex: 1 1 100%;
+}
+
+.progress-badge-earned {
+    color: var(--progress-earned);
+    font-weight: var(--font-medium);
+}
+
+/* ── Challenges ─────────────────────────────────────────────────────────── */
+
+.progress-challenge-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+}
+
+@media (max-width: 420px) {
+    .progress-challenge-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.progress-challenge,
+.progress-marathon {
+    padding: var(--space-3);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--border-radius-card);
+    background: var(--surface-card);
+    color: var(--text-color);
+}
+
+.progress-marathon {
+    margin-bottom: var(--space-3);
+}
+
+.progress-marathon.is-in-season {
+    border-color: color-mix(in srgb, var(--progress-earned) 60%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--progress-earned) 30%, transparent);
+}
+
+.progress-challenge-header {
+    display: flex;
+    align-items: baseline;
+    margin-bottom: var(--space-1);
+}
+
+.progress-challenge-title {
+    font-weight: var(--font-semibold);
+}
+
+.progress-target-list .list-group-item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    padding-left: 0;
+    padding-right: 0;
+    background: transparent;
+    color: var(--text-color);
+    border-color: var(--surface-border);
+}
+
+.progress-target-mark {
+    flex: 0 0 auto;
+    color: var(--text-muted);
+}
+
+/* The name takes the room left by the mark and the wishlist button, so a long common
+   name wraps under itself instead of pushing the mark onto its own line. */
+.progress-target-text {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.progress-target.is-captured .progress-target-mark,
+.progress-marathon-list .is-captured .progress-target-mark {
+    color: var(--progress-captured);
+}
+
+.progress-marathon-details summary {
+    cursor: pointer;
+    font-weight: var(--font-medium);
+}
+
+.progress-marathon-list {
+    columns: 1;
+    margin: var(--space-2) 0 0;
+    padding-left: 1.6rem;
+}
+
+@media (min-width: 768px) {
+    .progress-marathon-list {
+        columns: 2;
+    }
+}
+
+@media (min-width: 1200px) {
+    .progress-marathon-list {
+        columns: 3;
+    }
+}
+
+.progress-marathon-list li {
+    break-inside: avoid;
+    padding: 0.1rem 0;
+}
+
+.progress-marathon-time {
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+}
+
+/* ── Year in review viewer ──────────────────────────────────────────────── */
+
+.year-review {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3);
+    max-width: 44rem;
+    margin: 0 auto;
+}
+
+.year-review-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    width: 100%;
+}
+
+.year-review-year {
+    width: auto;
+}
+
+.year-review-counter {
+    margin-left: auto;
+}
+
+/* The canvas is 1080 x 1350 (4:5); it is scaled to fit the screen height, minus the
+   modal header and footer, the year picker, the navigation, the share button and the
+   privacy line, so the share button stays on screen without scrolling. */
+.year-review-stage {
+    width: min(100%, calc((100dvh - 25rem) * 0.8));
+    min-width: 15rem;
+    aspect-ratio: 4 / 5;
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+}
+
+.year-review-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.year-review-nav {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.year-review-dots {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-2);
+}
+
+.year-review-dot {
+    width: 0.65rem;
+    height: 0.65rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--surface-border-strong);
+}
+
+.year-review-dot.is-active {
+    background: var(--accent-1);
+}
+
+.year-review-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-2);
+}
+
+.year-review-empty {
+    padding: var(--space-5) var(--space-3);
+    color: var(--text-muted);
+}
+
+.year-review-empty-icon {
+    display: block;
+    margin-bottom: var(--space-3);
+    font-size: 2.5rem;
+    color: var(--accent-1);
+}
+
+/* ── End-of-year highlight (Astrophotography tab) ───────────────────────── */
+
+.year-review-highlight {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+    padding: var(--space-3);
+    border: 1px solid color-mix(in srgb, var(--progress-earned) 50%, transparent);
+    border-radius: var(--border-radius-card);
+    background: var(--surface-1);
+    color: var(--text-color);
+    box-shadow: var(--shadow-sm);
+}
+
+.year-review-highlight.d-none {
+    display: none;
+}
+
+.year-review-highlight-icon {
+    font-size: 1.6rem;
+    color: var(--progress-earned);
+}

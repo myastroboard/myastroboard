@@ -16,6 +16,7 @@ device and never affect other users. Instance-wide settings are in App settings,
 | Experience level | Beginner, Intermediate, Advanced | Filters "Tonight for you" and the Beginner Catalog by difficulty ([BEGINNER_EXPERIENCE.md](BEGINNER_EXPERIENCE.md)) |
 | Beginner Catalog | on / off | Shows the Beginner sub-tab in SkyTonight |
 | "Tonight for you" | on / off | Recommended targets at the top of SkyTonight -> Deep Sky Objects |
+| Badges and challenges | on / off | The Astrodex -> Progress tab ([MY_PROGRESS.md](MY_PROGRESS.md)) |
 | Publish my activity to Home Assistant | on / off (off by default) | Creates a Home Assistant device with your own Astrodex counters, tonight's plan and your log totals, when the administrator runs the MQTT connector ([HOME_ASSISTANT.md](HOME_ASSISTANT.md)) |
 
 **Reset to defaults** restores every choice above. The interface language is picked in the footer

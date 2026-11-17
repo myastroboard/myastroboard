@@ -88,7 +88,8 @@
     "about": "À propos",
     "observatory": "Observatoire",
     "session_analytics": "Votre ciel",
-    "wishlist": "Liste de souhaits"
+    "wishlist": "Liste de souhaits",
+    "progress": "Progression"
   },
   "about": {
     "title": "À propos de MyAstroBoard",
@@ -1028,7 +1029,9 @@
     "2fa_confirmed_at": "Active depuis le {date}",
     "2fa_disable_confirm_password": "Confirmez avec votre mot de passe actuel",
     "trusted_networks_broad_confirm": "Le réseau '{network}' couvre une plage d'adresses anormalement large - c'est souvent une erreur de frappe dans le préfixe (par exemple /2 au lieu de /24). L'ajouter quand même ?",
-    "2fa_already_enabled": "La double authentification est déjà active. Désactivez-la d'abord avant de la reconfigurer."
+    "2fa_already_enabled": "La double authentification est déjà active. Désactivez-la d'abord avant de la reconfigurer.",
+    "pref_achievements_enabled": "Afficher les badges et les défis",
+    "pref_achievements_enabled_info": "Ajoute à l'Astrodex un onglet \"Progression\" avec les badges obtenus d'après votre journal, les défis de saison et le marathon Messier."
   },
   "astrodex": {
     "title": "Astrodex - Attrapez-les tous !",
@@ -3240,5 +3243,186 @@
     "banner_install": "Installer la vôtre",
     "read_only": "Démo en lecture seule : les modifications ne sont pas enregistrées. Installez votre propre MyAstroBoard pour garder vos données.",
     "signin_refused": "Ce compte ne peut pas se connecter sur la démo. Préparez la démo avec DEMO_MODE désactivé, voir docs/DEMO_MODE.md."
+  },
+  "progress": {
+    "title": "Votre progression",
+    "intro": "Les étapes franchies d'après ce que vous avez réellement enregistré, et ce qu'il reste à viser.",
+    "disabled": "Les badges et les défis sont désactivés. Vous pouvez les réactiver dans Mes paramètres -> Personnaliser.",
+    "next_title": "Prochaines étapes à portée",
+    "challenges_title": "Défis",
+    "badges_title": "Badges",
+    "badges_note": "Les badges sont lus dans votre journal et votre Astrodex tels qu'ils sont : supprimer les entrées sur lesquelles repose un badge le retire.",
+    "stat_badges": "Badges obtenus",
+    "stat_badges_hint": "Calculés d'après ce que vous avez réellement enregistré",
+    "stat_objects": "Objets capturés",
+    "stat_objects_hint": "Journal et Astrodex réunis",
+    "next_none": "Tous les badges commencés sont obtenus. Choisissez un défi ci-dessous pour en commencer un nouveau.",
+    "next_start": "Enregistrez votre première nuit ou ajoutez un objet à votre Astrodex : vos premiers badges suivront.",
+    "visible_tonight": "Visible ce soir",
+    "missing_title": "Encore à capturer, visible ce soir : {catalogue}",
+    "missing_intro": "Les objets de ce catalogue que vous n'avez pas encore capturés, observables ce soir dans vos contraintes SkyTonight, les plus longtemps visibles d'abord.",
+    "missing_none": "Plus rien de ce catalogue n'est observable d'ici ce soir.",
+    "hours_tonight": "{hours} h ce soir",
+    "transit_at": "Au plus haut à {time}",
+    "load_error": "Impossible de charger votre progression.",
+    "counter_hours": "{current} h / {target} h",
+    "new": "Nouveau",
+    "earned": "Obtenu",
+    "earned_on": "Obtenu le {date}",
+    "captured": "Capturé",
+    "not_captured": "Pas encore capturé",
+    "share_title": "Partager ce badge",
+    "share_kicker": "Badge",
+    "share_earned": "Obtenu le",
+    "share_constellations": "constellations",
+    "season_intro": "{season} : les objets Messier et Caldwell les plus brillants bien placés depuis {location} cette saison, dans vos limites d'altitude SkyTonight.",
+    "season_winter": "Hiver",
+    "season_spring": "Printemps",
+    "season_summer": "Été",
+    "season_autumn": "Automne",
+    "challenge_galaxy": "Les galaxies de la saison",
+    "challenge_nebula": "Les nébuleuses de la saison",
+    "challenge_cluster": "Les amas d'étoiles de la saison",
+    "challenges_error": "Les défis n'ont pas pu être calculés pour votre lieu.",
+    "challenges_none": "Aucun défi ne peut être calculé pour votre lieu en ce moment.",
+    "marathon_title": "Marathon Messier {year}",
+    "marathon_when": "Nuit du {date}, Lune éclairée à {moon} % - dans {days} jours.",
+    "marathon_tonight": "C'est ce soir : Lune éclairée à {moon} %.",
+    "marathon_past": "Nuit du {date}, Lune éclairée à {moon} %.",
+    "marathon_reach": "Depuis votre lieu, {reachable} des {total} objets Messier sont accessibles cette nuit-là, jusqu'à {altitude} degrés de hauteur, entre {start} et {end}. {captured} d'entre eux sont déjà dans votre journal.",
+    "marathon_order": "Ordre conseillé pour votre latitude",
+    "marathon_unreachable": "Hors de portée d'ici cette nuit-là : {names}.",
+    "group_firsts": "Premières fois",
+    "group_catalogues": "Catalogues",
+    "group_endurance": "Endurance",
+    "group_sky": "Tout le ciel",
+    "group_conditions": "Conditions",
+    "class_galaxy": "Galaxies",
+    "class_nebula": "Nébuleuses",
+    "class_cluster": "Amas d'étoiles",
+    "class_comet": "Comètes",
+    "class_planet": "Planètes",
+    "class_moon": "La Lune",
+    "class_sun": "Le Soleil",
+    "class_star": "Étoiles",
+    "class_other": "Autres objets",
+    "badges": {
+      "first_galaxy": {
+        "name": "Première galaxie",
+        "description": "Capturez votre première galaxie."
+      },
+      "first_nebula": {
+        "name": "Première nébuleuse",
+        "description": "Capturez votre première nébuleuse."
+      },
+      "first_cluster": {
+        "name": "Premier amas d'étoiles",
+        "description": "Capturez votre premier amas d'étoiles."
+      },
+      "first_comet": {
+        "name": "Première comète",
+        "description": "Capturez votre première comète."
+      },
+      "first_planet": {
+        "name": "Première planète",
+        "description": "Capturez votre première planète."
+      },
+      "dark_site": {
+        "name": "Ciel noir",
+        "description": "Observez une nuit sous un ciel Bortle 3 ou plus sombre (SQM de 21,3 ou plus)."
+      },
+      "new_moon_night": {
+        "name": "Nuit de nouvelle Lune",
+        "description": "Observez une nuit où la Lune est éclairée à 5 % au plus."
+      }
+    },
+    "rules": {
+      "catalogue_count": {
+        "name": "{catalogue} {count}",
+        "description": "Capturez {count} objets du catalogue {catalogue}."
+      },
+      "catalogue_complete": {
+        "name": "{catalogue} complet",
+        "description": "Capturez les {count} objets du catalogue {catalogue}."
+      },
+      "integration_hours": {
+        "name": "{count} heures de lumière",
+        "description": "Cumulez {count} heures d'intégration au total."
+      },
+      "single_target_hours": {
+        "name": "{count} heures sur une cible",
+        "description": "Cumulez {count} heures d'intégration sur un seul objet."
+      },
+      "multi_night_session": {
+        "name": "Plusieurs nuits, une session",
+        "description": "Enregistrez une session de {count} nuits ou plus."
+      },
+      "seasons": {
+        "name": "Quatre saisons",
+        "description": "Capturez quelque chose à chaque saison de l'année."
+      },
+      "constellations": {
+        "name": "{count} constellations",
+        "description": "Capturez des objets dans {count} constellations différentes."
+      },
+      "hemispheres": {
+        "name": "Deux hémisphères",
+        "description": "Capturez des objets de part et d'autre de l'équateur céleste."
+      }
+    },
+    "remaining": {
+      "catalogue_count": "Encore {remaining} objets {catalogue} pour ce badge.",
+      "integration_hours": "Encore {remaining} heures d'intégration pour ce badge.",
+      "single_target_hours": "Encore {remaining} heures sur votre cible la plus photographiée.",
+      "multi_night_session": "Ajoutez une deuxième nuit à la même session.",
+      "seasons": "Encore {remaining} saisons à couvrir.",
+      "constellations": "Encore {remaining} constellations pour ce badge.",
+      "hemispheres": "Capturez un objet de l'autre côté de l'équateur céleste."
+    }
+  },
+  "year_review": {
+    "open": "Mon année astro",
+    "title": "Mon année astro {year}",
+    "kicker": "Mon année astro {year}",
+    "year_subheading": "Une année sous le ciel",
+    "hero_integration": "de lumière collectée",
+    "hero_objects": "objets capturés",
+    "hero_on_target": "sur cette cible",
+    "hero_that_night": "collectées cette nuit-là",
+    "hero_share": "de la lumière de l'année",
+    "fact_nights": "Nuits dehors",
+    "fact_sessions": "Sessions",
+    "fact_objects": "Objets",
+    "fact_new": "Nouveaux cette année",
+    "fact_favourite": "Type préféré",
+    "fact_nights_on_it": "Nuits dessus",
+    "fact_rating": "Votre note",
+    "fact_hours": "Intégration",
+    "fact_combinations": "Configurations utilisées",
+    "fact_previous": "En {year}",
+    "fact_pictures": "Photos",
+    "targets_heading": "Vos cibles",
+    "target_kicker": "Cible de l'année {year}",
+    "night_kicker": "Meilleure nuit de {year}",
+    "equipment_kicker": "Le matériel qui a le plus travaillé",
+    "progress_heading": "Votre progression",
+    "list_catalogues": "Catalogues",
+    "gained": "(+{count} cette année)",
+    "previous_objects": "{count} objets",
+    "mosaic_heading": "Mon {year} en images",
+    "share": "Partager cet écran",
+    "share_title": "Partager cet écran",
+    "counter": "{index} / {total}",
+    "previous": "Écran précédent",
+    "next": "Écran suivant",
+    "go_to": "Écran {index}",
+    "year_label": "Année",
+    "privacy": "Vous seul voyez votre rétrospective. Elle est dessinée dans votre navigateur à partir de votre propre journal et ne montre jamais votre lieu.",
+    "empty": "Rien dans votre journal ni dans votre Astrodex pour {year} pour l'instant. Enregistrez une nuit ou ajoutez une photo, et votre rétrospective se construira toute seule.",
+    "load_error": "Impossible de charger votre rétrospective.",
+    "highlight_title": "Votre année astro {year} est prête",
+    "highlight_text": "Quelques écrans sur votre année sous le ciel, chacun prêt à partager.",
+    "highlight_open": "La voir",
+    "highlight_dismiss": "Masquer jusqu'à l'an prochain"
   }
 }
