@@ -495,6 +495,37 @@ def _cached_night_context(
     return context
 
 
+def night_context_for(location: dict[str, Any], night_date: date) -> dict[str, Any]:
+    """The cached night context of *location* for *night_date* (see build_night_context)."""
+    lat_deg, lon_deg, timezone_name, _horizon = _location_geometry(location)
+    return _cached_night_context(location.get('id'), lat_deg, lon_deg, timezone_name, night_date)
+
+
+def observing_constraints() -> tuple[float, float]:
+    """``(altitude_min, altitude_max)`` as the live SkyTonight calculator applies them."""
+    return _resolve_constraints()
+
+
+def location_geometry(location: dict[str, Any]) -> tuple[float, float, str, list[dict[str, Any]]]:
+    """``(latitude, longitude, timezone, horizon_profile)`` read defensively off a preset."""
+    return _location_geometry(location)
+
+
+def location_cache_signature(location: dict[str, Any]) -> tuple[Any, ...]:
+    """Every preset field a location-dependent result depends on (see _location_cache_signature)."""
+    return _location_cache_signature(location)
+
+
+def fixed_target_altaz(ra_deg: float, dec_deg: float, lat_deg: float, lst_hours: np.ndarray):
+    """Analytic ``(alt, az)`` arrays of a fixed target over an LST array (see _target_altaz)."""
+    return _target_altaz(ra_deg, dec_deg, lat_deg, lst_hours)
+
+
+def horizon_floor(azimuths: np.ndarray, horizon_profile: list[dict[str, Any]]) -> np.ndarray:
+    """The custom horizon's altitude at each azimuth, as SkyTonight applies it."""
+    return _horizon_floor_array(azimuths.astype(np.float64), horizon_profile or [])
+
+
 def _remember(cache: OrderedDict, key: Any, value: Any) -> Any:
     """Store *value* in a bounded LRU and return it."""
     cache[key] = value

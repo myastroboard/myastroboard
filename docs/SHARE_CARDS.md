@@ -14,6 +14,8 @@ The share button (a share icon) opens the card:
 | **Observing session** | Astrodex -> Observation Log -> a session -> share button in the toolbar | Date, equipment combination, total integration, number of targets and nights, average SQM and Moon illumination, the list of targets, and the session's first linked picture when there is one |
 | **My sky tonight** | SkyTonight -> "Tonight for you" card header | Night score, best imaging window and its duration, Moon phase and illumination, the three recommended targets |
 | **Event** | Calendar -> an event in the timeline | The event title, when it happens (in the location's time zone), whether it is happening now, and its description |
+| **Badge** | Astrodex -> Progress -> an earned badge | The badge, its date, and for a catalogue badge the count and a montage of your own pictures of that catalogue |
+| **Year in review** | Astrodex -> Your Sky or Progress -> My astro year | Each screen of the review ([MY_PROGRESS.md](MY_PROGRESS.md)) |
 
 The framing simulator has its own export, see [SKYTONIGHT.md](SKYTONIGHT.md#framing-simulator).
 
@@ -56,7 +58,12 @@ otherwise.
 
 - `openShareCard(model)` - the modal: preview, options, download and share. A model is a plain
   object: `kicker`, `heading`, `subheading`, an optional same-origin `imageUrl`, an optional `hero`
-  figure, `facts` (each with an `id` so it can be unchecked), an optional `list` and `paragraph`.
+  figure, `facts` (each with an `id` so it can be unchecked), an optional `list` and `paragraph`,
+  optional `mosaicUrls` (several same-origin pictures assembled into one square-tiled montage when
+  there is no `imageUrl`) and `onClose` (called when the modal closes, so a caller can reopen its own
+  view), `bars` (labelled progress bars, each with a value, a total and an optional note), and
+  `fill` (a card without picture scales its text up to fill the card). A `list` is numbered unless
+  it says `numbered: false`.
 - `drawShareCard(canvas, model, options, image)` - the drawing. The text block is planned first
   (fonts shrink to fit, long lines are clamped), then the picture gets the remaining height.
 - `shareAstrodexPicture`, `shareObservationSession`, `shareTonight`, `shareEvent` - build a model

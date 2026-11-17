@@ -168,6 +168,7 @@ from blueprints.misc import misc_bp
 from blueprints.mqtt_connections import mqtt_connections_bp
 from blueprints.observation_sessions import observation_sessions_bp
 from blueprints.plan_my_night import plan_my_night_bp
+from blueprints.progress import progress_bp
 from blueprints.push import push_bp
 from blueprints.session_analytics import session_analytics_bp
 
@@ -197,6 +198,7 @@ app.register_blueprint(astrodex_bp)
 app.register_blueprint(equipment_bp)
 app.register_blueprint(observation_sessions_bp)
 app.register_blueprint(session_analytics_bp)
+app.register_blueprint(progress_bp)
 
 
 # ============================================================

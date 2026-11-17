@@ -1663,6 +1663,99 @@ textarea.form-control:focus {
     left: 0;
 }
 
+/* Phone sub-tab menu (static/js/subtab_menu.js): below the "md" breakpoint each sub-tab
+   bar is replaced by one dropdown button showing the current sub-tab; the caret says it is
+   a menu. Wider screens keep the pills. */
+.subtab-menu {
+    display: none;
+}
+
+@media (max-width: 767.98px) {
+    .main-tab-content .sub-tabs {
+        display: none !important;
+    }
+
+    .subtab-menu:not(.is-empty) {
+        display: block;
+    }
+
+    /* The panel around the bar clips its content and is a stacking context: let the open
+       list overflow it and sit above the panels that follow. Its corner glow would
+       overflow too, so it goes. */
+    .bg-sub-container.has-subtab-menu {
+        overflow: visible;
+        z-index: 20;
+    }
+
+    .bg-sub-container.has-subtab-menu::after {
+        display: none;
+    }
+}
+
+.subtab-menu-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    min-height: 2.6rem;
+    border: 1px solid var(--surface-border-strong);
+    border-radius: var(--border-radius-pill);
+    background-color: var(--bg-violet);
+    color: var(--text-color);
+    font-weight: bold;
+    text-align: left;
+}
+
+.subtab-menu-toggle:hover,
+.subtab-menu-toggle:focus-visible,
+.subtab-menu-toggle.show {
+    border-color: var(--accent-1);
+    color: var(--text-color);
+}
+
+/* Bootstrap's caret, pushed to the right edge. */
+.subtab-menu-toggle::after {
+    margin-left: auto;
+}
+
+.subtab-menu-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.subtab-menu-list {
+    width: 100%;
+    padding: 0.35rem;
+    /* Opaque in every theme: --surface-panel lets the page show through. */
+    background-color: var(--surface-card);
+    border-color: var(--surface-border-strong);
+    box-shadow: var(--shadow-glass);
+}
+
+.subtab-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.5rem;
+    border-radius: var(--border-radius-pill);
+    color: var(--text-color);
+}
+
+.subtab-menu-item:hover,
+.subtab-menu-item:focus {
+    background-color: var(--surface-hover);
+    color: var(--text-color);
+}
+
+/* Same as an active pill. */
+.subtab-menu-item.active,
+.subtab-menu-item:active {
+    background-color: var(--bg-violet);
+    color: var(--text-color);
+    font-weight: bold;
+}
+
 @media (max-width: 1292px) {
     .sub-tab-btn {
         padding: 0.4rem 0.6rem !important;

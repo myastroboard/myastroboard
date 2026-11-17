@@ -20,8 +20,13 @@
  *     imageUrl?: string,                  same-origin picture, drawn uncropped
  *     hero?: { value, unit?, label },     one large figure
  *     facts?: [{ id, label, value }],     each can be unchecked by the user
- *     list?: { title, items: string[] },
+ *     list?: { title, items: string[], numbered?: boolean },   numbered by default
+ *     bars?: { title?, items: [{ label, value, total, note? }] }, labelled progress bars
+ *     fill?: boolean,                     a card without picture scales its text up to fill
  *     paragraph?: string,
+ *     mosaicUrls?: string[],              several same-origin pictures, drawn as one montage
+ *                                         when there is no imageUrl
+ *     onClose?: Function,                 called when the share modal is closed
  *   }
  */
 
@@ -69,6 +74,8 @@ const SHARE_MARGIN = 64;
 const SHARE_MIN_IMAGE_HEIGHT = 380;
 const SHARE_MAX_LIST_ITEMS = 6;
 const SHARE_MAX_PARAGRAPH_LINES = 5;
+// Largest text scale a text-only card may use to fill itself (model.fill).
+const SHARE_MAX_FILL_SCALE = 1.7;
 
 // Number of share modals opened so far, used to build unique element ids.
 let _shModalCount = 0;
@@ -181,69 +188,95 @@ function _shSeedFrom(text) {
  * done later from this plan, once the block's total height is known - that height decides
  * how much room a picture gets.
  * @param {number} inner - width available to the text, in pixels
+ * @param {number} [scale] - text size factor; a card without picture can ask for a larger
+ *     block (model.fill) so a few figures do not float in an empty card
  * @returns {{blocks: Object[], height: number}}
  */
-function _shPlanInfo(ctx, model, options, inner, palette, compact) {
+function _shPlanInfo(ctx, model, options, inner, palette, compact, scale = 1) {
     const blocks = [];
-    const push = (block) => blocks.push(block);
-    const gap = (height) => push({ kind: 'gap', height });
+    const px = (value) => Math.round(value * scale);
+    const push = (block) => blocks.push({ scale, ...block });
+    const gap = (height) => push({ kind: 'gap', height: px(height) });
 
     if (model.kicker) {
-        push({ kind: 'text', text: model.kicker.toUpperCase(), font: _shFont(700, 26), color: palette.accent, height: 38, spacing: 3 });
+        push({ kind: 'text', text: model.kicker.toUpperCase(), font: _shFont(700, px(26)), color: palette.accent, height: px(38), spacing: 3 });
     }
-    const heading = _shFitText(ctx, model.heading || '', inner, 700, compact ? 56 : 68, 36, 2);
+    const heading = _shFitText(ctx, model.heading || '', inner, 700, px(compact ? 56 : 68), 36, 2);
     heading.lines.forEach((line) => {
         push({ kind: 'text', text: line, font: _shFont(700, heading.size), color: palette.text, height: Math.round(heading.size * 1.2) });
     });
     if (model.subheading) {
-        ctx.font = _shFont(400, 30);
+        ctx.font = _shFont(400, px(30));
         _shWrapClamped(ctx, model.subheading, inner, 2).forEach((line) => {
-            push({ kind: 'text', text: line, font: _shFont(400, 30), color: palette.muted, height: 42 });
+            push({ kind: 'text', text: line, font: _shFont(400, px(30)), color: palette.muted, height: px(42) });
         });
     }
 
     if (model.hero) {
         gap(compact ? 18 : 34);
-        push({ kind: 'hero', hero: model.hero, height: compact ? 130 : 170, size: compact ? 104 : 136 });
+        push({ kind: 'hero', hero: model.hero, height: px(compact ? 130 : 170), size: px(compact ? 104 : 136) });
     }
 
     const facts = (model.facts || []).filter((fact) => options.facts[fact.id] !== false && fact.value);
     if (facts.length) {
         gap(compact ? 20 : 30);
         for (let index = 0; index < facts.length; index += 2) {
-            push({ kind: 'facts', left: facts[index], right: facts[index + 1] || null, height: 92 });
+            push({ kind: 'facts', left: facts[index], right: facts[index + 1] || null, height: px(92) });
         }
+    }
+
+    if (model.bars && model.bars.items && model.bars.items.length) {
+        gap(compact ? 16 : 26);
+        if (model.bars.title) {
+            push({ kind: 'text', text: model.bars.title.toUpperCase(), font: _shFont(700, px(22)), color: palette.muted, height: px(36), spacing: 2 });
+        }
+        model.bars.items.slice(0, SHARE_MAX_LIST_ITEMS).forEach((bar) => {
+            push({ kind: 'bar', bar, height: px(84) });
+        });
     }
 
     if (model.list && model.list.items && model.list.items.length) {
         gap(compact ? 16 : 26);
-        push({ kind: 'text', text: model.list.title.toUpperCase(), font: _shFont(700, 22), color: palette.muted, height: 36, spacing: 2 });
+        push({ kind: 'text', text: model.list.title.toUpperCase(), font: _shFont(700, px(22)), color: palette.muted, height: px(36), spacing: 2 });
         const items = model.list.items.slice(0, SHARE_MAX_LIST_ITEMS);
         const extra = model.list.items.length - items.length;
+        const numbered = model.list.numbered !== false;
         items.forEach((item, index) => {
-            push({ kind: 'item', index: index + 1, text: item, height: 46 });
+            push({ kind: 'item', index: numbered ? index + 1 : null, text: item, height: px(46) });
         });
         if (extra > 0) {
             push({
                 kind: 'text',
                 text: _shT('share.and_more', 'and {count} more', { count: extra }),
-                font: _shFont(400, 26),
+                font: _shFont(400, px(26)),
                 color: palette.muted,
-                height: 40,
+                height: px(40),
             });
         }
     }
 
     if (model.paragraph) {
         gap(compact ? 16 : 26);
-        ctx.font = _shFont(400, 30);
+        ctx.font = _shFont(400, px(30));
         _shWrapClamped(ctx, model.paragraph, inner, SHARE_MAX_PARAGRAPH_LINES).forEach((line) => {
-            push({ kind: 'text', text: line, font: _shFont(400, 30), color: palette.text, height: 44 });
+            push({ kind: 'text', text: line, font: _shFont(400, px(30)), color: palette.text, height: px(44) });
         });
     }
 
     const height = blocks.reduce((total, block) => total + block.height, 0);
     return { blocks, height };
+}
+
+function _shRoundedBar(ctx, x, y, width, height) {
+    const radius = height / 2;
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.arc(x + width - radius, y + radius, radius, -Math.PI / 2, Math.PI / 2);
+    ctx.lineTo(x + radius, y + height);
+    ctx.arc(x + radius, y + radius, radius, Math.PI / 2, (3 * Math.PI) / 2);
+    ctx.closePath();
+    ctx.fill();
 }
 
 function _shDrawInfo(ctx, plan, left, top, inner, palette) {
@@ -254,6 +287,7 @@ function _shDrawInfo(ctx, plan, left, top, inner, palette) {
     ctx.textBaseline = 'alphabetic';
     ctx.textAlign = 'left';
     plan.blocks.forEach((block) => {
+        const px = (value) => Math.round(value * (block.scale || 1));
         if (block.kind === 'text') {
             ctx.font = block.font;
             ctx.fillStyle = block.color;
@@ -271,31 +305,70 @@ function _shDrawInfo(ctx, plan, left, top, inner, palette) {
                 ctx.fillStyle = palette.muted;
                 ctx.fillText(block.hero.unit, SHARE_MARGIN + valueWidth + 14, y + block.size * 0.86);
             }
-            ctx.font = _shFont(400, 28);
+            ctx.font = _shFont(400, px(28));
             ctx.fillStyle = palette.muted;
-            ctx.fillText(block.hero.label, SHARE_MARGIN, y + block.height - 8, inner);
+            ctx.fillText(block.hero.label, SHARE_MARGIN, y + block.height - px(8), inner);
         } else if (block.kind === 'facts') {
             // A fact alone on its row (a long date range) takes the whole width.
             const column = block.right ? (inner - 32) / 2 : inner;
             [block.left, block.right].forEach((fact, position) => {
                 if (!fact) return;
                 const x = SHARE_MARGIN + position * (column + 32);
-                ctx.font = _shFont(400, 22);
+                ctx.font = _shFont(400, px(22));
                 ctx.fillStyle = palette.muted;
-                ctx.fillText(String(fact.label), x, y + 26, column);
-                const fitted = _shFitText(ctx, String(fact.value), column, 600, 34, 22, 1);
+                ctx.fillText(String(fact.label), x, y + px(26), column);
+                const fitted = _shFitText(ctx, String(fact.value), column, 600, px(34), 22, 1);
                 ctx.font = _shFont(600, fitted.size);
                 ctx.fillStyle = palette.text;
-                ctx.fillText(fitted.lines[0] || '', x, y + 68, column);
+                ctx.fillText(fitted.lines[0] || '', x, y + px(68), column);
             });
-        } else if (block.kind === 'item') {
-            ctx.font = _shFont(700, 28);
-            ctx.fillStyle = palette.accent;
-            ctx.fillText(String(block.index), SHARE_MARGIN, y + 34);
-            ctx.font = _shFont(400, 30);
+        } else if (block.kind === 'bar') {
+            // A labelled progress bar: "Messier ......... 39 / 109 (+5)".
+            const bar = block.bar;
+            const total = Number(bar.total) || 0;
+            const ratio = total > 0 ? Math.max(0, Math.min(1, Number(bar.value) / total)) : 0;
+            const figure = `${bar.value} / ${bar.total}`;
+            ctx.font = _shFont(600, px(30));
             ctx.fillStyle = palette.text;
-            const lines = _shWrapClamped(ctx, block.text, inner - 44, 1);
-            ctx.fillText(lines[0] || '', SHARE_MARGIN + 44, y + 34, inner - 44);
+            ctx.textAlign = 'right';
+            let right = SHARE_MARGIN + inner;
+            if (bar.note) {
+                ctx.font = _shFont(700, px(26));
+                ctx.fillStyle = palette.accent;
+                ctx.fillText(bar.note, right, y + px(34));
+                right -= ctx.measureText(bar.note).width + px(14);
+                ctx.font = _shFont(600, px(30));
+                ctx.fillStyle = palette.text;
+            }
+            ctx.fillText(figure, right, y + px(34));
+            const figureLeft = right - ctx.measureText(figure).width - px(16);
+            ctx.textAlign = 'left';
+            ctx.font = _shFont(600, px(30));
+            ctx.fillText(String(bar.label), SHARE_MARGIN, y + px(34), Math.max(40, figureLeft - SHARE_MARGIN));
+            const trackY = y + px(50);
+            const trackHeight = px(14);
+            ctx.fillStyle = palette.rule;
+            _shRoundedBar(ctx, SHARE_MARGIN, trackY, inner, trackHeight);
+            if (ratio > 0) {
+                ctx.fillStyle = palette.accent;
+                _shRoundedBar(ctx, SHARE_MARGIN, trackY, Math.max(trackHeight, inner * ratio), trackHeight);
+            }
+        } else if (block.kind === 'item') {
+            const indent = px(44);
+            if (block.index !== null) {
+                ctx.font = _shFont(700, px(28));
+                ctx.fillStyle = palette.accent;
+                ctx.fillText(String(block.index), SHARE_MARGIN, y + px(34));
+            } else {
+                ctx.fillStyle = palette.accent;
+                ctx.beginPath();
+                ctx.arc(SHARE_MARGIN + px(8), y + px(24), px(6), 0, 2 * Math.PI);
+                ctx.fill();
+            }
+            ctx.font = _shFont(400, px(30));
+            ctx.fillStyle = palette.text;
+            const lines = _shWrapClamped(ctx, block.text, inner - indent, 1);
+            ctx.fillText(lines[0] || '', SHARE_MARGIN + indent, y + px(34), inner - indent);
         }
         y += block.height;
     });
@@ -404,6 +477,12 @@ function drawShareCard(canvas, model, options, image) {
     } else {
         if (landscape) textWidth = Math.round(width * 0.62);
         plan = _shPlanInfo(ctx, model, options, textWidth, palette, compact);
+        if (model.fill && plan.height > 0) {
+            // A card made only of text (a year in review screen) grows its text block to
+            // fill about three quarters of the card instead of floating in empty space.
+            const scale = Math.max(1, Math.min(SHARE_MAX_FILL_SCALE, (bodyHeight * 0.74) / plan.height));
+            if (scale > 1.02) plan = _shPlanInfo(ctx, model, options, textWidth, palette, compact, scale);
+        }
     }
 
     // Centred in its band; a little above centre in a tall card without picture, where it
@@ -462,6 +541,54 @@ function _shLoadImage(url) {
         image.onerror = () => resolve(null);
         image.src = url;
     });
+}
+
+/**
+ * Assemble several pictures into one square-tiled montage, used as the card's picture.
+ * Each tile is centre-cropped to a square: a montage is a contact sheet, and uneven tiles
+ * would leave it full of holes. The single-picture card still never crops.
+ * @param {HTMLImageElement[]} images
+ * @returns {HTMLCanvasElement|null} carries naturalWidth / naturalHeight like an image
+ */
+function _shComposeMosaic(images) {
+    const tiles = (images || []).filter(Boolean);
+    if (!tiles.length) return null;
+    const columns = tiles.length <= 1 ? 1 : tiles.length <= 4 ? 2 : 3;
+    const rows = Math.ceil(tiles.length / columns);
+    const size = 540;
+    const gap = 8;
+    const canvas = document.createElement('canvas');
+    canvas.width = columns * size + (columns - 1) * gap;
+    canvas.height = rows * size + (rows - 1) * gap;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    tiles.forEach((image, index) => {
+        const side = Math.min(image.naturalWidth, image.naturalHeight);
+        const sx = (image.naturalWidth - side) / 2;
+        const sy = (image.naturalHeight - side) / 2;
+        const x = (index % columns) * (size + gap);
+        const y = Math.floor(index / columns) * (size + gap);
+        ctx.drawImage(image, sx, sy, side, side, x, y, size, size);
+    });
+    canvas.naturalWidth = canvas.width;
+    canvas.naturalHeight = canvas.height;
+    return canvas;
+}
+
+/**
+ * The picture a model draws: its own picture, else a montage of its mosaic pictures.
+ * @param {Object} model
+ * @returns {Promise<HTMLImageElement|HTMLCanvasElement|null>}
+ */
+async function loadShareCardImage(model) {
+    if (!model) return null;
+    if (model.imageUrl) return _shLoadImage(model.imageUrl);
+    if (Array.isArray(model.mosaicUrls) && model.mosaicUrls.length) {
+        const images = await Promise.all(model.mosaicUrls.map(_shLoadImage));
+        return _shComposeMosaic(images);
+    }
+    return null;
 }
 
 function _shCanvasToBlob(canvas) {
@@ -538,10 +665,10 @@ async function openShareCard(model) {
     titleEl.textContent = model.title || _shT('share.title', 'Share');
     DOMUtils.clear(bodyEl);
     bodyEl.appendChild(DOMUtils.createSpinnerWrapper(_shT('common.loading', 'Loading...')));
-    openModal(modalEl, { backdrop: true });
+    openModal(modalEl, { backdrop: true, onHidden: typeof model.onClose === 'function' ? model.onClose : null });
 
     const [image] = await Promise.all([
-        _shLoadImage(model.imageUrl),
+        loadShareCardImage(model),
         document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve(),
     ]);
 

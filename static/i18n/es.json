@@ -88,7 +88,9 @@
     "about": "Acerca de",
     "observatory": "Observatorio",
     "session_analytics": "Su cielo",
-    "wishlist": "Lista de deseos"
+    "wishlist": "Lista de deseos",
+    "progress": "Progreso",
+    "subtab_menu": "Secciones"
   },
   "about": {
     "title": "Acerca de MyAstroBoard",
@@ -1028,7 +1030,9 @@
     "2fa_confirmed_at": "Activa desde el {date}",
     "2fa_disable_confirm_password": "Confirma con tu contraseña actual",
     "trusted_networks_broad_confirm": "La red '{network}' cubre un rango de direcciones inusualmente amplio - suele ser un error tipográfico en el prefijo (por ejemplo /2 en lugar de /24). ¿Añadirla de todos modos?",
-    "2fa_already_enabled": "La autenticación en dos pasos ya está activa. Desactívala antes de volver a configurarla."
+    "2fa_already_enabled": "La autenticación en dos pasos ya está activa. Desactívala antes de volver a configurarla.",
+    "pref_achievements_enabled": "Mostrar insignias y retos",
+    "pref_achievements_enabled_info": "Añade a Astrodex una pestaña \"Progreso\" con las insignias obtenidas a partir de su registro, los retos de temporada y el maratón Messier."
   },
   "astrodex": {
     "title": "Astrodex - ¡Tengo que atraparlos a todos!",
@@ -3240,5 +3244,189 @@
     "banner_install": "Instale la suya",
     "read_only": "Demo de solo lectura: los cambios no se guardan. Instale su propio MyAstroBoard para conservar sus datos.",
     "signin_refused": "Esta cuenta no puede iniciar sesión en la demo. Prepare la demo con DEMO_MODE desactivado, vea docs/DEMO_MODE.md."
+  },
+  "progress": {
+    "title": "Su progreso",
+    "intro": "Las metas alcanzadas según lo que ha registrado de verdad, y lo siguiente a lo que apuntar.",
+    "disabled": "Las insignias y los retos están desactivados. Puede volver a activarlos en Mi configuración -> Personalizar.",
+    "next_title": "Próximas metas a su alcance",
+    "challenges_title": "Retos",
+    "badges_title": "Insignias",
+    "badges_note": "Las insignias se leen de su registro y de su Astrodex tal como están: borrar las entradas en las que se basa una insignia la retira.",
+    "stat_badges": "Insignias obtenidas",
+    "stat_badges_hint": "Calculadas a partir de lo que ha registrado de verdad",
+    "stat_objects": "Objetos capturados",
+    "stat_objects_hint": "Registro y Astrodex juntos",
+    "next_none": "Todas las insignias empezadas están obtenidas. Elija un reto más abajo para empezar una nueva.",
+    "next_start": "Registre su primera noche o añada un objeto a su Astrodex: sus primeras insignias llegarán.",
+    "visible_tonight": "Visible esta noche",
+    "missing_title": "Por capturar, visible esta noche: {catalogue}",
+    "missing_intro": "Objetos de este catálogo que aún no ha capturado, observables esta noche dentro de sus límites de SkyTonight, primero los visibles durante más tiempo.",
+    "missing_none": "Nada de lo que queda en este catálogo es observable desde aquí esta noche.",
+    "hours_tonight": "{hours} h esta noche",
+    "transit_at": "Más alto a las {time}",
+    "load_error": "No se pudo cargar su progreso.",
+    "counter_hours": "{current} h / {target} h",
+    "new": "Nueva",
+    "earned": "Obtenida",
+    "earned_on": "Obtenida el {date}",
+    "captured": "Capturado",
+    "not_captured": "Aún no capturado",
+    "share_title": "Compartir esta insignia",
+    "share_kicker": "Insignia",
+    "share_earned": "Obtenida el",
+    "share_constellations": "constelaciones",
+    "season_intro": "{season}: los objetos Messier y Caldwell más brillantes bien situados desde {location} esta temporada, dentro de sus límites de altitud de SkyTonight.",
+    "season_winter": "Invierno",
+    "season_spring": "Primavera",
+    "season_summer": "Verano",
+    "season_autumn": "Otoño",
+    "challenge_galaxy": "Galaxias de la temporada",
+    "challenge_nebula": "Nebulosas de la temporada",
+    "challenge_cluster": "Cúmulos estelares de la temporada",
+    "challenges_error": "No se pudieron calcular los retos para su ubicación.",
+    "challenges_none": "Ahora mismo no se puede calcular ningún reto para su ubicación.",
+    "marathon_title": "Maratón Messier {year}",
+    "marathon_when": "Noche del {date}, Luna iluminada al {moon} % - dentro de {days} días.",
+    "marathon_tonight": "Es esta noche: Luna iluminada al {moon} %.",
+    "marathon_past": "Noche del {date}, Luna iluminada al {moon} %.",
+    "marathon_reach": "Desde su ubicación, {reachable} de los {total} objetos Messier se pueden alcanzar esa noche, hasta {altitude} grados de altura, entre las {start} y las {end}. {captured} de ellos ya están en su registro.",
+    "marathon_order": "Orden sugerido para su latitud",
+    "marathon_unreachable": "Fuera de alcance desde aquí esa noche: {names}.",
+    "group_firsts": "Primeras veces",
+    "group_catalogues": "Catálogos",
+    "group_endurance": "Constancia",
+    "group_sky": "Todo el cielo",
+    "group_conditions": "Condiciones",
+    "class_galaxy": "Galaxias",
+    "class_nebula": "Nebulosas",
+    "class_cluster": "Cúmulos estelares",
+    "class_comet": "Cometas",
+    "class_planet": "Planetas",
+    "class_moon": "La Luna",
+    "class_sun": "El Sol",
+    "class_star": "Estrellas",
+    "class_other": "Otros objetos",
+    "badges": {
+      "first_galaxy": {
+        "name": "Primera galaxia",
+        "description": "Capture su primera galaxia."
+      },
+      "first_nebula": {
+        "name": "Primera nebulosa",
+        "description": "Capture su primera nebulosa."
+      },
+      "first_cluster": {
+        "name": "Primer cúmulo estelar",
+        "description": "Capture su primer cúmulo estelar."
+      },
+      "first_comet": {
+        "name": "Primer cometa",
+        "description": "Capture su primer cometa."
+      },
+      "first_planet": {
+        "name": "Primer planeta",
+        "description": "Capture su primer planeta."
+      },
+      "dark_site": {
+        "name": "Cielo oscuro",
+        "description": "Observe una noche bajo un cielo Bortle 3 o más oscuro (SQM de 21,3 o más)."
+      },
+      "new_moon_night": {
+        "name": "Noche de Luna nueva",
+        "description": "Observe una noche con la Luna iluminada al 5 % como máximo."
+      }
+    },
+    "rules": {
+      "catalogue_count": {
+        "name": "{catalogue} {count}",
+        "description": "Capture {count} objetos del catálogo {catalogue}."
+      },
+      "catalogue_complete": {
+        "name": "{catalogue} completo",
+        "description": "Capture los {count} objetos del catálogo {catalogue}."
+      },
+      "integration_hours": {
+        "name": "{count} horas de luz",
+        "description": "Reúna {count} horas de integración en total."
+      },
+      "single_target_hours": {
+        "name": "{count} horas en un objetivo",
+        "description": "Reúna {count} horas de integración en un solo objeto."
+      },
+      "multi_night_session": {
+        "name": "Varias noches, una sesión",
+        "description": "Registre una sesión de {count} noches o más."
+      },
+      "seasons": {
+        "name": "Cuatro estaciones",
+        "description": "Capture algo en cada estación del año."
+      },
+      "constellations": {
+        "name": "{count} constelaciones",
+        "description": "Capture objetos en {count} constelaciones distintas."
+      },
+      "hemispheres": {
+        "name": "Ambos hemisferios",
+        "description": "Capture objetos a ambos lados del ecuador celeste."
+      }
+    },
+    "remaining": {
+      "catalogue_count": "Faltan {remaining} objetos {catalogue} para esta insignia.",
+      "integration_hours": "Faltan {remaining} horas de integración para esta insignia.",
+      "single_target_hours": "Faltan {remaining} horas en su objetivo más fotografiado.",
+      "multi_night_session": "Registre una segunda noche en la misma sesión.",
+      "seasons": "Faltan {remaining} estaciones por cubrir.",
+      "constellations": "Faltan {remaining} constelaciones para esta insignia.",
+      "hemispheres": "Capture un objeto al otro lado del ecuador celeste."
+    }
+  },
+  "year_review": {
+    "open": "Mi año astro",
+    "title": "Mi año astro {year}",
+    "kicker": "Mi año astro {year}",
+    "year_subheading": "Un año bajo el cielo",
+    "hero_integration": "de luz recogida",
+    "hero_objects": "objetos capturados",
+    "hero_on_target": "en este objetivo",
+    "hero_that_night": "recogidas esa noche",
+    "hero_share": "de la luz del año",
+    "fact_nights": "Noches fuera",
+    "fact_sessions": "Sesiones",
+    "fact_objects": "Objetos",
+    "fact_new": "Nuevos este año",
+    "fact_favourite": "Tipo favorito",
+    "fact_nights_on_it": "Noches en él",
+    "fact_rating": "Su valoración",
+    "fact_hours": "Integración",
+    "fact_combinations": "Equipos usados",
+    "fact_previous": "En {year}",
+    "fact_pictures": "Fotos",
+    "targets_heading": "Sus objetivos",
+    "target_kicker": "Objetivo del año {year}",
+    "night_kicker": "Mejor noche de {year}",
+    "equipment_kicker": "El equipo que más ha trabajado",
+    "progress_heading": "Su progreso",
+    "list_catalogues": "Catálogos",
+    "previous_objects": "{count} objetos",
+    "mosaic_heading": "Mi {year} en imágenes",
+    "share": "Compartir esta pantalla",
+    "share_title": "Compartir esta pantalla",
+    "counter": "{index} / {total}",
+    "previous": "Pantalla anterior",
+    "next": "Pantalla siguiente",
+    "go_to": "Pantalla {index}",
+    "year_label": "Año",
+    "privacy": "Solo usted ve su resumen. Se dibuja en su navegador a partir de su propio registro y nunca muestra su ubicación.",
+    "empty": "Todavía no hay nada en su registro ni en su Astrodex para {year}. Registre una noche o añada una foto, y su resumen se construirá solo.",
+    "load_error": "No se pudo cargar el resumen de su año.",
+    "highlight_title": "Su año astro {year} está listo",
+    "highlight_text": "Unas pantallas sobre su año bajo el cielo, cada una lista para compartir.",
+    "highlight_open": "Verlo",
+    "highlight_dismiss": "Ocultar hasta el año que viene",
+    "gained_short": "+{count}",
+    "download_all": "Descargar todo (ZIP)",
+    "share_all": "Compartir todo",
+    "preparing": "Preparando las imágenes..."
   }
 }

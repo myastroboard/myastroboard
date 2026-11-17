@@ -889,6 +889,41 @@ class TestValidateUserPreferences:
             auth.UserManager.sanitize_user_preferences({'mqtt_publish_enabled': True})['mqtt_publish_enabled'] is True
         )
 
+    def test_achievements_preferences_default_on_and_empty(self):
+        """Badges are on by default, nothing has been seen yet, no review is dismissed."""
+        defaults = auth.UserManager.sanitize_user_preferences({})
+        assert defaults['achievements_enabled'] is True
+        assert defaults['achievements_seen'] == []
+        assert defaults['year_review_dismissed'] is None
+
+    def test_achievements_enabled_not_bool_fails(self):
+        is_valid, msg = auth.UserManager.validate_user_preferences({'achievements_enabled': 'no'})
+        assert is_valid is False
+        assert 'achievements_enabled' in msg
+
+    @pytest.mark.parametrize(
+        'value',
+        ['first_galaxy', [1, 2], [''], ['x' * 65], ['badge'] * (auth.MAX_ACHIEVEMENTS_SEEN + 1)],
+    )
+    def test_achievements_seen_rejects_anything_but_a_short_id_list(self, value):
+        is_valid, msg = auth.UserManager.validate_user_preferences({'achievements_seen': value})
+        assert is_valid is False
+        assert 'achievements_seen' in msg
+
+    def test_achievements_seen_list_passes(self):
+        is_valid, _msg = auth.UserManager.validate_user_preferences({'achievements_seen': ['first_galaxy']})
+        assert is_valid is True
+
+    @pytest.mark.parametrize('value', ['2026', True, 1800, 2300, 2026.0])
+    def test_year_review_dismissed_must_be_a_plausible_year(self, value):
+        is_valid, msg = auth.UserManager.validate_user_preferences({'year_review_dismissed': value})
+        assert is_valid is False
+        assert 'year_review_dismissed' in msg
+
+    def test_year_review_dismissed_year_or_none_passes(self):
+        assert auth.UserManager.validate_user_preferences({'year_review_dismissed': 2026})[0] is True
+        assert auth.UserManager.validate_user_preferences({'year_review_dismissed': None})[0] is True
+
     def test_wizard_not_dict_fails(self):
         is_valid, msg = auth.UserManager.validate_user_preferences({'wizard': 'yes'})
         assert not is_valid
