@@ -14,6 +14,9 @@ from functools import wraps
 
 import pyotp
 from flask import jsonify, request, session
+
+# pyotp re-exports TOTP only implicitly (py.typed since 2.12), so pyright needs the defining module.
+from pyotp.totp import TOTP
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from db import bootstrap as db_bootstrap
@@ -244,14 +247,14 @@ class User:
         """Return the otpauth:// provisioning URI for this user's current secret."""
         if not self.totp_secret:
             raise ValueError("No TOTP secret set for this user")
-        return pyotp.TOTP(self.totp_secret).provisioning_uri(name=self.username, issuer_name=issuer)
+        return TOTP(self.totp_secret).provisioning_uri(name=self.username, issuer_name=issuer)
 
     def verify_totp(self, code):
         """Check a 6-digit TOTP code against this user's secret (clock-drift tolerant)."""
         if not self.totp_secret or not code:
             return False
         try:
-            return pyotp.TOTP(self.totp_secret).verify(str(code).strip(), valid_window=TOTP_VALID_WINDOW)
+            return TOTP(self.totp_secret).verify(str(code).strip(), valid_window=TOTP_VALID_WINDOW)
         except Exception as e:
             logger.warning(f"TOTP verification error for user {self.username}: {e}")
             return False
