@@ -57,8 +57,26 @@ def _own_profile_payload(user) -> dict[str, Any]:
     }
 
 
+# What a rejected profile change answers. Constant texts only: a ProfileError message can carry
+# the text of the exception behind it (Pillow's, for an unreadable picture), which stays in the log.
+_PROFILE_ERROR_MESSAGES = {
+    'profile.error_invalid': 'Invalid profile change',
+    'profile.error_display_name_invalid': 'Display name contains invalid characters',
+    'profile.error_display_name_length': 'Display name is too long',
+    'profile.error_display_name_taken': 'Display name already used',
+    'profile.error_bio_length': 'Bio is too long',
+    'profile.error_avatar_invalid': 'Not a usable picture',
+    'profile.error_avatar_too_large': 'Picture is too large',
+}
+
+
 def _profile_error(error: user_identity.ProfileError):
-    return jsonify({'error': str(error), 'error_key': error.key}), 400
+    for key, message in _PROFILE_ERROR_MESSAGES.items():
+        if error.key == key:
+            return jsonify({'error': message, 'error_key': key}), 400
+    return jsonify(
+        {'error': _PROFILE_ERROR_MESSAGES['profile.error_invalid'], 'error_key': 'profile.error_invalid'}
+    ), 400
 
 
 # ---------------------------------------------------------------------------

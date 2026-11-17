@@ -511,3 +511,27 @@ class TestAccountCount:
     def test_members_do_not(self, client):
         _login(client, _new_user())
         assert 'account_count' not in client.get('/api/community/activity').get_json()
+
+
+class TestErrorMessagesStayConstant:
+    """A rejected change answers with a fixed text, never the text of the exception behind it."""
+
+    def test_unreadable_picture_does_not_leak_the_decoder_error(self, client):
+        _login(client, _new_user())
+        response = client.post('/api/profile/avatar', data={'file': (io.BytesIO(b'not an image'), 'me.png')})
+        payload = response.get_json()
+        assert payload == {'error': 'Not a usable picture', 'error_key': 'profile.error_avatar_invalid'}
+
+    def test_every_profile_error_key_has_a_message(self):
+        import re
+        from pathlib import Path
+
+        sources = (Path(community_module.__file__).parents[1] / 'utils').glob('*.py')
+        keys = {key for path in sources for key in re.findall(r"'(profile\.error_[a-z_]+)'", path.read_text('utf-8'))}
+        assert keys and keys <= set(community_module._PROFILE_ERROR_MESSAGES)
+
+    def test_unknown_key_falls_back_to_the_generic_message(self):
+        with app.test_request_context():
+            response, status = community_module._profile_error(user_identity.ProfileError('raw detail', 'other'))
+        assert status == 400
+        assert response.get_json() == {'error': 'Invalid profile change', 'error_key': 'profile.error_invalid'}
