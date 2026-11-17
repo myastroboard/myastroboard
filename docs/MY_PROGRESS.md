@@ -137,6 +137,8 @@ and moves to the top of the challenges from 1 February.
 - The three new preferences live on the account like every other preference, so account deletion
   and the personal data export cover them. No new table, no new file.
 - Share cards are drawn in the browser and never contain a location.
+- On a demo instance ([DEMO_MODE.md](DEMO_MODE.md)) the badges a visitor has seen stay in their own
+  session, like the rest of their preferences.
 
 ## API
 

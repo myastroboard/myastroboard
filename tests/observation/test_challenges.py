@@ -158,3 +158,74 @@ class TestMissingTonight:
         monkeypatch.setattr(challenges.visibility_calendar, 'next_visibility_batch', fake_batch)
         rows = challenges.missing_tonight('Messier', PARIS, datetime.date(2026, 11, 17), {'a'})
         assert [row['target_id'] for row in rows] == ['c', 'b']
+
+
+class TestDefensivePaths:
+    def test_bounded_cache_drops_the_oldest(self):
+        cache = challenges.OrderedDict()
+        for key in range(challenges._MAX_CACHE_ENTRIES + 3):
+            challenges._remember(cache, key, key)
+        assert len(cache) == challenges._MAX_CACHE_ENTRIES
+        assert 0 not in cache
+
+    def test_no_sample_night_means_no_challenge(self, monkeypatch):
+        def broken(location, night):
+            raise RuntimeError('no ephemeris')
+
+        monkeypatch.setattr(challenges.visibility_calendar, 'night_context_for', broken)
+        monkeypatch.setattr(challenges.visibility_calendar, 'observing_constraints', lambda: (30.0, 90.0))
+        assert challenges.seasonal_challenges(PARIS, datetime.date(2026, 11, 17), set())['challenges'] == []
+
+    def test_unplaced_and_unclassed_candidates_are_skipped_and_lists_are_cached(self, monkeypatch):
+        calls = []
+        candidates = [
+            member('a', 'M 1', 'galaxy', 8.0, ra_deg=None),
+            member('b', 'M 2', 'star', 8.0),
+            member('c', 'M 3', 'galaxy', 8.0),
+        ]
+        monkeypatch.setattr(challenges.achievements, 'catalogue_members', lambda catalogue: candidates)
+        monkeypatch.setattr(
+            challenges.visibility_calendar, 'night_context_for', lambda location, night: {'date': night}
+        )
+        monkeypatch.setattr(challenges.visibility_calendar, 'observing_constraints', lambda: (30.0, 90.0))
+
+        def sample(context, ra_deg, dec_deg, *_args):
+            calls.append(ra_deg)
+            return {'observable_hours': 5.0, 'date': context['date'].isoformat()}
+
+        monkeypatch.setattr(challenges.visibility_calendar, 'sample_target_in_context', sample)
+        today = datetime.date(2026, 11, 17)
+        challenges.seasonal_challenges(PARIS, today, set())
+        first = len(calls)
+        challenges.seasonal_challenges(PARIS, today, set())
+        # Only the placed galaxy is sampled, on the three nights of the season...
+        assert first == 3
+        # ...and the second call is served from the cache.
+        assert len(calls) == first
+
+    def test_unknown_latitude_counts_as_northern(self):
+        assert challenges._latitude({'latitude': 'abc'}) is None
+        assert challenges.current_season(datetime.date(2026, 7, 1), None)['name'] == 'summer'
+
+    def test_without_a_dark_new_moon_the_darkest_night_is_kept(self, monkeypatch):
+        monkeypatch.setattr(challenges, 'phase_at', lambda instant: {'illumination_percent': 40.0 + instant.day / 100})
+        nights = challenges.marathon_nights(2027, 'Europe/Paris')
+        assert nights == [(datetime.date(2027, 3, 1), pytest.approx(40.01))]
+
+    def test_marathon_plan_is_cached(self, monkeypatch):
+        computed = []
+
+        def fake_compute(location, year):
+            computed.append(year)
+            return {'date': f'{year}-03-08', 'sequence': [], 'unreachable': []}
+
+        monkeypatch.setattr(challenges, '_compute_marathon', fake_compute)
+        challenges.messier_marathon(PARIS, datetime.date(2026, 11, 17), set())
+        challenges.messier_marathon(PARIS, datetime.date(2026, 11, 18), set())
+        assert computed == [2027]
+
+    def test_missing_tonight_with_nothing_left(self, monkeypatch):
+        monkeypatch.setattr(
+            challenges.achievements, 'catalogue_members', lambda catalogue: [member('a', 'M 1', 'galaxy', 8.0)]
+        )
+        assert challenges.missing_tonight('Messier', PARIS, datetime.date(2026, 11, 17), {'a'}) == []

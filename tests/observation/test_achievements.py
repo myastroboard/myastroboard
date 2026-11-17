@@ -426,3 +426,54 @@ class TestCataloguePictures:
         facts = facts_for([], items)
         assert achievements.catalogue_pictures(facts, items, 'Messier') == ['m31-cover.jpg', 'm42.jpg']
         assert achievements.catalogue_pictures(facts, items, 'Messier', limit=1) == ['m31-cover.jpg']
+
+
+class TestDefensiveInputs:
+    """Stored records can be hand-edited or legacy: junk must be skipped, never raise."""
+
+    def test_junk_records_are_skipped(self):
+        night = make_night('n1', '2026-01-10')
+        entries = [
+            make_entry('', 'n1', frame_count=5),
+            make_entry('M 31', 'n1', integration_minutes='abc', frame_count=2),
+        ]
+        sessions = ['not-a-session', make_session('s1', [night], entries)]
+        items = ['not-an-item', {'id': 'a9', 'name': '', 'pictures': []}]
+        facts = facts_for(sessions, items)
+        assert list(facts['captures']) == ['dso-m31']
+        assert facts['integration'] == []
+
+    def test_a_failing_dataset_lookup_falls_back_to_the_record(self):
+        def broken(_name, _catalogue):
+            raise RuntimeError('dataset missing')
+
+        night = make_night('n1', '2026-01-10')
+        entry = make_entry('M 31', 'n1', type='Galaxy', frame_count=1)
+        facts = collect_progress([make_session('s1', [night], [entry])], resolve=broken)
+        assert next(iter(facts['captures'].values()))['object_class'] == 'galaxy'
+
+    def test_malformed_dates_have_no_season(self):
+        assert season_index('2026-xx-01') is None
+        assert season_index('2026-13-01') is None
+
+    def test_unknown_rule_is_skipped(self):
+        odd = [{'id': 'odd', 'family': 'odd', 'group': 'sky', 'rule': 'no-such-rule', 'icon': 'bi-x'}]
+        assert evaluate_badges(facts_for([]), TOTALS, odd) == []
+
+    def test_catalogue_members_read_dataclass_targets(self, monkeypatch):
+        from types import SimpleNamespace
+
+        target = SimpleNamespace(
+            target_id='dso-m42',
+            category='deep_sky',
+            object_type='Emission Nebula',
+            preferred_name='Orion Nebula',
+            catalogue_names={'Messier': 'M 42'},
+            constellation='Ori',
+            magnitude=4.0,
+            coordinates=SimpleNamespace(ra_hours=5.59, dec_degrees=-5.39),
+        )
+        monkeypatch.setattr(achievements.skytonight_targets, 'load_targets_dataset', lambda: {'targets': [target]})
+        member = achievements.catalogue_members('Messier')[0]
+        assert member['object_class'] == 'nebula'
+        assert member['dec_deg'] == pytest.approx(-5.39)

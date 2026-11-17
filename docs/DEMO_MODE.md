@@ -19,7 +19,9 @@ separate instance with its own data, never your personal one.
   (`DEMO_ALLOWED_WRITE_ENDPOINTS` in `backend/utils/demo_mode.py`).
 - **Own preferences.** Theme, language, density and other UI preferences are kept in the
   visitor's session cookie, not on the shared account, so one visitor never changes what the
-  next one sees. Location, notification and MQTT preferences stay as you set them.
+  next one sees. The same goes for the badges a visitor has seen (`POST /api/achievements/seen`,
+  [MY_PROGRESS.md](MY_PROGRESS.md)). Location, notification and MQTT preferences stay as you set
+  them.
 - **No notifications.** No visitor is ever asked for notification permission, the
   *Notifications* settings tab is hidden, and the push notification scheduler does not run.
 - **No setup wizard**, no location switching, no on-demand translation (it would use your

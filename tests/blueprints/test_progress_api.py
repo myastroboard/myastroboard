@@ -235,3 +235,91 @@ class TestMissingTonight:
 
     def test_invalid_limit_is_rejected(self, client):
         assert client.get('/api/achievements/missing-tonight?catalogue=Messier&limit=x').status_code == 400
+
+
+class TestPresetsAndCatalogues:
+    def test_dark_site_badge_from_the_location_preset(self, client, admin_user_id, monkeypatch):
+        """Sessions store only the preset id; its Bortle class comes from the configuration."""
+        session = _seed(admin_user_id, 'admin', '2026-01-10', frame_count=10)
+        observation_sessions.update_session(admin_user_id, session['id'], {'location_id': 'loc-dark'})
+        monkeypatch.setattr(progress_module, 'get_all_locations', lambda config: [{'id': 'loc-dark', 'bortle': 2}])
+        payload = client.get('/api/achievements').get_json()
+        assert next(badge for badge in payload['badges'] if badge['id'] == 'dark_site')['earned'] is True
+
+    def test_unreadable_presets_only_cost_the_dark_site_badge(self, client, admin_user_id, monkeypatch):
+        _seed(admin_user_id, 'admin', '2026-01-10', frame_count=10)
+
+        def broken(_config):
+            raise RuntimeError('no config')
+
+        monkeypatch.setattr(progress_module, 'get_all_locations', broken)
+        response = client.get('/api/achievements')
+        assert response.status_code == 200
+        assert next(badge for badge in response.get_json()['badges'] if badge['id'] == 'first_galaxy')['earned']
+
+    def test_catalogue_rows_carry_picture_filenames(self, client, admin_user_id, monkeypatch):
+        _seed(admin_user_id, 'admin', '2026-01-10', frame_count=10)
+        monkeypatch.setattr(progress_module.achievements, 'catalogue_totals', lambda: {'Messier': 3})
+        rows = client.get('/api/achievements').get_json()['catalogues']
+        assert rows[0]['catalogue'] == 'Messier'
+        assert rows[0]['captured'] == 1
+        assert isinstance(rows[0]['pictures'], list)
+
+
+class TestDemoMode:
+    def test_seen_badges_stay_in_the_visitor_session(self, client, admin_user_id, monkeypatch):
+        """The demo account is shared: a visitor's seen badges never reach the account."""
+        stored = {}
+        monkeypatch.setattr(progress_module._demo_mode, 'is_demo_session', lambda: True)
+        monkeypatch.setattr(progress_module._demo_mode, 'visitor_preferences', lambda prefs: {**prefs, **stored})
+        monkeypatch.setattr(progress_module._demo_mode, 'store_session_preferences', stored.update)
+        response = client.post('/api/achievements/seen', json={'ids': ['first_galaxy']})
+        assert response.get_json()['seen'] == ['first_galaxy']
+        assert stored == {'achievements_seen': ['first_galaxy']}
+        assert user_manager.get_user_preferences(admin_user_id)['achievements_seen'] == []
+
+    def test_nothing_is_written_when_nothing_is_new(self, client, monkeypatch):
+        client.post('/api/achievements/seen', json={'ids': ['first_galaxy']})
+
+        def must_not_write(*_args, **_kwargs):
+            raise AssertionError('preferences written although nothing changed')
+
+        monkeypatch.setattr(progress_module.user_manager, 'update_user_preferences', must_not_write)
+        response = client.post('/api/achievements/seen', json={'ids': ['first_galaxy']})
+        assert response.status_code == 200
+
+
+class TestServerErrors:
+    @pytest.mark.parametrize(
+        ('method', 'route'),
+        [
+            ('get', '/api/session-analytics/year-review'),
+            ('get', '/api/achievements'),
+            ('get', '/api/achievements/challenges'),
+            ('get', '/api/achievements/missing-tonight?catalogue=Messier'),
+        ],
+    )
+    def test_unexpected_failure_returns_500(self, client, monkeypatch, method, route):
+        def broken(_user):
+            raise RuntimeError('storage down')
+
+        monkeypatch.setattr(progress_module, '_user_facts', broken)
+        response = getattr(client, method)(route)
+        assert response.status_code == 500
+        assert response.get_json() == {'error': 'Internal server error'}
+
+    def test_seen_failure_returns_500(self, client, monkeypatch):
+        def broken(_user):
+            raise RuntimeError('storage down')
+
+        monkeypatch.setattr(progress_module, '_user_preferences', broken)
+        assert client.post('/api/achievements/seen', json={'ids': []}).status_code == 500
+
+    def test_seasonal_failure_leaves_the_marathon(self, client, monkeypatch):
+        def broken(*_args, **_kwargs):
+            raise RuntimeError('no ephemeris')
+
+        monkeypatch.setattr(progress_module.challenges, 'seasonal_challenges', broken)
+        payload = client.get('/api/achievements/challenges').get_json()
+        assert payload['seasonal'] is None
+        assert payload['marathon'] is not None

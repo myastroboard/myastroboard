@@ -36,13 +36,14 @@ DEMO_LOCKED_PREFERENCE_KEYS = frozenset({'location', 'notifications', 'mqtt_publ
 SAFE_METHODS = frozenset({'GET', 'HEAD', 'OPTIONS'})
 
 # Non-GET endpoints a demo visitor may still call: signing in and out, the session-scoped
-# preferences, and pure calculations that store nothing.
+# preferences (the badges already seen are one of them), and pure calculations that store nothing.
 DEMO_ALLOWED_WRITE_ENDPOINTS = frozenset(
     {
         'auth.login',
         'auth.verify_login_2fa',
         'auth.logout',
         'auth.update_own_preferences',
+        'progress.mark_achievements_seen',
         'equipment.calculate_fov',
         'misc.convert_coordinates_api',
         'skytonight.get_skytonight_combination_recommendations_api',

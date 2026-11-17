@@ -162,3 +162,45 @@ class TestScreens:
         sessions, items = busy_year
         facts = collect_progress(sessions, items, resolve=fake_resolve)
         assert available_years(facts) == [2026, 2025, 2024]
+
+
+def _one_night(**entry_fields):
+    return [make_session('s1', [make_night('n1', '2026-01-10')], [make_entry('M 31', 'n1', **entry_fields)])]
+
+
+class TestDefensiveInputs:
+    def test_target_without_a_usable_picture_has_no_picture(self):
+        items = [{'id': 'a1', 'name': 'M 31', 'pictures': [{'id': 'p1', 'filename': ''}]}]
+        payload = review(_one_night(integration_minutes=60.0, astrodex_item_id='a1'), items)
+        assert payload['target_of_year']['picture'] is None
+
+    def test_cover_picture_when_none_was_taken_that_year(self):
+        items = [
+            {
+                'id': 'a1',
+                'name': 'M 31',
+                'pictures': [
+                    {'id': 'p1', 'filename': 'old.jpg', 'date': '2020-01-01', 'rating': 'x'},
+                    {'id': 'p2', 'filename': 'cover.jpg', 'date': '2021-01-01', 'is_main': True},
+                ],
+            }
+        ]
+        payload = review(_one_night(integration_minutes=60.0, astrodex_item_id='a1'), items)
+        assert payload['target_of_year']['picture']['filename'] == 'cover.jpg'
+
+    def test_captures_without_integration_have_no_target_of_the_year(self):
+        payload = review(_one_night(frame_count=3))
+        assert payload['has_data'] is True
+        assert payload['target_of_year'] is None
+        assert payload['best_night'] is None
+
+    def test_unnamed_entries_and_junk_items_are_ignored(self):
+        night = make_night('n1', '2026-01-10')
+        entries = [make_entry('M 31', 'n1', integration_minutes=30.0), make_entry('', 'n1', integration_minutes=10.0)]
+        items = [
+            'junk',
+            {'id': 'a2', 'name': 'M 42', 'pictures': [{'id': 'p', 'filename': 'x.jpg', 'date': '2019-01-01'}]},
+        ]
+        payload = review([make_session('s1', [night], entries)], items)
+        assert payload['best_night']['targets'] == ['M 31']
+        assert payload['mosaic'] == []
