@@ -1633,11 +1633,7 @@
                                 <div class="d-flex align-items-center gap-2 ms-auto">
                                     <label class="form-label mb-0 text-muted small" data-i18n="settings.notifications_lead_label">Notify before</label>
                                     <select class="form-select form-select-sm notif-lead-select w-auto" id="notif-lead-N9" data-trigger="N9">
-                                        <option value="1440">1 day</option>
-                                        <option value="2880">2 days</option>
-                                        <option value="4320">3 days</option>
-                                        <option value="7200">5 days</option>
-                                        <option value="10080">7 days</option>
+                                        <!-- Options built by fillNotifLeadDaysSelect() (notifications.js), translated -->
                                     </select>
                                 </div>
                             </div>
@@ -3386,10 +3382,10 @@
                     <div class="footer-theme">
                         <label class="theme-label" for="theme-select-footer" data-i18n="common.theme">Theme</label>
                         <select id="theme-select-footer" class="form-select form-select-sm theme-select theme-select-footer" data-theme-picker data-i18n-aria-label="common.theme" aria-label="Theme">
-                            <option value="auto">Auto</option>
-                            <option value="light">Light</option>
-                            <option value="dark">Dark</option>
-                            <option value="red">Red Light</option>
+                            <option value="auto" data-i18n="settings.pref_theme_auto">Auto</option>
+                            <option value="light" data-i18n="settings.pref_theme_light">Light</option>
+                            <option value="dark" data-i18n="settings.pref_theme_dark">Dark</option>
+                            <option value="red" data-i18n="settings.pref_theme_red">Red Light</option>
                         </select>
                     </div>
                 </div>

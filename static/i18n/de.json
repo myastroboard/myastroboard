@@ -898,6 +898,8 @@
     "push_kp_visibility_excellent": "Ausgezeichnet",
     "push_kp_visibility_severe_storm": "Schwerer Sturm",
     "notifications_minutes": "min",
+    "notifications_lead_days_one": "1 Tag",
+    "notifications_lead_days": "{count} Tage",
     "notifications_push_active": "Hintergrund-Push aktiv",
     "notifications_push_inapp_only": "Nur In-App - Tab muss geöffnet sein",
     "notifications_vapid_not_configured": "Hintergrund-Push-Benachrichtigungen funktionieren möglicherweise nicht: Die Kontakt-E-Mail ist nicht konfiguriert. Administratoren können sie unter App-Einstellungen -> Konfiguration -> Benachrichtigungen festlegen.",

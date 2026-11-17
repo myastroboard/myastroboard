@@ -898,6 +898,8 @@
     "push_kp_visibility_excellent": "Excellente",
     "push_kp_visibility_severe_storm": "Tempête sévère",
     "notifications_minutes": "min",
+    "notifications_lead_days_one": "1 jour",
+    "notifications_lead_days": "{count} jours",
     "notifications_push_active": "Push en arrière-plan actif",
     "notifications_push_inapp_only": "Dans l'application uniquement - l'onglet doit être ouvert",
     "notifications_vapid_not_configured": "Les notifications push en arrière-plan peuvent ne pas fonctionner : l'e-mail de contact n'est pas configuré. Les administrateurs peuvent le définir dans Paramètres app -> Configuration -> Notifications.",

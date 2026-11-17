@@ -36,6 +36,30 @@ const _NOTIF_DEFAULTS = Object.freeze({
     }),
 });
 
+// N9's lead choices, in days (stored as day-equivalent minutes); shared with the setup wizard.
+const NOTIF_N9_LEAD_DAYS = Object.freeze([1, 2, 3, 5, 7]);
+
+/** Translated "1 day" / "N days" label of an N9 lead time. */
+function notifLeadDaysLabel(days) {
+    return days === 1
+        ? i18n.t('settings.notifications_lead_days_one')
+        : i18n.t('settings.notifications_lead_days', { count: days });
+}
+
+/** Fill an N9 lead <select> with the translated day choices, keeping its current value. */
+function fillNotifLeadDaysSelect(select) {
+    if (!select) return;
+    const current = select.value;
+    DOMUtils.clear(select);
+    NOTIF_N9_LEAD_DAYS.forEach((days) => {
+        const opt = document.createElement('option');
+        opt.value = String(days * 1440);
+        opt.textContent = notifLeadDaysLabel(days);
+        select.appendChild(opt);
+    });
+    if (current) select.value = current;
+}
+
 class NotificationManager {
     constructor() {
         this._prefs        = null; // lazy-loaded from localStorage
@@ -741,6 +765,8 @@ function initNotificationSettingsUI() {
     notificationManager._prefs = null; // refresh from server state on each open
     _refreshPermissionBanner();
     _refreshVapidWarning();
+    // Labels first: _loadPrefsIntoUI() then selects the saved value among these options.
+    fillNotifLeadDaysSelect(document.getElementById('notif-lead-N9'));
     _loadPrefsIntoUI();
     _loadSubscriptionList();
 

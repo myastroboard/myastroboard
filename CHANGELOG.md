@@ -13,7 +13,8 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixes
 
 - Interface texts that still sent you to "Parameters -> Advanced" now name the current screens (App settings ->
-  Configuration or Connectors), and the My settings -> Notifications messages are translated in every language.
+  Configuration or Connectors), and the My settings -> Notifications messages, the meteor shower / comet lead time
+  ("2 days") and the footer theme picker are translated in every language.
 
 ### Breaking changes
 

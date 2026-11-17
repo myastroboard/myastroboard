@@ -898,6 +898,8 @@
     "push_kp_visibility_excellent": "Excellent",
     "push_kp_visibility_severe_storm": "Severe Storm",
     "notifications_minutes": "min",
+    "notifications_lead_days_one": "1 day",
+    "notifications_lead_days": "{count} days",
     "notifications_push_active": "Background push active",
     "notifications_push_inapp_only": "In-app only - tab must be open",
     "notifications_vapid_not_configured": "Background push notifications may not work: the contact email is not configured. Administrators can set it in App settings -> Configuration -> Notifications.",

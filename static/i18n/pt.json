@@ -898,6 +898,8 @@
     "push_kp_visibility_excellent": "Excelente",
     "push_kp_visibility_severe_storm": "Tempestade severa",
     "notifications_minutes": "min",
+    "notifications_lead_days_one": "1 dia",
+    "notifications_lead_days": "{count} dias",
     "notifications_push_active": "Push em segundo plano ativo",
     "notifications_push_inapp_only": "Apenas no aplicativo - a aba deve estar aberta",
     "notifications_vapid_not_configured": "As notificações push em segundo plano podem não funcionar: o e-mail de contato não está configurado. Os administradores podem configurá-lo em Configurações do aplicativo -> Configuração -> Notificações.",

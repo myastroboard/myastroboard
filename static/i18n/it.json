@@ -898,6 +898,8 @@
     "push_kp_visibility_excellent": "Eccellente",
     "push_kp_visibility_severe_storm": "Tempesta severa",
     "notifications_minutes": "min",
+    "notifications_lead_days_one": "1 giorno",
+    "notifications_lead_days": "{count} giorni",
     "notifications_push_active": "Push in background attivo",
     "notifications_push_inapp_only": "Solo in-app - la scheda deve essere aperta",
     "notifications_vapid_not_configured": "Le notifiche push in background potrebbero non funzionare: l'email di contatto non è configurata. Gli amministratori possono impostarla in Impostazioni dell'app -> Configurazione -> Notifiche.",
