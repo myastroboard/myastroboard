@@ -94,6 +94,8 @@ Private by default, as every sharing feature of MyAstroBoard:
 - **App settings -> Users -> Reset profile** clears a member's display name, bio and picture
   (moderation). Their account, data and Community choices are kept.
 - The users table shows the display name under the login name.
+- An admin who is the only account on the instance sees a note on the Activity page with a link to
+  that switch: the tab has nobody to show until other members join.
 
 ## Demo mode
 

@@ -3523,6 +3523,8 @@
     "block_equipment": "Equipment",
     "no_equipment": "No equipment yet.",
     "block_activity": "Recent activity",
-    "no_activity": "No activity yet."
+    "no_activity": "No activity yet.",
+    "single_account_note": "You are the only account on this instance: the Community comes to life with several members. If you do not need it, you can turn it off.",
+    "single_account_link": "App settings -> Configuration"
   }
 }

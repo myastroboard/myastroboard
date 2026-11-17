@@ -322,7 +322,7 @@ the profile blocks they show.
 - `DELETE /api/users/<user_id>/profile` (admin) - Moderation: clear a member's display name, bio and picture
 - `GET /api/community/members` - Members who joined, in alphabetical order (identity, bio, membership date - no figures), and whether the caller joined
 - `GET /api/community/members/<user_id>` - One member's profile with only the blocks they show (`stats`, `badges`, `pictures`, `equipment`, `activity`); 404 for a member who did not join, except for the caller's own preview
-- `GET /api/community/activity` - The activity feed (one entry per member and day, newest first) and the shared "together" totals; cached for one minute
+- `GET /api/community/activity` - The activity feed (one entry per member and day, newest first) and the shared "together" totals; cached for one minute. Admins also get `account_count`
 
 ## Equipment
 

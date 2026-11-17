@@ -3523,6 +3523,8 @@
     "block_equipment": "Attrezzatura",
     "no_equipment": "Ancora nessuna attrezzatura.",
     "block_activity": "Attività recente",
-    "no_activity": "Ancora nessuna attività."
+    "no_activity": "Ancora nessuna attività.",
+    "single_account_note": "Sei l'unico account di questa istanza: la comunità prende vita con più membri. Se non ti serve, puoi disattivarla.",
+    "single_account_link": "Impostazioni dell'app -> Configurazione"
   }
 }

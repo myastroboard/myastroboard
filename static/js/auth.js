@@ -910,17 +910,17 @@ function displayUsers(users) {
     // Attach event listeners to buttons
     usersList.querySelectorAll('.user-edit-username').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            const userId = e.target.getAttribute('data-user-id');
-            const username = e.target.getAttribute('data-username');
+            const userId = e.currentTarget.getAttribute('data-user-id');
+            const username = e.currentTarget.getAttribute('data-username');
             editUsername(userId, username);
         });
     });
     
     usersList.querySelectorAll('.user-edit-role').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            const userId = e.target.getAttribute('data-user-id');
-            const username = e.target.getAttribute('data-username');
-            const role = e.target.getAttribute('data-role');
+            const userId = e.currentTarget.getAttribute('data-user-id');
+            const username = e.currentTarget.getAttribute('data-username');
+            const role = e.currentTarget.getAttribute('data-role');
             editRole(userId, username, role);
         });
     });
@@ -955,8 +955,8 @@ function displayUsers(users) {
 
     usersList.querySelectorAll('.user-change-password').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            const userId = e.target.getAttribute('data-user-id');
-            const username = e.target.getAttribute('data-username');
+            const userId = e.currentTarget.getAttribute('data-user-id');
+            const username = e.currentTarget.getAttribute('data-username');
             changePassword(userId, username);
         });
     });
@@ -970,8 +970,8 @@ function displayUsers(users) {
 
     usersList.querySelectorAll('.user-delete').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            const userId = e.target.getAttribute('data-user-id');
-            const username = e.target.getAttribute('data-username');
+            const userId = e.currentTarget.getAttribute('data-user-id');
+            const username = e.currentTarget.getAttribute('data-username');
             deleteUser(userId, username);
         });
     });

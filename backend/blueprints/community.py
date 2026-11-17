@@ -352,7 +352,11 @@ def get_community_activity():
         if not viewer:  # pragma: no cover
             return jsonify({'error': 'User not authenticated'}), 401
         snapshot = _community_snapshot(config)
-        return jsonify({**snapshot, 'you_listed': user_identity.is_listed(viewer)})
+        payload = {**snapshot, 'you_listed': user_identity.is_listed(viewer)}
+        if viewer.is_admin():
+            # Lets the page tell an admin alone on the instance where to turn the tab off
+            payload['account_count'] = len(user_manager.all_users())
+        return jsonify(payload)
     except Exception as error:
         logger.error(f'Error building the Community activity: {error}')
         return jsonify({'error': 'Internal server error'}), 500

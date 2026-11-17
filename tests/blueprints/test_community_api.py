@@ -498,3 +498,16 @@ class TestWriteServerErrors:
         _login(client, member)
         monkeypatch.setattr(community_module.members, 'build_profile', self._boom)
         assert client.get(f'/api/community/members/{member.user_id}').status_code == 500
+
+
+class TestAccountCount:
+    """Only admins learn how many accounts exist (for the "you are alone here" note)."""
+
+    def test_admins_get_the_account_count(self, client):
+        _login(client, user_manager.get_user_by_username('admin'))
+        payload = client.get('/api/community/activity').get_json()
+        assert payload['account_count'] == len(user_manager.all_users())
+
+    def test_members_do_not(self, client):
+        _login(client, _new_user())
+        assert 'account_count' not in client.get('/api/community/activity').get_json()

@@ -3063,7 +3063,7 @@
     "tonight_intro": "Voici ce que vous pouvez photographier ce soir",
     "redo_wizard": "Relancer l'assistant de configuration",
     "redo_wizard_info": "Relancer l'assistant de configuration guidée depuis le début.",
-    "profile_intro": "Choisissez comment les autres membres de cette instance vous voient. Tout est facultatif et modifiable ensuite dans Mes réglages -> Profil."
+    "profile_intro": "Choisissez comment les autres membres de cette instance vous voient. Tout est facultatif et modifiable ensuite dans Mes paramètres -> Profil."
   },
   "difficulty": {
     "beginner": "Débutant",
@@ -3505,7 +3505,7 @@
     "error_load": "Impossible de charger la communauté.",
     "you": "Vous",
     "member_since": "Membre depuis le {date}",
-    "members_not_listed": "Vous n'êtes pas dans l'annuaire : rejoignez la communauté depuis Mes réglages -> Profil.",
+    "members_not_listed": "Vous n'êtes pas dans l'annuaire : rejoignez la communauté depuis Mes paramètres -> Profil.",
     "members_empty": "Personne n'a encore rejoint la communauté.",
     "members_count": "Membres : {count}, par ordre alphabétique",
     "back_to_members": "Tous les membres",
@@ -3523,6 +3523,8 @@
     "block_equipment": "Matériel",
     "no_equipment": "Aucun matériel pour le moment.",
     "block_activity": "Activité récente",
-    "no_activity": "Aucune activité pour le moment."
+    "no_activity": "Aucune activité pour le moment.",
+    "single_account_note": "Vous êtes le seul compte de cette instance : la communauté prend vie avec plusieurs membres. Si vous n'en avez pas besoin, vous pouvez la désactiver.",
+    "single_account_link": "Paramètres app -> Configuration"
   }
 }

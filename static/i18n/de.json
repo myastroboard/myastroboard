@@ -3523,6 +3523,8 @@
     "block_equipment": "Ausrüstung",
     "no_equipment": "Noch keine Ausrüstung.",
     "block_activity": "Letzte Aktivität",
-    "no_activity": "Noch keine Aktivität."
+    "no_activity": "Noch keine Aktivität.",
+    "single_account_note": "Sie sind das einzige Konto dieser Instanz: Die Community lebt erst mit mehreren Mitgliedern auf. Wenn Sie sie nicht brauchen, können Sie sie ausschalten.",
+    "single_account_link": "App-Einstellungen -> Konfiguration"
   }
 }

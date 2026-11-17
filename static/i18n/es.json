@@ -3063,7 +3063,7 @@
     "tonight_intro": "Esto es lo que puedes imaginar esta noche.",
     "redo_wizard": "Asistente de rehacer configuración",
     "redo_wizard_info": "Ejecute nuevamente el asistente de configuración guiada desde el principio.",
-    "profile_intro": "Elija cómo le ven los demás miembros de esta instancia. Todo es opcional y puede cambiarse después en Mis ajustes -> Perfil."
+    "profile_intro": "Elija cómo le ven los demás miembros de esta instancia. Todo es opcional y puede cambiarse después en Mi configuración -> Perfil."
   },
   "difficulty": {
     "beginner": "Principiante",
@@ -3505,7 +3505,7 @@
     "error_load": "No se pudo cargar la comunidad.",
     "you": "Usted",
     "member_since": "Miembro desde el {date}",
-    "members_not_listed": "No figura en el directorio: únase desde Mis ajustes -> Perfil.",
+    "members_not_listed": "No figura en el directorio: únase desde Mi configuración -> Perfil.",
     "members_empty": "Nadie se ha unido todavía.",
     "members_count": "Miembros: {count}, por orden alfabético",
     "back_to_members": "Todos los miembros",
@@ -3523,6 +3523,8 @@
     "block_equipment": "Equipo",
     "no_equipment": "Ningún equipo por ahora.",
     "block_activity": "Actividad reciente",
-    "no_activity": "Ninguna actividad por ahora."
+    "no_activity": "Ninguna actividad por ahora.",
+    "single_account_note": "Es la única cuenta de esta instancia: la comunidad cobra vida con varios miembros. Si no la necesita, puede desactivarla.",
+    "single_account_link": "Configuración de la aplicación -> Configuración"
   }
 }

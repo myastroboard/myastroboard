@@ -134,6 +134,34 @@ function _cmRenderJoinBanner(listed) {
     container.appendChild(banner);
 }
 
+/** Admin alone on the instance: the tab has nobody to show, say where it can be turned off. */
+function _cmRenderSingleAccountNote(accountCount) {
+    const banner = document.getElementById('community-join-banner');
+    if (!banner || accountCount !== 1) return;
+    const note = _cmEl('div', 'alert alert-info community-message');
+    DOMUtils.append(note, DOMUtils.createIcon('bi bi-info-circle icon-inline'), ` ${_cmT(
+        'community.single_account_note',
+        'You are the only account on this instance: the Community comes to life with several members. If you do not need it, you can turn it off.'
+    )} `);
+    const link = _cmEl('a', 'alert-link', _cmT('community.single_account_link', 'App settings -> Configuration'));
+    link.href = '#parameters/configuration';
+    link.addEventListener('click', (event) => {
+        event.preventDefault();
+        if (typeof switchMainTab === 'function') switchMainTab('parameters');
+        if (typeof switchSubTab === 'function') switchSubTab('parameters', 'configuration');
+        // Scroll the window itself: scrollIntoView() would scroll the nearest overflow:hidden
+        // panel instead and shift its content out of view. Once the tab is laid out.
+        requestAnimationFrame(() => {
+            const target = document.getElementById('feature-community-wrapper');
+            if (!target) return;
+            const top = target.getBoundingClientRect().top + window.scrollY - window.innerHeight / 3;
+            window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+        });
+    });
+    note.appendChild(link);
+    banner.prepend(note);
+}
+
 function _cmRenderTogether(together) {
     const container = document.getElementById('community-together');
     if (!container) return;
@@ -251,6 +279,7 @@ async function loadCommunityActivity() {
         const payload = await fetchJSON('/api/community/activity');
         if (token !== communityState.token) return;
         _cmRenderJoinBanner(payload.you_listed);
+        _cmRenderSingleAccountNote(payload.account_count);
         _cmRenderTogether(payload.together);
         const title = _cmEl('h3', 'h5 community-section-title', _cmT('community.feed_title', 'Latest activity'));
         _cmRenderFeed(feedContainer, payload.feed, _cmT('community.feed_empty', 'Nothing yet. The first captures of the members who joined will appear here.'));
