@@ -21,12 +21,8 @@ def _resolve_astrodex_visibility_context():
     """
     config = load_config()
     private_mode = bool(config.get('astrodex', {}).get('private', False))
-    users = user_manager.list_users()
-    usernames_by_id = {
-        user_entry.get('user_id', ''): user_entry.get('username', 'unknown')
-        for user_entry in users
-        if user_entry.get('user_id')
-    }
+    # Names shown on shared pictures: the display name, else the login name
+    usernames_by_id = user_manager.display_names_by_id()
     return private_mode, usernames_by_id
 
 

@@ -371,7 +371,7 @@ def load_all_shared_equipment(equipment_type: str, exclude_user_id: str) -> list
     """
     from utils.auth import user_manager
 
-    user_map = {u['user_id']: u['username'] for u in user_manager.list_users()}
+    user_map = user_manager.display_names_by_id()
 
     shared_items: list[dict] = []
     try:
@@ -564,7 +564,7 @@ def load_all_shared_combinations(exclude_user_id: str) -> list[dict]:
     """
     from utils.auth import user_manager
 
-    user_map = {u['user_id']: u['username'] for u in user_manager.list_users()}
+    user_map = user_manager.display_names_by_id()
 
     result: list[dict] = []
     try:

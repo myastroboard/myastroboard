@@ -248,12 +248,7 @@ def get_astrodex():
 
         config = load_config()
         private_mode = bool(config.get('astrodex', {}).get('private', False))
-        users = user_manager.list_users()
-        usernames_by_id = {
-            user_entry.get('user_id', ''): user_entry.get('username', 'unknown')
-            for user_entry in users
-            if user_entry.get('user_id')
-        }
+        usernames_by_id = user_manager.display_names_by_id()
 
         astrodex_data = astrodex.get_visible_astrodex(
             current_user_id=user_id,
@@ -300,12 +295,7 @@ def get_astrodex_map():
 
         config = load_config()
         map_private = bool(config.get('astrodex', {}).get('map_private', False))
-        users = user_manager.list_users()
-        usernames_by_id = {
-            user_entry.get('user_id', ''): user_entry.get('username', 'unknown')
-            for user_entry in users
-            if user_entry.get('user_id')
-        }
+        usernames_by_id = user_manager.display_names_by_id()
 
         map_data = astrodex.get_astrodex_map_points(
             current_user_id=user_id,
@@ -781,12 +771,7 @@ def get_astrodex_image(filename):
 
         config = load_config()
         private_mode = bool(config.get('astrodex', {}).get('private', False))
-        users = user_manager.list_users()
-        usernames_by_id = {
-            user_entry.get('user_id', ''): user_entry.get('username', 'unknown')
-            for user_entry in users
-            if user_entry.get('user_id')
-        }
+        usernames_by_id = user_manager.display_names_by_id()
 
         if not astrodex.can_user_view_image(user_id, filename, private_mode, usernames_by_id):
             return jsonify({'error': 'Image not accessible'}), 403

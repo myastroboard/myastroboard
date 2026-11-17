@@ -834,7 +834,12 @@ function renderAstrodexGrid(items, isAllowedAstrodex) {
         if (!isOwnedByCurrentUser) {
             const owner = document.createElement('div');
             owner.className = 'astrodex-card-constellation';
-            DOMUtils.append(owner, DOMUtils.createIcon('bi bi-person text-primary icon-inline'), item.owner_username || 'Shared');
+            if (item.owner_user_id && typeof buildUserChip === 'function') {
+                // owner_username carries the display name (the login name when none is set)
+                owner.appendChild(buildUserChip({ user_id: item.owner_user_id, display_name: item.owner_username }));
+            } else {
+                DOMUtils.append(owner, DOMUtils.createIcon('bi bi-person text-primary icon-inline'), item.owner_username || 'Shared');
+            }
             body.appendChild(owner);
         }
 

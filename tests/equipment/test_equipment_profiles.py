@@ -1341,10 +1341,13 @@ def test_shared_equipment_and_combination_status(temp_data_dir, monkeypatch):
 
     fake_auth = types.SimpleNamespace(
         user_manager=types.SimpleNamespace(
-            list_users=lambda: [
-                {'user_id': user_a, 'username': 'alice'},
-                {'user_id': user_b, 'username': 'bob'},
-            ]
+            display_names_by_id=lambda: {
+                u['user_id']: u['username']
+                for u in [
+                    {'user_id': user_a, 'username': 'alice'},
+                    {'user_id': user_b, 'username': 'bob'},
+                ]
+            }
         )
     )
     monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
@@ -1599,7 +1602,11 @@ class TestLoadAllSharedEquipmentExceptions:
         import types
 
         fake_auth = types.SimpleNamespace(
-            user_manager=types.SimpleNamespace(list_users=lambda: [{'user_id': 'owner1', 'username': 'alice'}])
+            user_manager=types.SimpleNamespace(
+                display_names_by_id=lambda: {
+                    u['user_id']: u['username'] for u in [{'user_id': 'owner1', 'username': 'alice'}]
+                }
+            )
         )
         monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
         documents.put_document('owner1', 'equipment.telescopes', 'corrupt')
@@ -1609,7 +1616,9 @@ class TestLoadAllSharedEquipmentExceptions:
     def test_outer_exception_returns_empty_list(self, temp_data_dir, monkeypatch):
         import types
 
-        fake_auth = types.SimpleNamespace(user_manager=types.SimpleNamespace(list_users=lambda: []))
+        fake_auth = types.SimpleNamespace(
+            user_manager=types.SimpleNamespace(display_names_by_id=lambda: {u['user_id']: u['username'] for u in []})
+        )
         monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
 
         def raise_oops(*_args):
@@ -1628,7 +1637,11 @@ class TestComputeShareStatusBranches:
 
         user_a = 'share-owner'
         fake_auth = types.SimpleNamespace(
-            user_manager=types.SimpleNamespace(list_users=lambda: [{'user_id': user_a, 'username': 'alice'}])
+            user_manager=types.SimpleNamespace(
+                display_names_by_id=lambda: {
+                    u['user_id']: u['username'] for u in [{'user_id': user_a, 'username': 'alice'}]
+                }
+            )
         )
         monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
         documents.put_document(
@@ -2498,7 +2511,11 @@ class TestSharedEquipmentAdditionalBranches:
     def test_load_shared_equipment_item_not_shared_skipped(self, temp_data_dir, monkeypatch):
         """item in file has is_shared=False → not added to result."""
         fake_auth = types.SimpleNamespace(
-            user_manager=types.SimpleNamespace(list_users=lambda: [{'user_id': 'owner1', 'username': 'alice'}])
+            user_manager=types.SimpleNamespace(
+                display_names_by_id=lambda: {
+                    u['user_id']: u['username'] for u in [{'user_id': 'owner1', 'username': 'alice'}]
+                }
+            )
         )
         monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
         documents.put_document(
@@ -2513,10 +2530,13 @@ class TestSharedEquipmentAdditionalBranches:
         viewer_id = 'viewer'
         fake_auth = types.SimpleNamespace(
             user_manager=types.SimpleNamespace(
-                list_users=lambda: [
-                    {'user_id': owner_id, 'username': 'alice'},
-                    {'user_id': viewer_id, 'username': 'bob'},
-                ]
+                display_names_by_id=lambda: {
+                    u['user_id']: u['username']
+                    for u in [
+                        {'user_id': owner_id, 'username': 'alice'},
+                        {'user_id': viewer_id, 'username': 'bob'},
+                    ]
+                }
             )
         )
         monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
@@ -2534,7 +2554,11 @@ class TestSharedEquipmentAdditionalBranches:
     def test_load_shared_combinations_excludes_owner(self, temp_data_dir, monkeypatch):
         """combo file belongs to excluded user → skipped."""
         fake_auth = types.SimpleNamespace(
-            user_manager=types.SimpleNamespace(list_users=lambda: [{'user_id': 'excludeme', 'username': 'excluded'}])
+            user_manager=types.SimpleNamespace(
+                display_names_by_id=lambda: {
+                    u['user_id']: u['username'] for u in [{'user_id': 'excludeme', 'username': 'excluded'}]
+                }
+            )
         )
         monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
         documents.put_document(
@@ -2560,7 +2584,11 @@ class TestSharedEquipmentAdditionalBranches:
     def test_load_shared_combinations_invalid_json_continues(self, temp_data_dir, monkeypatch):
         """bad JSON in combo file → exception caught → continue."""
         fake_auth = types.SimpleNamespace(
-            user_manager=types.SimpleNamespace(list_users=lambda: [{'user_id': 'owner1', 'username': 'alice'}])
+            user_manager=types.SimpleNamespace(
+                display_names_by_id=lambda: {
+                    u['user_id']: u['username'] for u in [{'user_id': 'owner1', 'username': 'alice'}]
+                }
+            )
         )
         monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
         documents.put_document('owner1', 'equipment.combinations', 'corrupt')
@@ -2571,7 +2599,11 @@ class TestSharedEquipmentAdditionalBranches:
         """combination status is_shared=False → not added."""
         owner_id = 'owner1'
         fake_auth = types.SimpleNamespace(
-            user_manager=types.SimpleNamespace(list_users=lambda: [{'user_id': owner_id, 'username': 'alice'}])
+            user_manager=types.SimpleNamespace(
+                display_names_by_id=lambda: {
+                    u['user_id']: u['username'] for u in [{'user_id': owner_id, 'username': 'alice'}]
+                }
+            )
         )
         monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
         documents.put_document(
@@ -2595,7 +2627,9 @@ class TestSharedEquipmentAdditionalBranches:
 
     def test_load_shared_combinations_outer_exception_returns_empty(self, temp_data_dir, monkeypatch):
         """The store raises → outer except → return []."""
-        fake_auth = types.SimpleNamespace(user_manager=types.SimpleNamespace(list_users=lambda: []))
+        fake_auth = types.SimpleNamespace(
+            user_manager=types.SimpleNamespace(display_names_by_id=lambda: {u['user_id']: u['username'] for u in []})
+        )
         monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
         monkeypatch.setattr(
             equipment_profiles.documents, 'list_documents', lambda *_a: (_ for _ in ()).throw(Exception("db fail"))
@@ -2612,10 +2646,13 @@ class TestIndexTelescopesAndCameras:
         viewer_id = 'viewer'
         fake_auth = types.SimpleNamespace(
             user_manager=types.SimpleNamespace(
-                list_users=lambda: [
-                    {'user_id': owner_id, 'username': 'alice'},
-                    {'user_id': viewer_id, 'username': 'bob'},
-                ]
+                display_names_by_id=lambda: {
+                    u['user_id']: u['username']
+                    for u in [
+                        {'user_id': owner_id, 'username': 'alice'},
+                        {'user_id': viewer_id, 'username': 'bob'},
+                    ]
+                }
             )
         )
         monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)

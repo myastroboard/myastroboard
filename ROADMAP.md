@@ -425,7 +425,7 @@ and can be turned off.
 |---|---|
 | **Why** | Your Sky already computes how an observer is doing, as a dashboard to consult. The same figures told as a dated story, and as milestones to reach, give a reason to go back out and something to show. Mostly a new presentation of existing aggregations. |
 | **Effort** | Medium |
-| **Status** | ✅ Implemented (year in review, achievements and challenges) |
+| **Status** | ✅ Implemented (year in review, achievements and challenges, profiles and Community) |
 
 #### Year in review
 
@@ -446,6 +446,17 @@ and can be turned off.
   count for the latitude
 - A "next within reach" view linking to the missing targets visible tonight
 - Sober by design and can be turned off; no ranking between users
+
+#### Profiles and Community (pulled forward from v2.2)
+
+- A display name and a picture per account, shown wherever a member is named (shared pictures and
+  equipment, photo map, Astrodex Stream), set in My settings -> Profile or in the first-run wizard
+- A **Community** tab, opt-in per member: an alphabetical directory, profiles showing only the
+  blocks the member chooses (figures, badges, pictures, equipment, activity), a chronological
+  activity feed, and shared "together" totals with what nobody has captured yet
+- Emulation without competition: no ranking, no podium, no figure set against another member's
+- The Observation Log, locations and notes are never shown; the admin can turn the tab off and
+  reset a profile ([docs/COMMUNITY.md](docs/COMMUNITY.md))
 
 **i18n in 6 languages.**
 
@@ -519,6 +530,7 @@ and can be turned off.
 - The user chooses block by block what is shown: pictures individually marked public, headline
   figures, equipment, badges, tonight's conditions without position
 - No coordinates, no location name, no map; the Observation Log stays private
+- Reuses the v1.9 Community profile blocks and visibility choices, served without a session
 - Link preview tags, and a small embeddable "sky tonight" widget for a club website
 
 #### Transient alerts
@@ -641,7 +653,7 @@ Every planning tool up to this point still requires the user to decide what to s
   the pictures members already uploaded; expires by itself
 - **Outings** - a small calendar of observing nights at a registered location, with the forecast
   for that place and night, and sign-ups
-- **Club board** (individual opt-in) - catalogue progress and club-wide totals, without a podium
+- ~~**Club board**~~ - delivered in v1.9 as the Community tab ("together" totals, activity feed)
 - **Club page** - the aggregated version of the v1.11 public page
 - No external server required - purely local
 
@@ -750,12 +762,12 @@ Also:
 | v1.6 | MQTT Publisher & Home Assistant Integration + Astrodex Stream | All | Medium | ✅ Implemented |
 | v1.7 | Database storage (SQLite, relational, Alembic migrations, verified 1.6 import) | All | High | ✅ Implemented |
 | v1.8 | See and Show (framing simulator, share cards, guided tour) | All | Medium | ✅ Implemented |
-| v1.9 | My Progress (year in review, achievements and challenges) | All | Medium | ✅ Implemented |
+| v1.9 | My Progress (year in review, achievements and challenges, profiles and Community) | All | Medium | ✅ Implemented |
 | v1.10 | Effortless Log (FITS import, imaging projects, exports, moon-aware advice) | Advanced | High | 💡 Idea |
 | v1.11 | Open to the Outside (7-night outlook, public page, transients, planetary and lunar) | All | High | 💡 Idea |
 | v2.0 | Interactive Sky Chart + mosaic planner | All | High | 💡 Idea |
 | v2.1 | Astro Intelligence (plate solve and annotation, Night Copilot) | All | High | 💡 Idea |
-| v2.2 | Club (object of the month, outings, club board) | Clubs | Medium | 💡 Idea |
+| v2.2 | Club (object of the month, outings) | Clubs | Medium | 💡 Idea |
 | v2.3 | Capture Bridges, file-based (NINA sequence, PHD2 log) | Advanced | Medium | 💡 Idea |
 | v2.4+ | Live Observatory (former v2.4-v2.7), demand-driven | Advanced | Very High | 💡 Idea - not scheduled |
 | v3.0 | Personal Observatory OS | All | Very High | 💡 Idea |

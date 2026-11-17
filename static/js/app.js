@@ -86,7 +86,7 @@ function applyUserStartupPreferences(force = false) {
     const hash = window.location.hash.replace(/^#/, '').toLowerCase();
     if (hash) {
         const firstSegment = hash.split('/')[0];
-        const navigableMains = ['forecast-astro', 'forecast-weather', 'skytonight', 'spaceflight', 'astrodex', 'about', 'equipment', 'my-settings', 'parameters', 'weather', 'planmynight', 'plan-my-night', 'observatory'];
+        const navigableMains = ['forecast-astro', 'forecast-weather', 'skytonight', 'spaceflight', 'astrodex', 'about', 'equipment', 'my-settings', 'parameters', 'weather', 'planmynight', 'plan-my-night', 'observatory', 'community'];
         if (navigableMains.includes(firstSegment) || navigableMains.some(m => hash.startsWith(m + '/'))) {
             window.__myastroboardStartupApplied = true;
             return;
@@ -238,6 +238,7 @@ async function initializeApp() {
     if (typeof initSubtabMenus === 'function') initSubtabMenus();
     await loadTimezones();
     await loadConfiguration();  // Wait for config to load before loading catalogues
+    if (typeof refreshCommunityAvailability === 'function') refreshCommunityAvailability();
     if (typeof loadAppSettings === 'function' && currentUser?.role === 'admin') loadAppSettings();
     if (typeof initFirstRun === 'function') initFirstRun();
 
@@ -563,6 +564,15 @@ function switchSubTab(parentTab, subtabName, options = {}) {
         case 'notifications':
             if (typeof initNotificationSettingsUI === 'function') initNotificationSettingsUI();
             break; // My Settings tab
+        case 'profile':
+            if (typeof loadProfileSettings === 'function') loadProfileSettings();
+            break; // My Settings tab
+        case 'community-activity':
+            if (typeof loadCommunityActivity === 'function') loadCommunityActivity();
+            break; // Community tab
+        case 'community-members':
+            if (typeof loadCommunityMembers === 'function') loadCommunityMembers();
+            break; // Community tab
         default:
             if (subtabName.startsWith('skytonight-')) { // SkyTonight section tabs
                 const skytSection = subtabName.slice('skytonight-'.length);

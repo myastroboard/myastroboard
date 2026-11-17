@@ -36,6 +36,8 @@ database `myastroboard.db` ([details](DATABASE.md)), pictures and attachments as
 | Account: username, password hash, role, creation date, last login | database, `users` table | Passwords are hashed (werkzeug); never stored in clear. |
 | Two-factor secret (if enabled) | database, `users` table | TOTP seed, needed to verify codes. |
 | Preferences (language, time format, default/active location...) | database, `users` table | Includes the badges already seen and the dismissed year in review (v1.9); badges and the year in review themselves are computed on read, never stored ([details](MY_PROGRESS.md)). |
+| Profile: display name, bio, Community choices | database, `users` table | Chosen by the user. The display name and picture replace the login name where other members already saw it; the rest is shown only to signed-in members, only once the user joins the Community and only for the blocks they turn on ([details](COMMUNITY.md)). |
+| Profile picture | `avatars/` | Optional; re-encoded as a 256 px WebP with no metadata. |
 | Web Push subscriptions | database, `users` table | Browser push endpoint + keys, only if the user enabled notifications. |
 | Observing locations: name, latitude, longitude, timezone | database, configuration | A location is often the user's home: treat coordinates as personal data. |
 | Astrodex: observed objects, notes, optional picture coordinates | database, `astrodex_items` / `astrodex_pictures` | See [Photo metadata](#photo-metadata) below. |
@@ -65,6 +67,9 @@ Astrodex pictures and session attachments can be seen by other users of the inst
 Pictures uploaded before this protection existed still carry their original metadata. Non-image
 attachments (PDF, Word, text) are stored as sent: remove author metadata before uploading them if
 it matters.
+
+Profile pictures go further: they are decoded and re-encoded as a small square WebP, so nothing of
+the original file is kept but its pixels.
 
 The coordinates a user types **manually** on an Astrodex picture are different: they are
 deliberate data used by the photo map. On a new installation the map is private: each user only sees
@@ -138,8 +143,8 @@ Transfers outside the EU: 7Timer (China) receives location coordinates, and the 
 |---|---|
 | Access (Art. 15) | *My settings -> Security -> Your data* downloads a ZIP of everything stored about the user; an administrator can download the same archive for any user from *App settings -> Users -> Export data*. |
 | Rectification (Art. 16) | Users edit their own data; an administrator edits accounts and locations. |
-| Erasure (Art. 17) | An administrator deletes the account in *Users*. This removes the account **and all of its data**: Astrodex and pictures, observation sessions and attachments, equipment, plans and wishlist. Log lines mentioning the user remain until rotation. |
-| Portability (Art. 20) | The same ZIP: account and preferences, locations, Astrodex, observation log, equipment, plans and wishlist as JSON, with pictures and attachments as the original files. Password hashes and two-factor secrets are left out. |
+| Erasure (Art. 17) | An administrator deletes the account in *Users*. This removes the account **and all of its data**: profile and profile picture, Astrodex and pictures, observation sessions and attachments, equipment, plans and wishlist. Log lines mentioning the user remain until rotation. |
+| Portability (Art. 20) | The same ZIP: account, profile (with its picture) and preferences, locations, Astrodex, observation log, equipment, plans and wishlist as JSON, with pictures and attachments as the original files. Password hashes and two-factor secrets are left out. |
 | Objection / restriction | Handled by the administrator (disable the account, remove a location). |
 
 Accounts deleted **before** full erasure existed may have left files behind. The 1.7 upgrade moved
@@ -180,7 +185,8 @@ Privacy notice - [Instance name]
 
 Controller: [Club / association name], [address], contact: [email].
 
-What we collect: your username, a hashed password, your preferences, the observing
+What we collect: your username, a hashed password, your preferences, your profile if
+you fill it in (display name, picture, short presentation), the observing
 locations you record (name and coordinates), and the content you add (Astrodex pictures
 and notes, observation logs, equipment, plans, wishlist). Our server logs record your
 username and IP address when you sign in, for security.
@@ -189,7 +195,9 @@ Why: to provide the MyAstroBoard service you signed up for (Art. 6(1)(b) GDPR) a
 keep it secure (legitimate interest, Art. 6(1)(f)).
 
 Who can see it: administrators of this instance; other members only for what you share
-(shared Astrodex, photo map). Pictures are stripped of their GPS metadata on upload.
+(shared Astrodex, photo map, and your Community profile if you join the Community - you
+choose which parts). Your observation log, locations and notes are never shown to other
+members. Pictures are stripped of their GPS metadata on upload.
 
 Third parties: weather providers (Open-Meteo, 7Timer! - China) receive the coordinates
 of the observing locations; map tiles (OpenStreetMap - United Kingdom) are loaded by our server, and

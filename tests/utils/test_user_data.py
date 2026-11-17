@@ -18,6 +18,7 @@ _DIR_TARGETS = {
     'observation.astrodex.ASTRODEX_DIR': 'astrodex',
     'observation.astrodex.ASTRODEX_IMAGES_DIR': 'astrodex_images',
     'observation.observation_sessions.OBSERVATION_SESSIONS_DIR': 'observation_sessions',
+    'utils.user_identity.AVATARS_DIR': 'avatars',
 }
 
 
@@ -41,6 +42,7 @@ def _user(user_id=None, username='alice'):
         totp_enabled=True,
         push_subscriptions=[{'endpoint': 'https://push.example/secret', 'keys': {'auth': 'x'}}],
         preferences={'language': 'fr'},
+        profile={'display_name': 'Alice A.', 'bio': 'Hi', 'avatar': None, 'community': {'listed': True}},
         password_hash='scrypt:hash',
         totp_secret='BASE32SECRET',
     )
@@ -59,6 +61,7 @@ def _populate(root, user_id):
     (root / 'astrodex_images' / 'legacy_m42.jpg').write_bytes(b'\xff\xd8legacy')
     (root / 'observation_sessions' / 'attachments' / f'{user_id}_notes.txt').write_text('n', encoding='utf-8')
     (root / 'observation_sessions' / 'attachments' / f'{user_id}_draft.tmp').write_text('', encoding='utf-8')
+    (root / 'avatars' / f'{user_id}_avatar_0123456789abcdef.webp').write_bytes(b'RIFFwebp')
 
 
 class TestPurge:
@@ -70,10 +73,10 @@ class TestPurge:
         _populate(data_dirs, alice)
         _populate(data_dirs, bob)
 
-        assert user_data.purge_user_files(alice) == 3
+        assert user_data.purge_user_files(alice) == 4
 
         assert not list(data_dirs.rglob(f'{alice}_*'))
-        assert len(list(data_dirs.rglob(f'{bob}_*'))) == 3
+        assert len(list(data_dirs.rglob(f'{bob}_*'))) == 4
 
 
 class TestExport:
@@ -106,11 +109,13 @@ class TestExport:
             f'observation_sessions/{uid}_sessions.json',
             f'observation_sessions/attachments/{uid}_notes.txt',
             f'plans/{uid}_plan_my_night.json',
+            f'profile/{uid}_avatar_0123456789abcdef.webp',
             f'wishlist/{uid}_wishlist.json',
         }
         assert download_name.startswith('myastroboard_alice_data_') and download_name.endswith('.zip')
         assert account['username'] == 'alice' and account['two_factor_enabled'] is True
         assert account['push_subscriptions'] == 1
+        assert account['profile']['display_name'] == 'Alice A.'
         serialized = json.dumps(account)
         assert 'scrypt:hash' not in serialized and 'BASE32SECRET' not in serialized
         assert 'push.example' not in serialized
@@ -171,6 +176,7 @@ _BACKEND = Path(__file__).resolve().parents[2] / 'backend'
 # Directories holding ``<user_id>_...`` files: must all be in user_data_dirs()
 _PER_USER_DIRS = {
     ('observation/astrodex.py', 'ASTRODEX_IMAGES_DIR'),
+    ('utils/user_identity.py', 'AVATARS_DIR'),
 }
 
 # Data directories that hold no per-user files, with the reason
@@ -202,6 +208,7 @@ _USER_FILE_MODULES = {
     'demo/demo_life.py',
     'observation/myastroshine_integration.py',
     'utils/user_data.py',
+    'utils/user_identity.py',
 }
 
 _HOW_TO_FIX = (

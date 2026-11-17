@@ -5,7 +5,8 @@ A user's data lives in two places:
 - the database: the account row and the per-user records (Astrodex, observation log,
   wishlist, equipment, plans - see ``db/documents.py``). Deleting the account deletes them
   (``db/users_store.delete_user``);
-- binary files named ``<user_id>_...`` (Astrodex pictures, session attachments).
+- binary files named ``<user_id>_...`` (Astrodex pictures, session attachments, the
+  profile avatar).
   ``user_data_dirs()`` is the single list of those directories, used both for the right
   to erasure (account deletion) and for the right to data portability (the "Download my
   data" ZIP).
@@ -38,7 +39,8 @@ _EXPORT_README = """MyAstroBoard - personal data export
 Exported on: {exported_at}
 Account: {username} ({user_id})
 
-account.json                     your account (password and two-factor secrets excluded)
+account.json                     your account and profile (password and two-factor secrets excluded)
+profile/                         your profile picture (avatar)
 locations.json                   the observing locations available to you
 astrodex/                        your Astrodex (objects, notes, picture metadata)
 astrodex/images/                 your Astrodex pictures
@@ -59,10 +61,12 @@ def user_data_dirs() -> list[tuple[str, str]]:
     constant are honoured.
     """
     from observation import astrodex, observation_sessions
+    from utils import user_identity
 
     return [
         ('astrodex/images', astrodex.ASTRODEX_IMAGES_DIR),
         ('observation_sessions/attachments', observation_sessions.attachments_dir()),
+        ('profile', user_identity.AVATARS_DIR),
     ]
 
 
@@ -164,6 +168,7 @@ def _account_record(user) -> dict:
         'two_factor_enabled': bool(user.totp_enabled),
         'push_subscriptions': len(user.push_subscriptions or []),
         'preferences': user.preferences,
+        'profile': getattr(user, 'profile', None),
     }
 
 

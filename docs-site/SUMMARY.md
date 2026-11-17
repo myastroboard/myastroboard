@@ -22,6 +22,7 @@
   - [Your Sky and Wishlist](SESSION_ANALYTICS.md)
   - [Share Cards](SHARE_CARDS.md)
   - [My Progress](MY_PROGRESS.md)
+  - [Profiles and Community](COMMUNITY.md)
 - [Equipment]()
   - [Equipment](EQUIPMENT.md)
   - [Exposure Calculator](EXPOSURE_CALC.md)

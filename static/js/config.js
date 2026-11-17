@@ -47,6 +47,9 @@ async function loadConfiguration() {
         const astrodexMapPrivate = document.getElementById('astrodex-map-private');
         if (astrodexMapPrivate) astrodexMapPrivate.checked = config.astrodex?.map_private === true;
 
+        const communityEnabled = document.getElementById('community-enabled');
+        if (communityEnabled) communityEnabled.checked = config.community?.enabled !== false;
+
         const constraints = config.skytonight?.constraints || {};
 
         const altMin = document.getElementById('altitude-min');
@@ -90,6 +93,9 @@ async function saveConfiguration() {
             private: document.getElementById('astrodex-private').checked,
             map_private: document.getElementById('astrodex-map-private').checked
         },
+        community: {
+            enabled: document.getElementById('community-enabled')?.checked !== false
+        },
         skytonight: {
             constraints: {
                 altitude_constraint_min: parseFloat(document.getElementById('altitude-min').value),
@@ -115,6 +121,7 @@ async function saveConfiguration() {
         if (result.status === 'success') {
             showMessage('success', i18n.t('settings.config_saved'));
             currentConfig = config;
+            if (typeof refreshCommunityAvailability === 'function') refreshCommunityAvailability();
         } else {
             showMessage('error', result.message || i18n.t('settings.failed_to_save_config'));
         }

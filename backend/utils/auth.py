@@ -3,6 +3,7 @@ Authentication and User Management Module
 Handles user authentication, authorization, and session management
 """
 
+import copy
 import json
 import os
 import re
@@ -24,6 +25,7 @@ from db import users_store
 from db.engine import data_dir as db_data_dir
 from db.engine import transaction as db_transaction
 from db.legacy_sources import legacy_users_file_pending
+from utils import user_identity
 from utils.i18n_utils import SUPPORTED_LANGUAGES
 from utils.logging_config import get_logger
 from utils.user_data import purge_user_files
@@ -191,6 +193,7 @@ class User:
         totp_secret=None,
         totp_enabled=False,
         totp_confirmed_at=None,
+        profile=None,
     ):
         self.user_id = user_id or str(uuid.uuid4())
         self.username = username
@@ -208,6 +211,9 @@ class User:
         self.totp_secret = totp_secret if isinstance(totp_secret, str) and totp_secret else None
         self.totp_enabled = bool(totp_enabled) and bool(self.totp_secret)
         self.totp_confirmed_at = totp_confirmed_at
+        # How the other members see this user (display name, bio, avatar, Community
+        # choices) - see utils/user_identity.py. Normalized on load, never invalid.
+        self.profile = user_identity.sanitize_profile(profile)
 
     def to_dict(self):
         """Convert user to dictionary"""
@@ -224,6 +230,7 @@ class User:
             'totp_secret': self.totp_secret,
             'totp_enabled': self.totp_enabled,
             'totp_confirmed_at': self.totp_confirmed_at,
+            'profile': self.profile,
         }
 
     @staticmethod
@@ -246,7 +253,13 @@ class User:
             totp_secret=data.get('totp_secret'),
             totp_enabled=data.get('totp_enabled', False),
             totp_confirmed_at=data.get('totp_confirmed_at'),
+            profile=data.get('profile'),
         )
+
+    @property
+    def display_name(self):
+        """The name other members see: the profile display name, else the login name."""
+        return user_identity.display_name_of(self)
 
     def check_password(self, password):
         """Check if password matches"""
@@ -1073,9 +1086,89 @@ class UserManager:
                 'last_login': user.last_login,
                 'account_scope': user.account_scope,
                 'totp_enabled': user.totp_enabled,
+                'display_name': user.display_name,
+                'avatar_url': user_identity.avatar_url(user),
             }
             for user in self.users.values()
         ]
+
+    def display_names_by_id(self):
+        """``{user_id: name shown to others}`` for every account (display name, else login name).
+
+        This is what every "shared by" label uses, so a member is named the same way
+        everywhere.
+        """
+        self._reload_users_if_changed()
+        return {user.user_id: user.display_name for user in self.users.values()}
+
+    def all_users(self):
+        """Every account object, freshest copy (read-only use: never save through it)."""
+        self._reload_users_if_changed()
+        return list(self.users.values())
+
+    # ------------------------------------------------------------------
+    # Profile (display name, bio, avatar, Community choices) - see utils/user_identity.py
+    # ------------------------------------------------------------------
+
+    def _display_name_taken(self, name, exclude_user_id):
+        """A display name may not be another member's display name or login name.
+
+        Otherwise anyone could appear as "admin", or as somebody else.
+        """
+        for user in self.users.values():
+            if user.user_id == exclude_user_id:
+                continue
+            if _same_username(user.username, name) or _same_username(user.profile.get('display_name'), name):
+                return True
+        return False
+
+    @_serialized_users_write
+    def update_user_profile(self, user_id, updates):
+        """Apply a self-service profile change; raises ``user_identity.ProfileError``."""
+        self._reload_users_if_changed()
+        user = self.get_user_by_id(user_id)
+        if not user:
+            raise ValueError("User not found")
+        profile = user_identity.apply_profile_update(user.profile, updates)
+        name = profile.get('display_name')
+        if name and self._display_name_taken(name, user_id):
+            raise user_identity.ProfileError('Display name already used', 'profile.error_display_name_taken')
+        user.profile = profile
+        self.save_users()
+        logger.info(f"Updated profile of user {user.username} (ID: {user_id})")
+        return copy.deepcopy(user.profile)
+
+    @_serialized_users_write
+    def set_user_avatar(self, user_id, filename):
+        """Point the profile at a new avatar file (None removes it); return the previous file name."""
+        self._reload_users_if_changed()
+        user = self.get_user_by_id(user_id)
+        if not user:
+            raise ValueError("User not found")
+        previous = (user.profile.get('avatar') or {}).get('filename')
+        profile = copy.deepcopy(user.profile)
+        profile['avatar'] = {'filename': filename, 'updated_at': datetime.now(UTC).isoformat()} if filename else None
+        user.profile = user_identity.sanitize_profile(profile)
+        self.save_users()
+        return previous
+
+    @_serialized_users_write
+    def reset_user_profile(self, user_id):
+        """Moderation: clear the display name, bio and avatar (Community choices are kept).
+
+        Returns the avatar file name that was dropped, so the caller deletes the file.
+        """
+        self._reload_users_if_changed()
+        user = self.get_user_by_id(user_id)
+        if not user:
+            raise ValueError("User not found")
+        previous = (user.profile.get('avatar') or {}).get('filename')
+        profile = copy.deepcopy(user.profile)
+        profile.update({'display_name': None, 'bio': '', 'avatar': None})
+        user.profile = user_identity.sanitize_profile(profile)
+        self.save_users()
+        logger.info(f"Profile of user {user.username} (ID: {user_id}) reset by an admin")
+        return previous
 
     @staticmethod
     def _stamp_last_login(user):

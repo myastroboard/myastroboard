@@ -22,6 +22,9 @@ separate instance with its own data, never your personal one.
   next one sees. The same goes for the badges a visitor has seen (`POST /api/achievements/seen`,
   [MY_PROGRESS.md](MY_PROGRESS.md)). Location, notification and MQTT preferences stay as you set
   them.
+- **Fixed profile.** The demo account's display name, picture and Community choices are yours to
+  set before opening the demo; a visitor can browse the Community tab but not change the profile
+  ([COMMUNITY.md](COMMUNITY.md)).
 - **No notifications.** No visitor is ever asked for notification permission, the
   *Notifications* settings tab is hidden, and the push notification scheduler does not run.
 - **No setup wizard**, no location switching, no on-demand translation (it would use your

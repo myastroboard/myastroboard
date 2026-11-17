@@ -144,8 +144,9 @@ function updateUserInterface() {
     const usernameDisplay = document.getElementById('username-display');
     
     if (usernameDisplay) {
-        usernameDisplay.textContent = currentUser.username;
+        usernameDisplay.textContent = currentUser.display_name || currentUser.username;
     }
+    if (typeof renderNavbarIdentity === 'function') renderNavbarIdentity();
     
     // Remove parameters tab for read-only and regular users
     const parametersTab = document.querySelector('[data-tab="parameters"]');
@@ -763,8 +764,19 @@ function displayUsers(users) {
         
         const isCurrentUser = user.user_id === currentUser?.user_id;
 
+        // Login name first (what the admin manages), the display name below when it differs
         const usernameCell = document.createElement('th');
-        usernameCell.textContent = user.username;
+        if (typeof buildUserChip === 'function') {
+            usernameCell.appendChild(buildUserChip({ user_id: user.user_id, avatar_url: user.avatar_url, display_name: user.username }));
+        } else {
+            usernameCell.textContent = user.username;
+        }
+        if (user.display_name && user.display_name !== user.username) {
+            const displayName = document.createElement('div');
+            displayName.className = 'small text-muted fw-normal';
+            displayName.textContent = user.display_name;
+            usernameCell.appendChild(displayName);
+        }
 
         const roleCell = document.createElement('td');
         roleCell.textContent = user.role;
@@ -863,6 +875,14 @@ function displayUsers(users) {
             label: i18n.t('users.export_data')
         }));
 
+        actionsCell.appendChild(createActionButton({
+            className: 'btn btn-outline-secondary btn-small user-reset-profile mb-2 me-2',
+            userId: user.user_id,
+            username: user.username,
+            iconClass: 'bi bi-person-x icon-inline',
+            label: i18n.t('users.reset_profile')
+        }));
+
         if (!isCurrentUser) {
             actionsCell.appendChild(createActionButton({
                 className: 'btn btn-danger btn-small user-delete mb-2 me-2',
@@ -890,17 +910,17 @@ function displayUsers(users) {
     // Attach event listeners to buttons
     usersList.querySelectorAll('.user-edit-username').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            const userId = e.target.getAttribute('data-user-id');
-            const username = e.target.getAttribute('data-username');
+            const userId = e.currentTarget.getAttribute('data-user-id');
+            const username = e.currentTarget.getAttribute('data-username');
             editUsername(userId, username);
         });
     });
     
     usersList.querySelectorAll('.user-edit-role').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            const userId = e.target.getAttribute('data-user-id');
-            const username = e.target.getAttribute('data-username');
-            const role = e.target.getAttribute('data-role');
+            const userId = e.currentTarget.getAttribute('data-user-id');
+            const username = e.currentTarget.getAttribute('data-username');
+            const role = e.currentTarget.getAttribute('data-role');
             editRole(userId, username, role);
         });
     });
@@ -935,16 +955,23 @@ function displayUsers(users) {
 
     usersList.querySelectorAll('.user-change-password').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            const userId = e.target.getAttribute('data-user-id');
-            const username = e.target.getAttribute('data-username');
+            const userId = e.currentTarget.getAttribute('data-user-id');
+            const username = e.currentTarget.getAttribute('data-username');
             changePassword(userId, username);
         });
     });
     
+    usersList.querySelectorAll('.user-reset-profile').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const button = e.target.closest('.user-reset-profile');
+            resetUserProfile(button.getAttribute('data-user-id'), button.getAttribute('data-username'));
+        });
+    });
+
     usersList.querySelectorAll('.user-delete').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            const userId = e.target.getAttribute('data-user-id');
-            const username = e.target.getAttribute('data-username');
+            const userId = e.currentTarget.getAttribute('data-user-id');
+            const username = e.currentTarget.getAttribute('data-username');
             deleteUser(userId, username);
         });
     });
@@ -1483,6 +1510,32 @@ async function deleteUser(userId, username) {
     } catch (error) {
         console.error('Error deleting user:', error);
         showMessage('error', i18n.t('users.error_delete_user'));
+    }
+}
+
+// Moderation: clear a member's display name, bio and avatar (their Community choices stay)
+async function resetUserProfile(userId, username) {
+    if (!confirm(i18n.t('users.confirm_reset_profile', { username }))) {
+        return;
+    }
+    try {
+        const response = await fetchWithRetry(`/api/users/${encodeURIComponent(userId)}/profile`, {
+            method: 'DELETE',
+            credentials: 'include'
+        }, {
+            maxAttempts: 1,
+            timeoutMs: 15000
+        });
+        const data = await response.json();
+        if (response.ok) {
+            showMessage('success', i18n.t('users.reset_profile_done'));
+            loadUsers();
+        } else {
+            showMessage('error', localizeApiError(data, 'users.reset_profile_error'));
+        }
+    } catch (error) {
+        console.error('Error resetting profile:', error);
+        showMessage('error', i18n.t('users.reset_profile_error'));
     }
 }
 

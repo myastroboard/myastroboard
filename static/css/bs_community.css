@@ -1,0 +1,388 @@
+/* Community tab (static/js/community.js) and the profile editor (static/js/profile.js).
+
+   Theme tokens only (bs_variables.css), so the light, dark and red themes all apply.
+   Nothing here lays figures of two members side by side: the directory cards carry no
+   numbers on purpose. */
+
+/* ── Profile editor ─────────────────────────────────────────────────────── */
+
+.profile-identity {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+    align-items: flex-start;
+}
+
+.profile-avatar-column {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    flex: 0 0 12rem;
+    text-align: center;
+}
+
+.profile-avatar-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-2);
+}
+
+.profile-fields {
+    flex: 1 1 18rem;
+    min-width: 0;
+}
+
+.profile-community {
+    margin-top: var(--space-4);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--surface-border);
+}
+
+.profile-community-title {
+    margin-bottom: var(--space-3);
+}
+
+.profile-switch {
+    margin-bottom: var(--space-3);
+}
+
+.profile-blocks {
+    margin: var(--space-2) 0 0;
+    padding: var(--space-3);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--border-radius-card);
+    transition: opacity 0.2s ease;
+}
+
+.profile-blocks.is-off {
+    opacity: 0.55;
+}
+
+.profile-blocks-legend {
+    float: none;
+    width: auto;
+    margin-bottom: var(--space-2);
+    font-size: 1rem;
+    font-weight: var(--font-semibold);
+}
+
+.profile-blocks .profile-switch:last-child {
+    margin-bottom: 0;
+}
+
+.profile-promise {
+    margin-top: var(--space-3);
+}
+
+.profile-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+.profile-editor-wizard .profile-avatar-column {
+    flex-basis: 9rem;
+}
+
+.profile-editor-wizard .user-avatar-lg {
+    width: 4.5rem;
+    height: 4.5rem;
+}
+
+@media (max-width: 575.98px) {
+    .profile-avatar-column {
+        flex-basis: 100%;
+    }
+}
+
+/* ── Shared pieces ──────────────────────────────────────────────────────── */
+
+.community-section-title {
+    margin: var(--space-4) 0 var(--space-2);
+}
+
+.community-empty {
+    padding: var(--space-3) 0;
+}
+
+.community-member-link {
+    color: var(--text-color);
+    font-weight: var(--font-semibold);
+    text-decoration: none;
+    max-width: 100%;
+}
+
+.community-member-link:hover,
+.community-member-link:focus-visible {
+    text-decoration: underline;
+}
+
+.community-bar {
+    height: 0.45rem;
+    margin: var(--space-1) 0;
+    background-color: var(--surface-border);
+}
+
+.community-bar .progress-bar {
+    background-color: var(--accent-1);
+}
+
+.community-join {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-3);
+    margin-bottom: var(--space-3);
+    padding: var(--space-3);
+    border: 1px dashed var(--surface-border);
+    border-radius: var(--border-radius-card);
+}
+
+.community-join-text {
+    flex: 1 1 16rem;
+    min-width: 0;
+}
+
+/* ── Together ───────────────────────────────────────────────────────────── */
+
+.community-catalogues {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+}
+
+.community-catalogue {
+    padding: var(--space-3);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--border-radius-card);
+    background: var(--surface-card);
+}
+
+.community-catalogue-head {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-2);
+}
+
+.community-remaining {
+    overflow-wrap: anywhere;
+}
+
+.community-complete {
+    color: var(--progress-earned, var(--accent-2));
+    font-weight: var(--font-semibold);
+}
+
+/* ── Feed ───────────────────────────────────────────────────────────────── */
+
+.community-feed {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.community-digest {
+    padding: var(--space-3);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--border-radius-card);
+    background: var(--surface-card);
+    color: var(--text-color);
+    min-width: 0;
+}
+
+.community-digest-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-1) var(--space-2);
+    margin-bottom: var(--space-2);
+}
+
+.community-digest-line {
+    margin-top: var(--space-1);
+    overflow-wrap: anywhere;
+}
+
+.community-digest-badges {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.community-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+}
+
+.community-badge-icon {
+    width: 1.8rem;
+    height: 1.8rem;
+    font-size: 0.9rem;
+}
+
+.community-badge-name {
+    font-weight: var(--font-semibold);
+    overflow-wrap: anywhere;
+}
+
+.community-thumbs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+}
+
+.community-thumb {
+    display: block;
+    overflow: hidden;
+    border-radius: var(--border-radius-card);
+    background-color: var(--surface-border);
+}
+
+.community-thumb img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.community-thumb-sm {
+    width: 4.5rem;
+    height: 4.5rem;
+}
+
+.community-thumb-lg {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+}
+
+/* ── Directory ──────────────────────────────────────────────────────────── */
+
+.community-members {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+    gap: var(--space-3);
+}
+
+.community-member-card {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    width: 100%;
+    padding: var(--space-3);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--border-radius-card);
+    background: var(--surface-card);
+    color: var(--text-color);
+    text-align: left;
+    transition: border-color 0.15s ease;
+}
+
+.community-member-card:hover,
+.community-member-card:focus-visible {
+    border-color: var(--accent-1);
+}
+
+.community-member-body {
+    min-width: 0;
+}
+
+.community-member-name {
+    font-weight: var(--font-semibold);
+    overflow-wrap: anywhere;
+}
+
+.community-member-bio {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin: var(--space-1) 0;
+    white-space: pre-line;
+}
+
+/* ── Profile page ───────────────────────────────────────────────────────── */
+
+.community-profile-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--space-4);
+}
+
+.community-profile-identity {
+    flex: 1 1 16rem;
+    min-width: 0;
+}
+
+.community-profile-name {
+    margin: 0 0 var(--space-1);
+    font-size: 1.5rem;
+    overflow-wrap: anywhere;
+}
+
+.community-profile-bio {
+    margin: var(--space-2) 0;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+
+.community-badges {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+    gap: var(--space-2);
+}
+
+.community-badge-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--border-radius-card);
+    background: var(--surface-card);
+}
+
+.community-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+    gap: var(--space-3);
+}
+
+.community-gallery-item {
+    margin: 0;
+    min-width: 0;
+}
+
+.community-gallery-item figcaption {
+    margin-top: var(--space-1);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.community-equipment {
+    margin: 0;
+    padding-left: 1.2rem;
+}
+
+@media (max-width: 420px) {
+    .community-members,
+    .community-catalogues,
+    .community-badges {
+        grid-template-columns: 1fr;
+    }
+
+    .community-gallery {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}

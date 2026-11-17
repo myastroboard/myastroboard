@@ -23,6 +23,20 @@ device and never affect other users. Instance-wide settings are in App settings,
 and is remembered for the account too. The login page has the same picker: a language chosen there
 is kept for the account once you sign in.
 
+## Profile
+
+How the other members of the instance see you ([COMMUNITY.md](COMMUNITY.md)):
+
+| Setting | What it does |
+|---|---|
+| Display name | Replaces your login name wherever the others see you (shared pictures and equipment, Community, navbar). Your login name does not change. |
+| Picture | Optional; cropped to a square, location and camera details removed. Without one, your initials are shown. |
+| About me | A short presentation (280 characters) on your Community profile. |
+| Join the Community | Off by default. Puts you in the member directory with the blocks you choose: figures, badges, pictures, equipment, activity. |
+
+**See my profile as the others do** previews your Community profile, even before you join. Saved
+with `PUT /api/profile`; the picture has its own route (`POST /api/profile/avatar`).
+
 ## Location
 
 The locations an administrator gave you access to ([LOCATIONS.md](LOCATIONS.md)):
