@@ -36,6 +36,30 @@ const _NOTIF_DEFAULTS = Object.freeze({
     }),
 });
 
+// N9's lead choices, in days (stored as day-equivalent minutes); shared with the setup wizard.
+const NOTIF_N9_LEAD_DAYS = Object.freeze([1, 2, 3, 5, 7]);
+
+/** Translated "1 day" / "N days" label of an N9 lead time. */
+function notifLeadDaysLabel(days) {
+    return days === 1
+        ? i18n.t('settings.notifications_lead_days_one')
+        : i18n.t('settings.notifications_lead_days', { count: days });
+}
+
+/** Fill an N9 lead <select> with the translated day choices, keeping its current value. */
+function fillNotifLeadDaysSelect(select) {
+    if (!select) return;
+    const current = select.value;
+    DOMUtils.clear(select);
+    NOTIF_N9_LEAD_DAYS.forEach((days) => {
+        const opt = document.createElement('option');
+        opt.value = String(days * 1440);
+        opt.textContent = notifLeadDaysLabel(days);
+        select.appendChild(opt);
+    });
+    if (current) select.value = current;
+}
+
 class NotificationManager {
     constructor() {
         this._prefs        = null; // lazy-loaded from localStorage
@@ -672,7 +696,7 @@ async function _loadSubscriptionList() {
             const empty = document.createElement('p');
             empty.className = 'text-muted small mb-0';
             empty.setAttribute('data-i18n', 'settings.notif_no_subscriptions');
-            empty.textContent = i18n?.t('settings.notif_no_subscriptions') || 'No active subscriptions.';
+            empty.textContent = i18n.t('settings.notif_no_subscriptions');
             list.appendChild(empty);
             return;
         }
@@ -741,6 +765,8 @@ function initNotificationSettingsUI() {
     notificationManager._prefs = null; // refresh from server state on each open
     _refreshPermissionBanner();
     _refreshVapidWarning();
+    // Labels first: _loadPrefsIntoUI() then selects the saved value among these options.
+    fillNotifLeadDaysSelect(document.getElementById('notif-lead-N9'));
     _loadPrefsIntoUI();
     _loadSubscriptionList();
 
@@ -761,10 +787,9 @@ function initNotificationSettingsUI() {
         saveBtn.addEventListener('click', async () => {
             try {
                 await notificationManager.savePrefs(_collectPrefsFromUI());
-                const msg = (typeof i18n !== 'undefined') ? i18n.t('settings.notifications_saved') : 'Preferences saved.';
-                _showNotifMessage((msg && msg !== 'settings.notifications_saved') ? msg : 'Preferences saved.');
+                _showNotifMessage(i18n.t('settings.notifications_saved'));
             } catch {
-                _showNotifMessage(i18n?.t('common.error') || 'Failed to save preferences.', 'danger');
+                _showNotifMessage(i18n.t('settings.notifications_save_failed'), 'danger');
             }
         });
     }
@@ -784,21 +809,20 @@ function initNotificationSettingsUI() {
                 const res  = await fetch('/api/push/test', { method: 'POST', credentials: 'same-origin' });
                 const data = await res.json();
                 if (!res.ok) {
-                    _showNotifMessage(data.error || 'Push test failed.', 'danger');
+                    _showNotifMessage(i18n.t('settings.notifications_test_failed', { error: data.error || res.status }), 'danger');
                     return;
                 }
                 if (data.delivered === 0) {
-                    _showNotifMessage('Push sent but delivery failed - check server logs.', 'warning');
+                    _showNotifMessage(i18n.t('settings.notifications_test_not_delivered'), 'warning');
                     return;
                 }
                 // On iOS, the app must be backgrounded to display the notification.
-                const hint = /iPhone|iPad|iPod/.test(navigator.userAgent)
-                    ? ' Background or lock the app to see it.'
-                    : '';
-                const msg = (typeof i18n !== 'undefined') ? i18n.t('settings.notifications_test_body') : 'Notifications are working correctly.';
-                _showNotifMessage(((msg && msg !== 'settings.notifications_test_body') ? msg : 'Push sent!') + hint);
+                const msg = i18n.t('settings.notifications_test_body');
+                _showNotifMessage(/iPhone|iPad|iPod/.test(navigator.userAgent)
+                    ? `${msg} ${i18n.t('settings.notifications_test_ios_hint')}`
+                    : msg);
             } catch (e) {
-                _showNotifMessage('Push test error: ' + e.message, 'danger');
+                _showNotifMessage(i18n.t('settings.notifications_test_failed', { error: e.message }), 'danger');
             }
         });
     }
@@ -816,9 +840,9 @@ function initNotificationSettingsUI() {
                 await _unsubscribeFromPush();
                 _loadSubscriptionList();
                 _refreshPermissionBanner();
-                _showNotifMessage(i18n?.t('settings.notif_unsubscribed_all') || 'All subscriptions removed.');
+                _showNotifMessage(i18n.t('settings.notif_unsubscribed_all'));
             } catch (e) {
-                _showNotifMessage('Error: ' + e.message, 'danger');
+                _showNotifMessage(i18n.t('settings.notif_unsubscribe_all_failed', { error: e.message }), 'danger');
             } finally {
                 unsubAllBtn.disabled = false;
             }
