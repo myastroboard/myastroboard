@@ -8,6 +8,10 @@ const otpCodeInput = document.getElementById('otp-code');
 const otpVerifyBtn = document.getElementById('otp-verify-btn');
 const otpBackBtn = document.getElementById('otp-back-btn');
 const otpBtnText = otpVerifyBtn ? otpVerifyBtn.querySelector('.btn-text') : null;
+const languageSelect = document.getElementById('login-language-select');
+
+// Set when the visitor picks a language here; saved to their account once signed in.
+let languageChosenOnLoginPage = null;
 
 function setIconLabel(element, iconClass, text) {
     if (!element) {
@@ -26,11 +30,12 @@ function applyLoginTranslations() {
         return;
     }
 
-    const elements = document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-title]');
+    const elements = document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-title], [data-i18n-aria-label]');
     elements.forEach((element) => {
         const textKey = element.getAttribute('data-i18n');
         const placeholderKey = element.getAttribute('data-i18n-placeholder');
         const titleKey = element.getAttribute('data-i18n-title');
+        const ariaLabelKey = element.getAttribute('data-i18n-aria-label');
 
         if (textKey) {
             element.textContent = i18n.t(textKey);
@@ -43,9 +48,21 @@ function applyLoginTranslations() {
         if (titleKey) {
             element.setAttribute('title', i18n.t(titleKey));
         }
+
+        if (ariaLabelKey) {
+            element.setAttribute('aria-label', i18n.t(ariaLabelKey));
+        }
     });
 
     document.title = i18n.t('auth.login_page_title');
+
+    // The generic pass above replaced these labels' text and dropped their icons.
+    setIconLabel(document.getElementById('username-label'), 'bi bi-person-circle', i18n.t('users.username'));
+    setIconLabel(document.getElementById('password-label'), 'bi bi-shield-lock', i18n.t('users.password'));
+
+    if (languageSelect) {
+        languageSelect.value = i18n.getCurrentLanguage();
+    }
 
     if (!loginBtn.classList.contains('loading')) {
         setIconLabel(btnText, 'bi bi-rocket-takeoff', i18n.t('auth.sign_in'));
@@ -64,12 +81,50 @@ async function initializeLoginI18n() {
     // Ensure selected language resources are available before applying translations.
     await i18n.loadLanguage(i18n.getCurrentLanguage(), { activate: false, persistSelection: false });
     applyLoginTranslations();
+}
 
-    // Translate labels username and password after translations are loaded
-    const usernameLabel = document.getElementById('username-label');
-    const passwordLabel = document.getElementById('password-label');
-    setIconLabel(usernameLabel, 'bi bi-person-circle', i18n.t('users.username'));
-    setIconLabel(passwordLabel, 'bi bi-shield-lock', i18n.t('users.password'));
+// Switch the page language in place (no reload, so typed credentials survive).
+// i18n.setLanguage() stores the choice in localStorage and fires
+// i18nLanguageChanged, which re-runs applyLoginTranslations().
+async function handleLoginLanguageChange(event) {
+    const selectedLang = event.target.value;
+    if (selectedLang === i18n.getCurrentLanguage()) {
+        return;
+    }
+    try {
+        await i18n.setLanguage(selectedLang);
+        languageChosenOnLoginPage = selectedLang;
+    } catch (error) {
+        console.error('[Login] Error changing language:', error);
+        event.target.value = i18n.getCurrentLanguage();
+    }
+}
+
+// The dashboard applies the account's saved language on load, which would undo a
+// choice made on this page. Save an explicit choice to the account first; a failure
+// only costs the preference, never the sign-in.
+async function persistLoginLanguageChoice() {
+    if (!languageChosenOnLoginPage) {
+        return;
+    }
+    try {
+        await fetch(appUrl('/api/auth/preferences'), {
+            method: 'PUT',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ preferences: { language: languageChosenOnLoginPage } }),
+        });
+    } catch (error) {
+        console.debug('[Login] Could not save the language preference:', error);
+    }
+}
+
+async function redirectAfterLogin() {
+    showMessage(successMessage, i18n.t('auth.login_success_redirecting'), 2000);
+    await persistLoginLanguageChoice();
+    setTimeout(() => {
+        window.location.href = appUrl('/');
+    }, 1000);
 }
 
 function showMessage(element, message, duration = 0) {
@@ -168,10 +223,7 @@ async function submitOtpCode() {
         const data = await response.json();
 
         if (response.ok) {
-            showMessage(successMessage, i18n.t('auth.login_success_redirecting'), 2000);
-            setTimeout(() => {
-                window.location.href = appUrl('/');
-            }, 1000);
+            await redirectAfterLogin();
             return;
         }
 
@@ -262,10 +314,7 @@ loginForm.addEventListener('submit', async (e) => {
                 return;
             }
 
-            showMessage(successMessage, i18n.t('auth.login_success_redirecting'), 2000);
-            setTimeout(() => {
-                window.location.href = appUrl('/');
-            }, 1000);
+            await redirectAfterLogin();
         } else {
             setLoading(false);
             showMessage(errorMessage, translateLoginErrorMessage(data?.error, response.status, data?.error_key));
@@ -283,6 +332,8 @@ loginForm.addEventListener('submit', async (e) => {
 // Auto-hide error messages after 5 seconds
 document.addEventListener('DOMContentLoaded', () => {
     initializeLoginI18n();
+
+    languageSelect?.addEventListener('change', handleLoginLanguageChange);
 
     otpVerifyBtn?.addEventListener('click', submitOtpCode);
 

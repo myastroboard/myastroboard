@@ -156,6 +156,29 @@
     transform: translateY(0);
 }
 
+/* An idle message box takes no room: an invisible but laid-out box left a large
+   empty gap between the subtitle and the form. */
+.error-message:not(.show),
+.success-message:not(.show) {
+    display: none;
+}
+
+.error-message.show,
+.success-message.show {
+    animation: login-message-in 250ms var(--transition-smooth);
+}
+
+@keyframes login-message-in {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 /* Success message (for future use) */
 .success-message {
     background-color: var(--success-50);
@@ -204,6 +227,67 @@
     color: var(--text-color);
     background: color-mix(in srgb, var(--text-color) 10%, transparent);
     border-color: var(--text-color);
+}
+
+/* Card footer: language picker and project link, below a hairline */
+.login-footer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 1.75rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--surface-border);
+}
+
+.login-language {
+    position: relative;
+}
+
+.login-language-icon {
+    position: absolute;
+    top: 50%;
+    left: 0.75rem;
+    transform: translateY(-50%);
+    color: var(--text-grey);
+    font-size: 0.85rem;
+    pointer-events: none;
+}
+
+.login-language-select {
+    min-width: 9rem;
+    min-height: 2.1rem;
+    padding-top: 0.3rem;
+    padding-bottom: 0.3rem;
+    padding-left: 2.1rem;
+    border: 1px solid var(--surface-border-strong);
+    border-radius: var(--border-radius-pill);
+    background-color: var(--surface-2);
+    color: var(--text-color);
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.login-language-select:focus {
+    border-color: var(--border-violet);
+    box-shadow: var(--focus-ring-accent);
+}
+
+.login-powered-by {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: var(--text-grey);
+    font-size: 0.85rem;
+    text-decoration: none;
+    transition: color var(--transition-normal);
+}
+
+.login-powered-by:hover,
+.login-powered-by:focus-visible {
+    color: var(--text-violet);
+    text-decoration: underline;
+    text-underline-offset: 3px;
 }
 
 /* Responsive design */

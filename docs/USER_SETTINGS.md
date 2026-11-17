@@ -20,7 +20,8 @@ device and never affect other users. Instance-wide settings are in App settings,
 | Publish my activity to Home Assistant | on / off (off by default) | Creates a Home Assistant device with your own Astrodex counters, tonight's plan and your log totals, when the administrator runs the MQTT connector ([HOME_ASSISTANT.md](HOME_ASSISTANT.md)) |
 
 **Reset to defaults** restores every choice above. The interface language is picked in the footer
-and is remembered for the account too.
+and is remembered for the account too. The login page has the same picker: a language chosen there
+is kept for the account once you sign in.
 
 ## Location
 

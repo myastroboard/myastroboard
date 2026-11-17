@@ -3410,61 +3410,63 @@
     </main>
 
     <!-- Footer -->
-    <footer class="site-footer border-footer">
+    <footer class="site-footer">
         <div class="footer-inner">
-            <div class="footer-section footer-brand">
-                <span class="text-light">
-                    <span data-i18n="common.title_html">MyAstroBoard - Astronomy Observation Planning Dashboard</span>
-                    &nbsp;|&nbsp;
-                    <span id="version" class="text-light"></span>
-                </span>
-                <a href="https://myastroboard.org/" target="_blank" rel="noopener noreferrer" class="footer-link footer-link-subtle link-light ms-2" title="myastroboard.org" aria-label="myastroboard.org">
-                    <i class="bi bi-globe2" aria-hidden="true"></i>
-                    <span class="visually-hidden">myastroboard.org</span>
-                </a>
+            <div class="footer-brand">
+                <div class="footer-brand-line">
+                    <img src="{{ base }}/static/favicon.svg" alt="" width="28" height="28" class="footer-brand-logo">
+                    <span class="footer-brand-name">MyAstroBoard</span>
+                    <span id="version" class="footer-version"></span>
+                </div>
+                <p class="footer-tagline" data-i18n="common.slogan">Astronomical Observation Planning Tool</p>
+                <nav class="footer-links" data-i18n-aria-label="common.title" aria-label="MyAstroBoard">
+                    <a href="https://myastroboard.org/" target="_blank" rel="noopener noreferrer" class="footer-link">
+                        <i class="bi bi-globe2" aria-hidden="true"></i>
+                        myastroboard.org
+                    </a>
+                    <a href="https://github.com/myastroboard/myastroboard" target="_blank" rel="noopener noreferrer" class="footer-link">
+                        <i class="bi bi-github" aria-hidden="true"></i>
+                        GitHub
+                    </a>
+                    <a href="#about" class="footer-link main-tab-btn" data-tab="about">
+                        <i class="bi bi-info-circle" aria-hidden="true"></i>
+                        <span data-i18n="navbar.about">About</span>
+                    </a>
+                </nav>
             </div>
-            <div class="footer-section footer-update">
-                <span id="update-notification" class="text-light" style="display: none;">
+            <div class="footer-update">
+                <span id="update-notification" class="footer-update-notice" style="display: none;">
                     <span class="footer-update-dot" aria-hidden="true"></span>
                     <span id="update-text"></span>
                     <button type="button" id="update-whats-new-btn" class="footer-update-btn" data-i18n="whats_new.footer_link">See what's new</button>
                 </span>
             </div>
-            <div class="footer-section footer-actions">
-                <div class="footer-controls">
-                    <div class="footer-language">
-                        <label class="language-label" for="language-select-footer" data-i18n="common.language">Language</label>
-                        <select id="language-select-footer" class="form-select form-select-sm language-select" data-i18n-aria-label="common.language" aria-label="Language">
-                            <option value="de">Deutsch</option>
-                            <option value="en">English</option>
-                            <option value="es">Español</option>
-                            <option value="fr">Français</option>
-                            <option value="it">Italiano</option>
-                            <option value="pt">Português</option>
-                        </select>
-                    </div>
-                    <div class="footer-theme">
-                        <label class="theme-label" for="theme-select-footer" data-i18n="common.theme">Theme</label>
-                        <select id="theme-select-footer" class="form-select form-select-sm theme-select theme-select-footer" data-theme-picker data-i18n-aria-label="common.theme" aria-label="Theme">
-                            <option value="auto" data-i18n="settings.pref_theme_auto">Auto</option>
-                            <option value="light" data-i18n="settings.pref_theme_light">Light</option>
-                            <option value="dark" data-i18n="settings.pref_theme_dark">Dark</option>
-                            <option value="red" data-i18n="settings.pref_theme_red">Red Light</option>
-                        </select>
-                    </div>
+            <div class="footer-actions">
+                <button type="button" class="btn btn-sm footer-pill-btn pwa-install-btn" data-pwa-install hidden>
+                    <i class="bi bi-download" aria-hidden="true"></i>
+                    <span data-i18n="pwa.install_app"></span>
+                </button>
+                <div class="footer-select">
+                    <label class="visually-hidden" for="language-select-footer" data-i18n="common.language">Language</label>
+                    <i class="bi bi-translate footer-select-icon" aria-hidden="true"></i>
+                    <select id="language-select-footer" class="form-select form-select-sm footer-select-input" data-i18n-aria-label="common.language" aria-label="Language">
+                        <option value="de">Deutsch</option>
+                        <option value="en">English</option>
+                        <option value="es">Español</option>
+                        <option value="fr">Français</option>
+                        <option value="it">Italiano</option>
+                        <option value="pt">Português</option>
+                    </select>
                 </div>
-                <div class="footer-links">
-                    <button type="button" class="btn btn-outline-light btn-sm pwa-install-btn" data-pwa-install hidden>
-                        <span data-i18n="pwa.install_app"></span>
-                    </button>
-                    <a href="https://github.com/myastroboard/myastroboard" target="_blank" rel="noopener noreferrer" class="footer-link link-light link-offset-2 link-underline-opacity-25 link-underline-opacity-100-hover">
-                        <i class="bi bi-github icon-inline"></i>
-                        GitHub
-                    </a>
-                    <a href="#about" class="footer-link link-light link-offset-2 link-underline-opacity-25 link-underline-opacity-100-hover main-tab-btn" data-tab="about">
-                        <i class="bi bi-info-circle icon-inline" aria-hidden="true"></i>
-                        <span data-i18n="navbar.about">About</span>
-                    </a>
+                <div class="footer-select">
+                    <label class="visually-hidden" for="theme-select-footer" data-i18n="common.theme">Theme</label>
+                    <i class="bi bi-circle-half footer-select-icon" aria-hidden="true"></i>
+                    <select id="theme-select-footer" class="form-select form-select-sm footer-select-input" data-theme-picker data-i18n-aria-label="common.theme" aria-label="Theme">
+                        <option value="auto" data-i18n="settings.pref_theme_auto">Auto</option>
+                        <option value="light" data-i18n="settings.pref_theme_light">Light</option>
+                        <option value="dark" data-i18n="settings.pref_theme_dark">Dark</option>
+                        <option value="red" data-i18n="settings.pref_theme_red">Red Light</option>
+                    </select>
                 </div>
             </div>
         </div>

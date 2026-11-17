@@ -300,58 +300,279 @@ label,
   overflow-x: auto;
 }*/
 
-.theme-label, .language-label {
-    color: var(--text-color);
-    font-weight: var(--font-medium);
-}
-
-.theme-select, .language-select {
-    background-color: var(--surface-2);
-    color: var(--text-color);
-    border: 1px solid var(--surface-border-strong);
-    box-shadow: none;
-}
-
-.theme-select:focus, .language-select:focus {
-    border-color: var(--border-violet);
-    box-shadow: 0 0 0 0.2rem var(--accent-soft);
-}
-
-.theme-select-footer {
-    min-width: 140px;
-}
-
+/* ---------- Site footer ----------
+   The footer sits on the page gradient, which stays dark in every theme (light
+   included), so it is drawn with --text-light at reduced strength rather than the
+   card text tokens. Three areas: brand + links, update notice, preference pickers. */
 .site-footer {
-    padding: 1.5rem 0;
-    margin-top: 2rem;
-    padding-left: 1.35em;
-    padding-right: 1.35em;
+    --footer-fg: var(--text-light);
+    --footer-fg-muted: color-mix(in srgb, var(--text-light) 66%, transparent);
+    --footer-line: color-mix(in srgb, var(--text-light) 14%, transparent);
+    --footer-fill: color-mix(in srgb, var(--text-light) 7%, transparent);
+    --footer-fill-hover: color-mix(in srgb, var(--text-light) 13%, transparent);
+    position: relative;
+    z-index: 1;
+    margin-top: 2.5rem;
+    padding: 1.5rem 1.35em 1.75rem;
+    color: var(--footer-fg);
+    border-top: 1px solid var(--footer-line);
+    background: linear-gradient(180deg, color-mix(in srgb, #000 14%, transparent), transparent);
 }
 
 .footer-inner {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-}
-
-.footer-section {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
+    gap: 1rem 2rem;
 }
 
 .footer-brand {
-    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
     min-width: 0;
 }
 
+.footer-brand-line {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.footer-brand-logo {
+    flex: none;
+    width: 28px;
+    height: 28px;
+}
+
+.footer-brand-name {
+    font-size: 1.05rem;
+    font-weight: var(--font-semibold);
+    letter-spacing: 0.01em;
+}
+
+.footer-version {
+    padding: 0.1rem 0.5rem;
+    border: 1px solid var(--footer-line);
+    border-radius: var(--border-radius-pill);
+    background: var(--footer-fill);
+    color: var(--footer-fg-muted);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.4;
+}
+
+.footer-version:empty {
+    display: none;
+}
+
+.footer-tagline {
+    margin: 0;
+    color: var(--footer-fg-muted);
+    font-size: 0.85rem;
+}
+
+.footer-links {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 1.1rem;
+    margin-top: 0.2rem;
+}
+
+.site-footer .footer-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: var(--footer-fg-muted);
+    font-size: 0.85rem;
+    line-height: 1.6;
+    text-decoration: none;
+    transition: color var(--transition-normal);
+}
+
+.site-footer .footer-link:hover,
+.site-footer .footer-link:focus-visible {
+    color: var(--footer-fg);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+/* The About link keeps .main-tab-btn so the tab router wires its click, but must
+   not take the navbar pill look, which that class forces with !important. */
+.site-footer .footer-link.main-tab-btn {
+    padding: 0 !important;
+    border: 0;
+    border-radius: 0;
+    background: none !important;
+    box-shadow: none;
+    transform: none;
+    overflow: visible;
+    color: var(--footer-fg-muted) !important;
+    font-weight: inherit !important;
+}
+
+.site-footer .footer-link.main-tab-btn::before {
+    content: none;
+}
+
+.site-footer .footer-link.main-tab-btn:hover,
+.site-footer .footer-link.main-tab-btn:focus-visible {
+    color: var(--footer-fg) !important;
+}
+
 .footer-update {
-    flex: 1 1 auto;
     min-width: 0;
-    justify-content: center;
     text-align: center;
+}
+
+/* app.js shows it with display: block; keep the pill hugging its text. */
+.footer-update-notice {
+    width: fit-content;
+    max-width: 100%;
+    margin-inline: auto;
+    padding: 0.35rem 0.85rem;
+    border: 1px solid var(--footer-line);
+    border-radius: var(--border-radius-pill);
+    background: var(--footer-fill);
+    font-size: 0.85rem;
+}
+
+.footer-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+/* Compact pill picker: a leading icon stands in for the visible label (the label
+   stays in the DOM, visually hidden, for screen readers and the language selector). */
+.footer-select {
+    position: relative;
+}
+
+.footer-select-icon {
+    position: absolute;
+    top: 50%;
+    left: 0.75rem;
+    transform: translateY(-50%);
+    color: var(--footer-fg-muted);
+    font-size: 0.85rem;
+    pointer-events: none;
+}
+
+.site-footer .footer-select-input {
+    --bs-form-select-bg-img: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23e2e8f0' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+    min-width: 9.5rem;
+    min-height: 2.1rem;
+    padding-top: 0.3rem;
+    padding-bottom: 0.3rem;
+    padding-left: 2.1rem;
+    border: 1px solid var(--footer-line);
+    border-radius: var(--border-radius-pill);
+    background-color: var(--footer-fill);
+    color: var(--footer-fg);
+    font-size: 0.85rem;
+    cursor: pointer;
+    box-shadow: none;
+    transition: background-color var(--transition-normal), border-color var(--transition-normal);
+}
+
+.site-footer .footer-select-input:hover {
+    background-color: var(--footer-fill-hover);
+}
+
+.site-footer .footer-select-input:focus {
+    border-color: color-mix(in srgb, var(--text-light) 45%, transparent);
+    box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--text-light) 14%, transparent);
+}
+
+/* The open list is drawn by the OS on an opaque surface: use the panel colours. */
+.site-footer .footer-select-input option {
+    background-color: var(--surface-panel);
+    color: var(--text-color);
+}
+
+.footer-pill-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border: 1px solid var(--footer-line);
+    border-radius: var(--border-radius-pill);
+    background: var(--footer-fill);
+    color: var(--footer-fg);
+    font-size: 0.85rem;
+}
+
+.footer-pill-btn:hover,
+.footer-pill-btn:focus-visible {
+    border-color: color-mix(in srgb, var(--text-light) 35%, transparent);
+    background: var(--footer-fill-hover);
+    color: var(--footer-fg);
+}
+
+/* Mid widths: three columns get cramped once the update notice shows, so it moves
+   to its own centred row under the brand and the pickers. */
+@media (min-width: 992px) and (max-width: 1199.98px) {
+    .footer-inner {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .footer-update {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+
+    .footer-update:has(.footer-update-notice[style*="none"]) {
+        display: none;
+    }
+}
+
+@media (max-width: 991.98px) {
+    .site-footer {
+        margin-top: 1.5rem;
+        padding: 1.25rem 1rem 1.5rem;
+    }
+
+    .footer-inner {
+        grid-template-columns: minmax(0, 1fr);
+        justify-items: center;
+        text-align: center;
+        gap: 1rem;
+    }
+
+    .footer-brand {
+        align-items: center;
+    }
+
+    .footer-links,
+    .footer-actions {
+        justify-content: center;
+    }
+
+    .footer-update:has(.footer-update-notice[style*="none"]) {
+        display: none;
+    }
+}
+
+@media (max-width: 479.98px) {
+    .footer-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        width: 100%;
+    }
+
+    .footer-actions .pwa-install-btn {
+        grid-column: 1 / -1;
+        justify-content: center;
+    }
+
+    .site-footer .footer-select-input {
+        min-width: 0;
+        width: 100%;
+    }
 }
 
 .footer-update-dot {
@@ -552,61 +773,6 @@ html[data-theme="red"] .whats-new-group-title.is-feature {
     }
 }
 
-.footer-actions {
-    flex: 1 1 auto;
-    min-width: 0;
-    justify-content: flex-end;
-    gap: 0.5rem;
-    flex-direction: column;
-    align-items: flex-end;
-}
-
-.footer-controls {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-}
-
-.footer-links {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-}
-
-.footer-theme {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.footer-language {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.footer-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    line-height: 1;
-}
-
-.footer-link-subtle {
-    opacity: 0.7;
-    font-size: 0.9rem;
-    text-decoration: none;
-}
-
-.footer-link-subtle:hover,
-.footer-link-subtle:focus {
-    opacity: 1;
-}
-
 .pwa-install-btn {
     white-space: nowrap;
 }
@@ -614,53 +780,6 @@ html[data-theme="red"] .whats-new-group-title.is-feature {
 .pwa-install-status {
     font-size: 0.8rem;
     opacity: 0.9;
-}
-
-.language-select {
-    min-width: 160px;
-}
-
-.theme-select-footer {
-    min-width: 160px;
-}
-
-@media (max-width: 991.98px) {
-    .site-footer {
-        padding: 1rem 0;
-        margin-top: 1.5rem;
-    }
-
-    .footer-inner {
-        flex-direction: column;
-        align-items: stretch;
-        text-align: center;
-        gap: 0.5rem;
-    }
-
-    .footer-section {
-        justify-content: center;
-        flex-wrap: wrap;
-        gap: 0.4rem;
-    }
-
-    .footer-actions {
-        flex-direction: column;
-        gap: 0.5rem;
-        align-items: center;
-    }
-
-    .footer-theme {
-        justify-content: center;
-    }
-
-    .footer-language {
-        justify-content: center;
-    }
-
-    .footer-controls,
-    .footer-links {
-        justify-content: center;
-    }
 }
 
 .modal-content {
@@ -933,10 +1052,6 @@ html[data-theme="red"] .leaflet-control-attribution svg {
     padding-right: 1.35em;
     position: relative;
     z-index: 1;
-}
-
-.border-footer {
-    border-top: 1px solid var(--border-violet);
 }
 
 .hero {
