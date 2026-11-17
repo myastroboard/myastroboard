@@ -18,8 +18,10 @@ from utils import backup_archive, repo_config
 from utils.auth import admin_required
 from utils.constants import DATA_DIR, SKYTONIGHT_LOGS_DIR, SKYTONIGHT_SCHEDULER_STATUS_FILE
 from utils.file_lock import interprocess_lock
+from utils.image_privacy import strip_stored_pictures
 from utils.logging_config import apply_log_retention, env_log_level, get_logger, refresh_log_levels
 from utils.metrics_collector import collect_metrics
+from utils.user_data import user_data_dirs
 
 logger = get_logger(__name__)
 
@@ -39,6 +41,9 @@ def get_app_settings_api():
             'session_cookie_secure': settings.get('session_cookie_secure', False),
             'search_engine_indexing': settings.get('search_engine_indexing', False),
             'external_base_url': _app_settings.get_external_base_url(),
+            'privacy_notice_url': _app_settings.get_privacy_notice()['url'],
+            'privacy_notice_text': _app_settings.get_privacy_notice()['text'],
+            'privacy_notice_text_max_length': _app_settings.PRIVACY_NOTICE_TEXT_MAX_LENGTH,
             'log_retention_days': _app_settings.get_log_retention_days(),
             'log_level': log_level,
             'console_log_level': console_log_level,
@@ -86,6 +91,27 @@ def update_app_settings_api():
             }
         ), 400
 
+    privacy_notice_url = _app_settings.normalize_privacy_notice_url(
+        data.get('privacy_notice_url', old_settings.get('privacy_notice_url', ''))
+    )
+    if privacy_notice_url is None:
+        return jsonify(
+            {
+                'error': 'privacy_notice_url must be an http(s):// address',
+                'error_key': 'settings.privacy_notice_url_invalid',
+            }
+        ), 400
+    privacy_notice_text = _app_settings.normalize_privacy_notice_text(
+        data.get('privacy_notice_text', old_settings.get('privacy_notice_text', ''))
+    )
+    if privacy_notice_text is None:
+        return jsonify(
+            {
+                'error': 'privacy_notice_text is too long',
+                'error_key': 'settings.privacy_notice_text_too_long',
+            }
+        ), 400
+
     # Turning on HTTPS-only cookies from a plain-HTTP page would lock the admin out: the browser
     # drops every Secure cookie the server sends to that page, so signing in (and out) stops
     # working there. Only the switch from off to on is refused; a value already on is kept.
@@ -118,6 +144,8 @@ def update_app_settings_api():
         'log_level': _app_settings.normalize_log_level(data.get('log_level'), old_log_level),
         'console_log_level': _app_settings.normalize_log_level(data.get('console_log_level'), old_console_log_level),
         'external_base_url': external_base_url,
+        'privacy_notice_url': privacy_notice_url,
+        'privacy_notice_text': privacy_notice_text,
     }
 
     _app_settings.save_app_settings(new_settings)
@@ -149,6 +177,29 @@ def update_app_settings_api():
         f"console_log_level={new_settings['console_log_level']}"
     )
     return jsonify({'status': 'success', 'requires_restart': requires_restart})
+
+
+@admin_bp.route('/api/admin/privacy/strip-picture-metadata', methods=['POST'])
+@admin_required
+def strip_picture_metadata_api():
+    """Remove GPS and camera metadata from pictures stored before uploads were stripped (1.6.4).
+
+    Body ``{"dry_run": true}`` counts without writing. Same as
+    ``manage.py strip-picture-metadata``.
+    """
+    data = request.get_json(silent=True) or {}
+    dry_run = data.get('dry_run') is True
+    try:
+        # A second request (another worker, a double click) waits for the first one to finish
+        with interprocess_lock(os.path.join(DATA_DIR, 'picture_metadata.lock')):
+            counts = strip_stored_pictures([directory for _folder, directory in user_data_dirs()], dry_run=dry_run)
+    except Exception as error:
+        logger.error(f'Picture metadata cleanup failed: {error}')
+        return jsonify({'error': 'Internal server error'}), 500
+    logger.info(
+        f"Picture metadata cleanup{' (dry run)' if dry_run else ''} by {session.get('username', '?')}: {counts}"
+    )
+    return jsonify({'status': 'success', 'dry_run': dry_run, **counts})
 
 
 @admin_bp.route('/api/admin/restart', methods=['POST'])

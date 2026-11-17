@@ -1035,7 +1035,26 @@
     "pref_achievements_enabled": "Mostrar distintivos e desafios",
     "pref_achievements_enabled_info": "Adiciona ao Astrodex uma aba \"Progresso\" com os distintivos obtidos a partir do seu registo, os desafios da estação e a maratona Messier.",
     "community_enabled": "Aba Comunidade",
-    "community_enabled_info": "O diretório de membros, os perfis e o feed de atividade. Ativá-la não compartilha nada por si só: cada membro escolhe se participa e o que mostra."
+    "community_enabled_info": "O diretório de membros, os perfis e o feed de atividade. Ativá-la não compartilha nada por si só: cada membro escolhe se participa e o que mostra.",
+    "privacy_notice_title": "Aviso de privacidade",
+    "privacy_notice_desc": "Opcional. Para você e sua família, nada é necessário (o GDPR não se aplica). Se você mantém a instância para outras pessoas (um clube, uma associação), deve informá-las sobre como seus dados são tratados (GDPR, art. 13): informe o endereço do seu aviso ou escreva-o abaixo, e ele será exibido em /privacy. Um link \"Aviso de privacidade\" aparece então na página de login, no rodapé e em Minhas configurações -> Segurança.",
+    "privacy_notice_template_link": "Modelo para adaptar",
+    "privacy_notice_url_label": "Endereço do seu aviso de privacidade",
+    "privacy_notice_url_help": "Opcional. Quando informado, substitui o texto abaixo.",
+    "privacy_notice_text_label": "Texto do seu aviso de privacidade",
+    "privacy_notice_text_help": "Exibido como foi escrito, com as quebras de linha, para qualquer pessoa, mesmo antes do login.",
+    "privacy_notice_url_invalid": "O endereço do aviso de privacidade deve começar com http:// ou https://.",
+    "privacy_notice_text_too_long": "O aviso de privacidade é longo demais (no máximo 20.000 caracteres).",
+    "picture_metadata_title": "Metadados de fotos antigas",
+    "picture_metadata_desc": "Desde a versão 1.6.4, a posição GPS e os dados da câmera são removidos de cada foto enviada. Fotos enviadas antes ainda podem contê-los: isto os remove da mesma forma, sem alterar a imagem.",
+    "picture_metadata_btn": "Verificar e limpar fotos antigas",
+    "picture_metadata_none": "Fotos verificadas: {count}. Nenhuma contém mais metadados.",
+    "picture_metadata_confirm": "Fotos que ainda contêm metadados (localização, câmera, comentários): {count}. Removê-los agora? As imagens não são alteradas.",
+    "picture_metadata_done": "Fotos limpas: {count}. Arquivos ilegíveis mantidos como estão: {failed}.",
+    "picture_metadata_error": "Não foi possível verificar as fotos antigas.",
+    "picture_metadata_checking": "Verificando as fotos...",
+    "picture_metadata_cleaning": "Limpando as fotos...",
+    "picture_metadata_cancelled": "Nada foi alterado. Fotos que ainda contêm metadados: {count}."
   },
   "astrodex": {
     "title": "Astrodex - Tenho que pegar todos!",
@@ -3526,5 +3545,13 @@
     "no_activity": "Ainda nenhuma atividade.",
     "single_account_note": "Você é a única conta desta instância: a comunidade ganha vida com vários membros. Se não precisar dela, pode desativá-la.",
     "single_account_link": "Configurações do aplicativo -> Configuração"
+  },
+  "privacy_notice": {
+    "page_title": "Aviso de privacidade - MyAstroBoard",
+    "title": "Aviso de privacidade",
+    "link": "Aviso de privacidade",
+    "how_we_handle": "Como esta instância trata seus dados:",
+    "back_to_login": "Voltar ao login",
+    "back_to_app": "Voltar ao aplicativo"
   }
 }

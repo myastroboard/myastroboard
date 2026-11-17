@@ -112,6 +112,15 @@ The generated data (target tables, altitude-vs-time charts, interactive sky map,
 your location and observing constraints. Deep-sky data comes from the SkyTonight/PyOngc pipeline
 ([details](https://docs.myastroboard.org/SKYTONIGHT.html)).
 
+## Privacy
+
+MyAstroBoard is self-hosted and sends nothing to the project: no account, no analytics, no tracking,
+no CDN. It is designed to make the GDPR easy for whoever runs an instance: private by default,
+personal data export and full erasure per account, picture location data removed on upload, log
+retention, and a place to publish your own privacy notice. The operator remains the data controller;
+the inventory of what is stored and sent, and a notice template, are in
+[docs/PRIVACY.md](https://docs.myastroboard.org/PRIVACY.html).
+
 ## Requirements
 
 - Docker and Docker Compose

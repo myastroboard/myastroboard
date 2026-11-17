@@ -344,3 +344,16 @@
         animation: none;
     }
 }
+
+/* The public privacy notice page (templates/privacy.html): the login card, wider, holding the
+   administrator's text with its line breaks. */
+.privacy-container {
+    max-width: 760px;
+}
+
+.privacy-notice-text {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    color: var(--text-color);
+    line-height: 1.55;
+}

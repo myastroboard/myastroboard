@@ -78,9 +78,13 @@ docker exec -u appuser myastroboard python backend/db/manage.py status
 docker exec -u appuser myastroboard python backend/db/manage.py list-users
 docker exec -u appuser myastroboard python backend/db/manage.py reset-password admin
 docker exec -u appuser myastroboard python backend/db/manage.py disable-2fa admin
+docker exec -u appuser myastroboard python backend/db/manage.py strip-picture-metadata --dry-run
 ```
 
-`reset-password` prints a generated password unless `--password` is given.
+`reset-password` prints a generated password unless `--password` is given. `strip-picture-metadata`
+removes the GPS position and camera details still in pictures stored before 1.6.4 (the same as the
+button in *App settings -> Configuration*, see [PRIVACY.md](PRIVACY.md#photo-metadata)); drop
+`--dry-run` to apply it.
 
 ## Network shares
 

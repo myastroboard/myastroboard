@@ -1035,7 +1035,26 @@
     "pref_achievements_enabled": "Afficher les badges et les défis",
     "pref_achievements_enabled_info": "Ajoute à l'Astrodex un onglet \"Progression\" avec les badges obtenus d'après votre journal, les défis de saison et le marathon Messier.",
     "community_enabled": "Onglet Communauté",
-    "community_enabled_info": "L'annuaire des membres, les profils et le fil d'activité. L'activer ne partage rien en soi : chaque membre choisit de rejoindre la communauté et ce qu'il montre."
+    "community_enabled_info": "L'annuaire des membres, les profils et le fil d'activité. L'activer ne partage rien en soi : chaque membre choisit de rejoindre la communauté et ce qu'il montre.",
+    "privacy_notice_title": "Notice de confidentialité",
+    "privacy_notice_desc": "Facultatif. Pour vous et votre foyer, rien n'est nécessaire (le RGPD ne s'applique pas). Si vous faites tourner l'instance pour d'autres personnes (un club, une association), vous devez leur indiquer comment leurs données sont traitées (RGPD, art. 13) : indiquez l'adresse de votre notice, ou écrivez-la ci-dessous, et elle est affichée à l'adresse /privacy. Un lien « Notice de confidentialité » apparaît alors sur la page de connexion, dans le pied de page et dans Mes paramètres -> Sécurité.",
+    "privacy_notice_template_link": "Modèle à adapter",
+    "privacy_notice_url_label": "Adresse de votre notice de confidentialité",
+    "privacy_notice_url_help": "Facultatif. Si elle est renseignée, elle remplace le texte ci-dessous.",
+    "privacy_notice_text_label": "Texte de votre notice de confidentialité",
+    "privacy_notice_text_help": "Affiché tel quel, retours à la ligne compris, à tout le monde, même avant la connexion.",
+    "privacy_notice_url_invalid": "L'adresse de la notice de confidentialité doit commencer par http:// ou https://.",
+    "privacy_notice_text_too_long": "La notice de confidentialité est trop longue (20 000 caractères au plus).",
+    "picture_metadata_title": "Métadonnées des anciennes photos",
+    "picture_metadata_desc": "Depuis la version 1.6.4, la position GPS et les informations de l'appareil sont retirées de chaque photo envoyée. Les photos envoyées avant peuvent encore les contenir : ceci les retire de la même façon, sans toucher à l'image elle-même.",
+    "picture_metadata_btn": "Vérifier et nettoyer les anciennes photos",
+    "picture_metadata_none": "Photos vérifiées : {count}. Aucune ne contient plus de métadonnées.",
+    "picture_metadata_confirm": "Photos contenant encore des métadonnées (position, appareil, commentaires) : {count}. Les retirer maintenant ? Les images elles-mêmes ne sont pas modifiées.",
+    "picture_metadata_done": "Photos nettoyées : {count}. Fichiers illisibles laissés tels quels : {failed}.",
+    "picture_metadata_error": "Les anciennes photos n'ont pas pu être vérifiées.",
+    "picture_metadata_checking": "Vérification des photos en cours...",
+    "picture_metadata_cleaning": "Nettoyage des photos en cours...",
+    "picture_metadata_cancelled": "Rien n'a été modifié. Photos contenant encore des métadonnées : {count}."
   },
   "astrodex": {
     "title": "Astrodex - Attrapez-les tous !",
@@ -3526,5 +3545,13 @@
     "no_activity": "Aucune activité pour le moment.",
     "single_account_note": "Vous êtes le seul compte de cette instance : la communauté prend vie avec plusieurs membres. Si vous n'en avez pas besoin, vous pouvez la désactiver.",
     "single_account_link": "Paramètres app -> Configuration"
+  },
+  "privacy_notice": {
+    "page_title": "Notice de confidentialité - MyAstroBoard",
+    "title": "Notice de confidentialité",
+    "link": "Notice de confidentialité",
+    "how_we_handle": "Comment cette instance traite vos données :",
+    "back_to_login": "Retour à la connexion",
+    "back_to_app": "Retour à l'application"
   }
 }

@@ -6,6 +6,7 @@ Run inside the container, as the application user:
     docker exec -u appuser myastroboard python backend/db/manage.py list-users
     docker exec -u appuser myastroboard python backend/db/manage.py reset-password admin
     docker exec -u appuser myastroboard python backend/db/manage.py disable-2fa admin
+    docker exec -u appuser myastroboard python backend/db/manage.py strip-picture-metadata --dry-run
 
 ``reset-password`` prints a generated password unless ``--password`` is given.
 """
@@ -91,6 +92,20 @@ def cmd_disable_2fa(args) -> int:
     return 0
 
 
+def cmd_strip_picture_metadata(args) -> int:
+    """Remove GPS and camera metadata from pictures stored before uploads were stripped (1.6.4)."""
+    from utils.image_privacy import strip_stored_pictures
+    from utils.user_data import user_data_dirs
+
+    counts = strip_stored_pictures([directory for _folder, directory in user_data_dirs()], dry_run=args.dry_run)
+    verb = 'would be cleaned' if args.dry_run else 'cleaned'
+    _out(
+        f"{counts['scanned']} picture(s) checked: {counts['cleaned']} {verb}, "
+        f"{counts['unchanged']} already clean, {counts['failed']} not readable (left as they are)"
+    )
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog='manage.py', description='MyAstroBoard database maintenance')
     commands = parser.add_subparsers(dest='command', required=True)
@@ -100,6 +115,11 @@ def build_parser() -> argparse.ArgumentParser:
     reset.add_argument('username')
     reset.add_argument('--password', help='the new password (at least 6 characters)')
     reset.set_defaults(func=cmd_reset_password)
+    strip = commands.add_parser(
+        'strip-picture-metadata', help='remove GPS and camera metadata from pictures stored before 1.6.4'
+    )
+    strip.add_argument('--dry-run', action='store_true', help='count only, change nothing')
+    strip.set_defaults(func=cmd_strip_picture_metadata)
     disable = commands.add_parser('disable-2fa', help='turn two-factor authentication off for an account')
     disable.add_argument('username')
     disable.set_defaults(func=cmd_disable_2fa)

@@ -1035,7 +1035,26 @@
     "pref_achievements_enabled": "Show badges and challenges",
     "pref_achievements_enabled_info": "Adds a \"Progress\" tab to Astrodex with badges earned from your log, seasonal challenges and the Messier marathon.",
     "community_enabled": "Community tab",
-    "community_enabled_info": "The member directory, profiles and activity feed. Turning it on shares nothing by itself: each member chooses whether to join and what to show."
+    "community_enabled_info": "The member directory, profiles and activity feed. Turning it on shares nothing by itself: each member chooses whether to join and what to show.",
+    "privacy_notice_title": "Privacy notice",
+    "privacy_notice_desc": "Optional. For yourself and your household, nothing is required (the GDPR does not apply). If you run the instance for others (a club, an association), you must tell them how their data is handled (GDPR, Art. 13): give the address of your notice, or write it below, and it is shown at /privacy. A \"Privacy notice\" link then appears on the login page, in the footer and in My settings -> Security.",
+    "privacy_notice_template_link": "Template to adapt",
+    "privacy_notice_url_label": "Address of your privacy notice",
+    "privacy_notice_url_help": "Optional. When set, it is used instead of the text below.",
+    "privacy_notice_text_label": "Text of your privacy notice",
+    "privacy_notice_text_help": "Shown as written, line breaks kept, to anyone, even before they sign in.",
+    "privacy_notice_url_invalid": "The address of the privacy notice must start with http:// or https://.",
+    "privacy_notice_text_too_long": "The privacy notice is too long (20,000 characters at most).",
+    "picture_metadata_title": "Metadata of older pictures",
+    "picture_metadata_desc": "Since version 1.6.4, the GPS position and camera details of every uploaded picture are removed. Pictures uploaded earlier may still carry them: this removes them the same way, without touching the image itself.",
+    "picture_metadata_btn": "Check and clean older pictures",
+    "picture_metadata_none": "Pictures checked: {count}. None carries metadata any more.",
+    "picture_metadata_confirm": "Pictures still carrying metadata (location, camera details, comments): {count}. Remove it now? The images themselves are not changed.",
+    "picture_metadata_done": "Pictures cleaned: {count}. Unreadable files left as they are: {failed}.",
+    "picture_metadata_error": "The older pictures could not be checked.",
+    "picture_metadata_checking": "Checking the pictures...",
+    "picture_metadata_cleaning": "Cleaning the pictures...",
+    "picture_metadata_cancelled": "Nothing was changed. Pictures still carrying metadata: {count}."
   },
   "astrodex": {
     "title": "Astrodex - Gotta Catch 'Em All!",
@@ -3526,5 +3545,13 @@
     "no_activity": "No activity yet.",
     "single_account_note": "You are the only account on this instance: the Community comes to life with several members. If you do not need it, you can turn it off.",
     "single_account_link": "App settings -> Configuration"
+  },
+  "privacy_notice": {
+    "page_title": "Privacy notice - MyAstroBoard",
+    "title": "Privacy notice",
+    "link": "Privacy notice",
+    "how_we_handle": "How this instance handles your data:",
+    "back_to_login": "Back to sign in",
+    "back_to_app": "Back to the application"
   }
 }

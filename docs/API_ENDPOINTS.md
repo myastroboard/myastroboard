@@ -11,6 +11,7 @@ This page lists the HTTP routes currently declared across `backend/blueprints/*.
 - `GET /sw.js`
 - `GET /offline.html`
 - `GET /robots.txt`
+- `GET /privacy` - The operator's privacy notice, public (readable before signing in): a redirect to the address set by the admin, else the text they wrote; 404 when neither is set
 
 ## Authentication
 
@@ -52,6 +53,7 @@ This page lists the HTTP routes currently declared across `backend/blueprints/*.
 
 - `GET /api/admin/app-settings`
 - `POST /api/admin/app-settings`
+- `POST /api/admin/privacy/strip-picture-metadata` - Remove the GPS position and camera details still in pictures stored before 1.6.4 (Astrodex, session attachments); body `{"dry_run": true}` only counts. Returns `scanned`, `cleaned`, `unchanged`, `failed`
 - `POST /api/admin/restart`
 
 ## Configuration
