@@ -119,9 +119,21 @@
             </button>
         </div>
 
-        <div class="mt-3 text-center">
-            <a class="footer-link footer-link-subtle login-powered-by" href="https://myastroboard.org" target="_blank" rel="noopener noreferrer">
-                <i class="bi bi-globe2 icon-inline" aria-hidden="true"></i>
+        <div class="login-footer">
+            <div class="login-language">
+                <label class="visually-hidden" for="login-language-select" data-i18n="common.language">Language</label>
+                <i class="bi bi-translate login-language-icon" aria-hidden="true"></i>
+                <select id="login-language-select" class="form-select form-select-sm login-language-select" data-i18n-aria-label="common.language" aria-label="Language">
+                    <option value="de">Deutsch</option>
+                    <option value="en">English</option>
+                    <option value="es">Español</option>
+                    <option value="fr">Français</option>
+                    <option value="it">Italiano</option>
+                    <option value="pt">Português</option>
+                </select>
+            </div>
+            <a class="login-powered-by" href="https://myastroboard.org" target="_blank" rel="noopener noreferrer">
+                <i class="bi bi-globe2" aria-hidden="true"></i>
                 <span data-i18n="auth.powered_by_myastroboard">Powered by MyAstroBoard</span>
             </a>
         </div>

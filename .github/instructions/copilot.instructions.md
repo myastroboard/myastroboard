@@ -1223,7 +1223,7 @@ Every step below is mandatory - missing any one of them causes a partial or brok
 3. Add the language to `_TRANSLATION_FILENAMES` in `backend/utils/i18n_utils.py`
 4. **Add the language code to the `allowed` set in `backend/app.py` -> `web_manifest_localized()`** - omitting this returns 404 for the manifest and breaks the PWA service worker install
 5. Add `'/manifest.XX.webmanifest'` and `'/static/i18n/XX.json'` to `APP_SHELL_URLS` in `static/sw.js`
-6. Add a `<option value="XX">` to the language selector in `templates/index.html`
+6. Add a `<option value="XX">` to the language selectors in `templates/index.html` (footer) and `templates/login.html`
 7. Add the language code to the `supported` array in the inline `<script>` block in `templates/index.html` (controls PWA manifest URL switching)
 8. Create the translated webmanifest: copy `static/manifest.webmanifest` to `static/manifest.XX.webmanifest` and translate the required keys (`description`, `lang`, `screenshots[].label`, `shortcuts[].name/short_name/description`)
 

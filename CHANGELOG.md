@@ -13,6 +13,8 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   planner for your latitude in Astrodex -> Progress ([docs/MY_PROGRESS.md](docs/MY_PROGRESS.md)).
 - Phones: each row of sub-tabs becomes one menu button showing the current sub-tab, instead of pills that
   wrapped over half the screen ([docs/MOBILE.md](docs/MOBILE.md)).
+- A cleaner footer (logo, version, links, compact language and theme pickers, readable in every theme),
+  and a language picker on the login page ([docs/USER_SETTINGS.md](docs/USER_SETTINGS.md)).
 
 ### Fixes
 
