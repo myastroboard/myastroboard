@@ -2,11 +2,11 @@
 // Multi-step onboarding wizard shown once per user, controlled by the
 // `wizard: {completed, skipped}` user preference (not `location_configured`).
 // Two flows:
-//   'full' (Context A - admin + fresh install): location, sky_quality, equipment, notifications, tonight
-//   'user' (Context B - everyone else, excluding read-only): welcome, equipment, notifications, tonight
+//   'full' (Context A - admin + fresh install): location, sky_quality, equipment, profile, notifications, tonight
+//   'user' (Context B - everyone else, excluding read-only): welcome, equipment, profile, notifications, tonight
 
-const WIZARD_STEPS_FULL = ['location', 'sky_quality', 'equipment', 'notifications', 'tonight'];
-const WIZARD_STEPS_USER = ['welcome', 'equipment', 'notifications', 'tonight'];
+const WIZARD_STEPS_FULL = ['location', 'sky_quality', 'equipment', 'profile', 'notifications', 'tonight'];
+const WIZARD_STEPS_USER = ['welcome', 'equipment', 'profile', 'notifications', 'tonight'];
 
 const _wizard = {
     modal: null,
@@ -20,6 +20,7 @@ const _wizard = {
     existingCameras: [],
     existingMounts: [],
     existingCombinations: [],
+    profileEditor: null,
 };
 
 /**
@@ -1339,6 +1340,41 @@ async function _saveNotificationsStep() {
     return true;
 }
 
+// ── Step: profile - how the others see me (all contexts) ────────────────────
+
+function _buildProfileStep(container) {
+    const intro = document.createElement('p');
+    intro.className = 'text-muted mb-3';
+    intro.textContent = i18n.t('wizard.profile_intro');
+    container.appendChild(intro);
+
+    const editorContainer = document.createElement('div');
+    editorContainer.appendChild(DOMUtils.createSpinnerWrapper(i18n.t('common.loading')));
+    container.appendChild(editorContainer);
+    _wizard.profileEditor = null;
+
+    (async () => {
+        try {
+            const data = typeof fetchOwnProfile === 'function' ? await fetchOwnProfile() : await fetchJSON('/api/profile');
+            if (!editorContainer.isConnected) return;
+            _wizard.profileEditor = buildProfileEditor(editorContainer, data, { mode: 'wizard' });
+        } catch (err) {
+            console.error('Wizard profile load error:', err);
+            DOMUtils.clear(editorContainer);
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-warning';
+            alert.textContent = i18n.t('profile.error_load');
+            editorContainer.appendChild(alert);
+        }
+    })();
+}
+
+async function _saveProfileStep() {
+    // Not loaded (network error): nothing to save, the step is optional
+    if (!_wizard.profileEditor) return true;
+    return _wizard.profileEditor.save();
+}
+
 // ── Step: tonight (all contexts) ────────────────────────────────────────────
 
 function _buildTonightStep(container) {
@@ -1371,6 +1407,7 @@ const _WIZARD_STEP_BUILDERS = {
     sky_quality: _buildSkyQualityStep,
     welcome: _buildWelcomeStep,
     equipment: _buildEquipmentStep,
+    profile: _buildProfileStep,
     notifications: _buildNotificationsStep,
     tonight: _buildTonightStep,
 };
@@ -1379,5 +1416,6 @@ const _WIZARD_STEP_SAVE = {
     location: _saveLocationStep,
     sky_quality: _saveSkyQualityStep,
     equipment: _saveEquipmentStep,
+    profile: _saveProfileStep,
     notifications: _saveNotificationsStep,
 };

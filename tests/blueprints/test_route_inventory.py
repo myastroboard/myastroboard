@@ -212,6 +212,16 @@ EXPECTED_ROUTES = {
     ('/api/achievements/seen', ('POST',)),
     ('/api/achievements/challenges', ('GET',)),
     ('/api/achievements/missing-tonight', ('GET',)),
+    # --- profile and community ---
+    ('/api/profile', ('GET',)),
+    ('/api/profile', ('PUT',)),
+    ('/api/profile/avatar', ('POST',)),
+    ('/api/profile/avatar', ('DELETE',)),
+    ('/api/users/<user_id>/avatar', ('GET',)),
+    ('/api/users/<user_id>/profile', ('DELETE',)),
+    ('/api/community/members', ('GET',)),
+    ('/api/community/members/<user_id>', ('GET',)),
+    ('/api/community/activity', ('GET',)),
     # --- wishlist (v1.5) ---
     ('/api/wishlist', ('GET',)),
     ('/api/wishlist', ('POST',)),

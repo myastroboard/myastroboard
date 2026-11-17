@@ -28,6 +28,7 @@ def temp_data_dir(monkeypatch):
 def _mock_user_manager():
     mgr = MagicMock()
     mgr.list_users.return_value = USER_LIST
+    mgr.display_names_by_id.return_value = {user['user_id']: user['username'] for user in USER_LIST}
     return mgr
 
 

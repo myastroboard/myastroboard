@@ -205,6 +205,12 @@ def update_config_api():
                 return jsonify({"error": _error}), 400
             _incoming_skytonight_block['constraints'] = _cleaned
 
+    _community_block = config.get('community')
+    if _community_block is not None:
+        if not isinstance(_community_block, dict) or not isinstance(_community_block.get('enabled', True), bool):
+            return jsonify({"error": "community.enabled must be true or false"}), 400
+        config['community'] = {'enabled': _community_block.get('enabled', True)}
+
     # Load old config to detect changes
     old_config = load_config()
 

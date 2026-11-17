@@ -65,6 +65,7 @@
     <link rel="stylesheet" href="{{ base }}/static/css/bs_observation_log.css?v={{ version }}" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="{{ base }}/static/css/bs_session_analytics.css?v={{ version }}" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="{{ base }}/static/css/bs_progress.css?v={{ version }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="{{ base }}/static/css/bs_community.css?v={{ version }}" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="{{ base }}/static/css/bs_equipment.css?v={{ version }}" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="{{ base }}/static/css/bs_metrics.css?v={{ version }}" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="{{ base }}/static/css/bs_events.css?v={{ version }}" media="print" onload="this.media='all'">
@@ -86,6 +87,7 @@
         <link rel="stylesheet" href="{{ base }}/static/css/bs_observation_log.css?v={{ version }}">
         <link rel="stylesheet" href="{{ base }}/static/css/bs_session_analytics.css?v={{ version }}">
         <link rel="stylesheet" href="{{ base }}/static/css/bs_progress.css?v={{ version }}">
+        <link rel="stylesheet" href="{{ base }}/static/css/bs_community.css?v={{ version }}">
         <link rel="stylesheet" href="{{ base }}/static/css/bs_equipment.css?v={{ version }}">
         <link rel="stylesheet" href="{{ base }}/static/css/bs_metrics.css?v={{ version }}">
         <link rel="stylesheet" href="{{ base }}/static/css/bs_events.css?v={{ version }}">
@@ -218,6 +220,12 @@
                                 <span data-i18n="navbar.astrodex">Astrodex</span>
                             </a>
                         </li>
+                        <li class="nav-item community-nav-item d-none">
+                            <a class="nav-link main-tab-btn" href="#" data-tab="community">
+                                <i class="bi bi-people-fill icon-inline text-info" aria-hidden="true"></i>
+                                <span data-i18n="navbar.community">Community</span>
+                            </a>
+                        </li>
                         <li class="nav-item">
                             <a class="nav-link main-tab-btn" href="#" data-tab="spaceflight">
                                 <i class="bi bi-rocket-takeoff icon-inline text-danger" aria-hidden="true"></i>
@@ -226,7 +234,7 @@
                         </li>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle main-tab-dropdown" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-person icon-inline text-primary" aria-hidden="true"></i><span id="username-display"></span>
+                                <i id="navbar-user-icon" class="bi bi-person icon-inline text-primary" aria-hidden="true"></i><img id="navbar-avatar" class="user-avatar user-avatar-xs navbar-avatar d-none" alt=""><span id="username-display"></span>
                             </a>
                             <ul class="dropdown-menu">
                                 <li id="observatory-nav-item" style="display:none;">
@@ -1093,6 +1101,44 @@
 
         </div>
 
+        <!-- Community Section: member directory, profiles, activity (community.js) -->
+        <div id="community-tab" class="main-tab-content">
+            <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                <ul class="nav nav-pills sub-tabs" id="community-subtabs">
+                    <li class="nav-item">
+                        <a class="nav-link sub-tab-btn active" href="#" data-subtab="community-activity">
+                            <i class="bi bi-activity text-info icon-inline" aria-hidden="true"></i> <span data-i18n="community.activity_tab">Activity</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link sub-tab-btn" href="#" data-subtab="community-members">
+                            <i class="bi bi-people text-primary icon-inline" aria-hidden="true"></i> <span data-i18n="community.members_tab">Members</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <div id="community-activity-subtab" class="sub-tab-content active">
+                <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                    <h2>
+                        <i class="bi bi-activity text-info icon-inline" aria-hidden="true"></i> <span data-i18n="community.activity_title">What the members are up to</span>
+                    </h2>
+                    <div id="community-join-banner"></div>
+                    <div id="community-together"></div>
+                    <div id="community-feed"></div>
+                </div>
+            </div>
+
+            <div id="community-members-subtab" class="sub-tab-content">
+                <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                    <h2>
+                        <i class="bi bi-people text-primary icon-inline" aria-hidden="true"></i> <span data-i18n="community.members_title">Members</span>
+                    </h2>
+                    <div id="community-members-content"></div>
+                </div>
+            </div>
+        </div>
+
         <!-- Equipment Section -->
         <div id="equipment-tab" class="main-tab-content">
             <!-- Equipment Sub-tabs -->
@@ -1281,6 +1327,11 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link sub-tab-btn" href="#" data-subtab="profile">
+                            <i class="bi bi-person-badge text-info icon-inline" aria-hidden="true"></i> <span data-i18n="profile.tab">Profile</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link sub-tab-btn" href="#" data-subtab="location">
                             <i class="bi bi-geo-alt text-danger icon-inline" aria-hidden="true"></i> <span data-i18n="settings.my_location">Location</span>
                         </a>
@@ -1298,6 +1349,19 @@
                         </a>
                     </li>
                 </ul>
+            </div>
+
+            <!-- Profile Sub-tab: display name, avatar, Community choices (profile.js) -->
+            <div id="profile-subtab" class="sub-tab-content">
+                <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                    <h2>
+                        <i class="bi bi-person-badge text-info icon-inline" aria-hidden="true"></i> <span data-i18n="profile.title">My profile</span>
+                    </h2>
+                    <div class="alert alert-info" role="alert" data-i18n="profile.info">
+                        How the other members of this instance see you. Until you join the Community, they only see your display name and picture, where your name already appears (shared pictures and equipment).
+                    </div>
+                    <div id="profile-editor"></div>
+                </div>
             </div>
 
             <!-- My Location Sub-tab (per-user location preferences, v1.2) -->
@@ -1951,6 +2015,11 @@
                             <input type="checkbox" id="astrodex-map-private" class="form-check-input" switch>
                             <label class="form-check-label" for="astrodex-map-private"> <span data-i18n="settings.astrodex_map_private">Photo map private</span></label>
                             <div class="form-text" data-i18n="settings.astrodex_map_private_info">When off (default), the Photo Map shows exact GPS locations of every shared user's photos to everyone. Turn this on if you don't want your precise photo locations visible to other users, even when Astrodex sharing is on.</div>
+                        </div>
+                        <div id="feature-community-wrapper" class="form-check form-switch mt-3">
+                            <input type="checkbox" id="community-enabled" class="form-check-input" switch>
+                            <label class="form-check-label" for="community-enabled"> <span data-i18n="settings.community_enabled">Community tab</span></label>
+                            <div class="form-text" data-i18n="settings.community_enabled_info">The member directory, profiles and activity feed. Turning it on shares nothing by itself: each member chooses whether to join and what to show.</div>
                         </div>
                     </div>
 
@@ -3844,6 +3913,7 @@
     <script src="{{ base }}/static/js/dom_utils.js?v={{ version }}"></script>
     <script src="{{ base }}/static/js/i18n.js?v={{ version }}"></script>
     <script src="{{ base }}/static/js/language_selector.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/user_identity.js?v={{ version }}"></script>
     <script src="{{ base }}/static/js/auth.js?v={{ version }}"></script>
     <script src="{{ base }}/static/js/events_alerts.js?v={{ version }}"></script>
     <script src="{{ base }}/static/js/utils.js?v={{ version }}"></script>
@@ -3873,6 +3943,8 @@
     <script src="{{ base }}/static/js/wishlist.js?v={{ version }}"></script>
     <script src="{{ base }}/static/js/progress.js?v={{ version }}"></script>
     <script src="{{ base }}/static/js/year_review.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/profile.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/community.js?v={{ version }}"></script>
     <script src="{{ base }}/static/js/config.js?v={{ version }}"></script>
     <script src="{{ base }}/static/js/locations.js?v={{ version }}"></script>
     <script src="{{ base }}/static/js/astrodex_map.js?v={{ version }}"></script>

@@ -307,6 +307,23 @@ Self-scoped and computed on read from the user's own Observation Log and Astrode
 - `GET /api/achievements/challenges` - Seasonal challenges and the next Messier marathon for the active location
 - `GET /api/achievements/missing-tonight` - Objects of a badge catalogue (`catalogue`) not captured yet and observable tonight; optional `limit` (max 30)
 
+## Profile and Community (see docs/COMMUNITY.md)
+
+Profile routes are self-service (any signed-in role, read-only included) and keep working when
+the admin turns the Community off. The `/api/community/*` routes answer 404 with
+`error_key: community.disabled` when it is off, and only ever return members who joined, with
+the profile blocks they show.
+
+- `GET /api/profile` - The caller's profile (display name, bio, avatar, Community choices), the identity the others see, the limits, and whether the Community is on and pictures are shared
+- `PUT /api/profile` - Partial update of `display_name`, `bio` and `community` (`listed`, `show_stats`, `show_badges`, `show_pictures`, `show_equipment`, `show_activity`); 400 with an `error_key` for an invalid or already used name
+- `POST /api/profile/avatar` - Multipart `file` (PNG, JPEG, WebP, GIF; 8 MB max): cropped to a 256 px square WebP, metadata removed; replaces the previous picture
+- `DELETE /api/profile/avatar` - Remove the picture; the generated initials picture takes its place
+- `GET /api/users/<user_id>/avatar` - A member's picture, or a generated initials SVG; long-cached when called with the `v` parameter from `avatar_url`
+- `DELETE /api/users/<user_id>/profile` (admin) - Moderation: clear a member's display name, bio and picture
+- `GET /api/community/members` - Members who joined, in alphabetical order (identity, bio, membership date - no figures), and whether the caller joined
+- `GET /api/community/members/<user_id>` - One member's profile with only the blocks they show (`stats`, `badges`, `pictures`, `equipment`, `activity`); 404 for a member who did not join, except for the caller's own preview
+- `GET /api/community/activity` - The activity feed (one entry per member and day, newest first) and the shared "together" totals; cached for one minute
+
 ## Equipment
 
 - `GET /api/equipment/telescopes`

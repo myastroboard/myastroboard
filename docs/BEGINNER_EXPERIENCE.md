@@ -6,7 +6,7 @@ assumed prior knowledge: no onboarding, no skill-aware guidance, no starter targ
 
 | Piece | What it does |
 |---|---|
-| [Guided Setup Wizard](#guided-setup-wizard) | Multi-step first-run modal: location, sky quality, equipment, notifications, "tonight" preview |
+| [Guided Setup Wizard](#guided-setup-wizard) | Multi-step first-run modal: location, sky quality, equipment, profile, notifications, "tonight" preview |
 | [Difficulty model](#difficulty-model) | A static, per-target 0-100 difficulty score computed alongside AstroScore |
 | ["Tonight for you" recommendations](#tonight-for-you-recommendations) | 3-5 targets matched to the user's skill level, shown at the top of SkyTonight -> DSO |
 | [Beginner Catalog](#beginner-catalog) | A curated, hand-picked list of ~30 forgiving starter targets with explanations |
@@ -34,8 +34,8 @@ function _getWizardFlow(config, currentUser) {
 
 | Flow | Who sees it | Steps |
 |---|---|---|
-| `full` (Context A) | Admin, on a fresh install with no location configured yet | Location -> Sky quality (Bortle/SQM) -> Equipment -> Notifications -> Tonight |
-| `user` (Context B) | Any other user (location already configured by an admin) | Welcome (read-only site info) -> Equipment -> Notifications -> Tonight |
+| `full` (Context A) | Admin, on a fresh install with no location configured yet | Location -> Sky quality (Bortle/SQM) -> Equipment -> Profile -> Notifications -> Tonight |
+| `user` (Context B) | Any other user (location already configured by an admin) | Welcome (read-only site info) -> Equipment -> Profile -> Notifications -> Tonight |
 
 Location and Bortle steps only appear for the admin doing the initial install, since those
 settings are shared/global (see [CONFIGURATION.md](CONFIGURATION.md)) rather than per-user.
@@ -43,6 +43,10 @@ settings are shared/global (see [CONFIGURATION.md](CONFIGURATION.md)) rather tha
 - **Equipment step**: preset picker (`static/data/equipment_presets.json`) or manual entry; also
   lists the user's existing telescopes/cameras (including shared equipment). Saves via the
   existing `POST /api/equipment/telescopes` / cameras endpoints (see [EQUIPMENT.md](EQUIPMENT.md)).
+- **Profile step** ("how the others see me"): display name, picture, and whether to join the
+  Community and what to show - the same editor as My settings -> Profile (`static/js/profile.js`),
+  saved through `PUT /api/profile`. Everything stays private until the user joins; see
+  [COMMUNITY.md](COMMUNITY.md).
 - **Notifications step**: same triggers as My settings -> Notifications, toggle-only; on the fresh
   install it also asks for the VAPID contact email (see [NOTIFICATIONS.md](NOTIFICATIONS.md)).
   Skip is always available and never pressured.

@@ -251,6 +251,10 @@ night, events <-> skytonight, skytonight <-> weather) and are being unwound one 
   - `created_at`: ISO timestamp of user creation
   - `last_login`: ISO timestamp of last successful login
   - `preferences`: Per-user UI customization settings
+  - `profile`: display name, bio, avatar file, Community choices (`utils/user_identity.py`, [docs/COMMUNITY.md](../../docs/COMMUNITY.md)).
+    Show another member by their display name and avatar (`user_manager.display_names_by_id()` on the
+    server, `buildUserChip()` in the browser), never by their login name; everything beyond that is
+    shown only once they join the Community, block by block
 - **Default User**: `admin:admin` created automatically on first run
 - **Persistence**: Stored in Docker volume (`./data:/app/data`), survives container restarts/rebuilds
 - **Security**: Passwords are hashed using Werkzeug's `generate_password_hash` (scrypt, its default)
@@ -363,7 +367,7 @@ night, events <-> skytonight, skytonight <-> weather) and are being unwound one 
 ### 6. Modern UI/UX
 
 - **Pattern**: Tab-based interface (main tabs + sub-tabs)
-- **Main tabs** (English labels): Astrophotography, Weather, SkyTonight, Astrodex, Spaceflight, Observatory (only with a connector enabled), Equipment, My settings, App settings (admin; DOM id `parameters`), About
+- **Main tabs** (English labels): Astrophotography, Weather, SkyTonight, Astrodex, Community (unless the admin turned it off), Spaceflight, Observatory (only with a connector enabled), Equipment, My settings, App settings (admin; DOM id `parameters`), About
 - **SkyTonight sub-tabs**:
   - **Plot**: Interactive sky map (azimuth/altitude polar projection, target trajectories, click-to-inspect)
   - **Deep Sky Objects**: Filterable/sortable table with AstroScore, magnitude, altitude, FOV score, add to Astrodex / Plan My Night

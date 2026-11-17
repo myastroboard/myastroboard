@@ -32,6 +32,9 @@ LOCATION_PRESET_EXTRA_FIELDS = {
 # installs; installs whose config.json predates the key keep the old shared behaviour
 # (see repo_config._read_merged_config).
 DEFAULT_ASTRODEX = {"private": False, "map_private": True}
+# The Community tab (member directory, profiles, activity). Turning it on shares nothing by
+# itself: each member's profile stays hidden until they join (utils/user_identity.py).
+DEFAULT_COMMUNITY = {"enabled": True}
 
 
 # Default constraint values
@@ -133,6 +136,7 @@ DEFAULT_CONFIG = {
     "location_configured": False,
     "min_altitude": 30,
     "astrodex": DEFAULT_ASTRODEX,
+    "community": DEFAULT_COMMUNITY,
     "skytonight": DEFAULT_SKYTONIGHT,
     "connectors": DEFAULT_CONNECTORS,
     # Broker profiles picked by the MQTT connectors (utils/mqtt_connections.py); passwords

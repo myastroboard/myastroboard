@@ -158,6 +158,7 @@ from blueprints.astrodex import astrodex_bp
 from blueprints.astrodex_stream import astrodex_stream_bp
 from blueprints.astronomy import astronomy_bp
 from blueprints.auth import auth_bp
+from blueprints.community import community_bp
 from blueprints.connectors import connectors_bp
 from blueprints.connectors_allsky import connectors_allsky_bp
 from blueprints.connectors_mqtt import connectors_mqtt_bp
@@ -199,6 +200,7 @@ app.register_blueprint(equipment_bp)
 app.register_blueprint(observation_sessions_bp)
 app.register_blueprint(session_analytics_bp)
 app.register_blueprint(progress_bp)
+app.register_blueprint(community_bp)
 
 
 # ============================================================

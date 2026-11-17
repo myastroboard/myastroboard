@@ -12,6 +12,7 @@ from flask import Blueprint, jsonify, request, send_file, session
 
 from utils import demo_mode as _demo_mode
 from utils import security_settings as _security_settings
+from utils import user_identity as _user_identity
 from utils.auth import (
     ALLOWED_ACCOUNT_SCOPES,
     DEFAULT_USER_PREFERENCES,
@@ -363,6 +364,8 @@ def auth_status():
                     'authenticated': True,
                     'user_id': user.user_id,
                     'username': user.username,
+                    'display_name': user.display_name,
+                    'avatar_url': _user_identity.avatar_url(user),
                     'role': user.role,
                     'using_default_password': user.is_using_default_password(),
                     # Exposed here so My Settings -> Security can render the 2FA panel

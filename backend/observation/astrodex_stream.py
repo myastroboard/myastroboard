@@ -147,7 +147,13 @@ def _eligible_pictures_shared() -> list[dict[str, Any]]:
     nothing in this feed is treated as "owned by the viewer", which is correct: there is no
     single viewer behind the shared feed.
     """
-    visible = astrodex.get_visible_astrodex(current_user_id="", private_mode=False)
+    # utils.auth loads the account store; imported here so this module stays light to import
+    from utils.auth import user_manager
+
+    # The banner names each picture's owner by their display name, never their login name
+    visible = astrodex.get_visible_astrodex(
+        current_user_id="", private_mode=False, usernames_by_id=user_manager.display_names_by_id()
+    )
     pictures: list[dict[str, Any]] = []
     for item in visible.get("items", []) or []:
         item_name = item.get("name", "")

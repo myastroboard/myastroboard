@@ -5,7 +5,8 @@ how an observer is doing, as a dashboard to consult; My Progress turns the same 
 review that can be shared, and into goals that give a reason to go back out.
 
 Everything here is **computed on read** from the user's own Observation Log and Astrodex. Nothing
-new is stored about observations, and nothing is ever shown to another user.
+new is stored about observations, and nothing is shown to another user unless the user joins the
+[Community](COMMUNITY.md) and chooses to show their badges or figures there.
 
 ---
 

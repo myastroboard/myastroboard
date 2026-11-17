@@ -220,17 +220,34 @@ label,
     display: block;
 }
 
-@media (min-width: 992px) and (max-width: 1292px) {
+/* Desktop navbar: six tabs, the account menu and Logout must fit on one line in every
+   language (Italian and Spanish labels are the longest). Labels never wrap; below 1500px
+   the pills tighten, and below 1200px the account menu shows the avatar alone (its name
+   stays readable to screen readers). */
+@media (min-width: 992px) and (max-width: 1499.98px) {
     .navbar .nav-link {
-        margin-right: 0.25rem;
+        margin-right: 0.1rem;
         padding-left: 0.5rem !important;
         padding-right: 0.5rem !important;
         font-size: 0.875rem;
+        white-space: nowrap;
     }
 
-    .main-tab-btn, .main-tab-dropdown {
-        padding: 0.5rem 0.65rem !important;
+    /* .navbar prefix: the base .main-tab-btn rule further down is !important too */
+    .navbar .main-tab-btn, .navbar .main-tab-dropdown {
+        padding: 0.5rem 0.55rem !important;
         gap: 0.3rem;
+    }
+}
+
+@media (min-width: 992px) and (max-width: 1199.98px) {
+    #navBarMyAstroBoard .navbar-avatar:not(.d-none) ~ #username-display {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        overflow: hidden !important;
+        clip: rect(0, 0, 0, 0) !important;
+        white-space: nowrap !important;
     }
 }
 
@@ -1594,6 +1611,7 @@ textarea.form-control:focus {
     align-items: center;
     gap: 0.5rem;
     overflow: hidden;
+    white-space: nowrap;
 }
 
 .main-tab-btn::before, .main-tab-dropdown::before {
@@ -2186,4 +2204,53 @@ html[data-theme="red"] .text-bg-primary {
 /* Spacing for the button row of a modal form built in JS. */
 .modal-actions-gap {
     gap: 1rem;
+}
+
+/* Member avatars (static/js/user_identity.js): the uploaded picture or generated initials,
+   always round. Used wherever a member is named - navbar, shared items, Community. */
+.user-avatar {
+    flex: 0 0 auto;
+    display: inline-block;
+    border-radius: 50%;
+    object-fit: cover;
+    background-color: var(--surface-border);
+    vertical-align: middle;
+}
+
+.user-avatar-xs {
+    width: 1.35rem;
+    height: 1.35rem;
+}
+
+.user-avatar-sm {
+    width: 1.9rem;
+    height: 1.9rem;
+}
+
+.user-avatar-md {
+    width: 3rem;
+    height: 3rem;
+}
+
+.user-avatar-lg {
+    width: 6rem;
+    height: 6rem;
+}
+
+.navbar-avatar {
+    margin-right: var(--space-1);
+}
+
+.user-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    max-width: 100%;
+}
+
+.user-chip-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }

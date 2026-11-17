@@ -17,7 +17,7 @@ The pages are grouped by who reads them: **using** MyAstroBoard, **running** an 
 - [Visual Tour](VISUAL_TOUR.md) - every tab, with screenshots
 - [Beginner Experience](BEGINNER_EXPERIENCE.md) - setup wizard, difficulty ratings, "Tonight for you", Beginner Catalog
 - [Glossary](GLOSSARY.md) - AstroScore, airmass, Bortle, seeing and the other terms on screen
-- [My settings](USER_SETTINGS.md) - theme, startup tab, locations, notifications, password and 2FA, your data
+- [My settings](USER_SETTINGS.md) - theme, startup tab, profile, locations, notifications, password and 2FA, your data
 - [Phones and tablets](MOBILE.md) - install the app, offline page, push notifications
 
 ### Tonight
@@ -35,6 +35,7 @@ The pages are grouped by who reads them: **using** MyAstroBoard, **running** an 
 - [Your Sky and Wishlist](SESSION_ANALYTICS.md) - progress, sky coverage, best months, what to image next
 - [Share Cards](SHARE_CARDS.md) - ready-to-post images of a picture, a session, tonight's sky or an event
 - [My Progress](MY_PROGRESS.md) - year in review, badges, seasonal challenges, Messier marathon
+- [Profiles and Community](COMMUNITY.md) - display name and picture, member directory, activity feed, shared totals
 
 ### Equipment
 
@@ -88,11 +89,12 @@ The pages are grouped by who reads them: **using** MyAstroBoard, **running** an 
 | Astrodex | Observation Log | [OBSERVATION_LOG.md](OBSERVATION_LOG.md) |
 | Astrodex | Your Sky, Wishlist | [SESSION_ANALYTICS.md](SESSION_ANALYTICS.md) |
 | Astrodex | Progress, My astro year | [MY_PROGRESS.md](MY_PROGRESS.md) |
+| Community | Activity, Members | [COMMUNITY.md](COMMUNITY.md) |
 | Spaceflight | Launches, Astronauts, Space Events, Orbital Stations | [SPACEFLIGHT.md](SPACEFLIGHT.md) |
 | Observatory | (appears with a connector) | [OBSERVATORY.md](OBSERVATORY.md) |
 | Equipment | Combinations, FOV Calculator, Telescopes, Cameras, Mounts, Filters, Accessories | [EQUIPMENT.md](EQUIPMENT.md) |
 | Equipment | Exposure Calc | [EXPOSURE_CALC.md](EXPOSURE_CALC.md) |
-| My settings | Customize, Location, Notifications, Security | [USER_SETTINGS.md](USER_SETTINGS.md) |
+| My settings | Customize, Profile, Location, Notifications, Security | [USER_SETTINGS.md](USER_SETTINGS.md) |
 | App settings | Locations | [LOCATIONS.md](LOCATIONS.md) |
 | App settings | Configuration, Logs, Metrics, Backup / Restore | [CONFIGURATION.md](CONFIGURATION.md) |
 | App settings | Connectors | [CONNECTORS.md](CONNECTORS.md) |
