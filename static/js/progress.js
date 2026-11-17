@@ -349,7 +349,8 @@ function shareBadge(badge, catalogueRows) {
         heading: texts.name,
         subheading: texts.description,
         hero,
-        mosaicUrls: pictures.map((filename) => appUrl(`/api/astrodex/images/${encodeURIComponent(filename)}`)),
+        // Montage tiles are 540 px: the medium preview is enough, and far lighter than the originals.
+        mosaicUrls: pictures.map((filename) => appUrl(`/api/astrodex/images/${encodeURIComponent(filename)}?size=medium`)),
         facts: [
             {
                 id: 'earned',

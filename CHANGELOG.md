@@ -12,7 +12,11 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
-- None.
+- My astro year: format, theme and signature are chosen once for the whole slideshow and apply to the
+  preview, "This screen" and "All screens" alike ([docs/MY_PROGRESS.md](docs/MY_PROGRESS.md)).
+- Community, Astrodex, Catalogue Collection, Observation Log and montages: pictures load as small
+  previews instead of full-size astrophotos, so these pages open quickly and scroll smoothly
+  ([docs/COMMUNITY.md](docs/COMMUNITY.md)).
 
 ### Breaking changes
 

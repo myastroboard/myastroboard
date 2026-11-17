@@ -153,14 +153,14 @@ class TestCardImages:
         ]
         page = catalogue_collection.get_collection_page('Messier', [_item('M 31', pictures)], caught='yes')
         card = page['items'][0]
-        assert card['image_url'] == '/api/astrodex/images/cover.jpg'
+        assert card['image_url'] == '/api/astrodex/images/cover.jpg?size=thumb'
         assert card['image_source'] == 'astrodex'
         assert card['picture_count'] == 2
 
     def test_caught_object_without_a_main_flag_falls_back_to_the_first_picture(self):
         pictures = [{'filename': 'only.jpg', 'is_main': False}]
         page = catalogue_collection.get_collection_page('Messier', [_item('M 31', pictures)], caught='yes')
-        assert page['items'][0]['image_url'] == '/api/astrodex/images/only.jpg'
+        assert page['items'][0]['image_url'] == '/api/astrodex/images/only.jpg?size=thumb'
 
     def test_caught_object_without_pictures_still_shows_the_sky_survey_preview(self):
         page = catalogue_collection.get_collection_page('Messier', [_item('M 31')], caught='yes')
@@ -182,7 +182,7 @@ class TestCardImages:
     def test_a_caught_body_shows_the_user_photo_instead_of_the_artwork(self):
         pictures = [{'filename': 'mars.jpg', 'is_main': True}]
         page = catalogue_collection.get_collection_page('Bodies', [_item('Mars', pictures)], caught='yes')
-        assert page['items'][0]['image_url'] == '/api/astrodex/images/mars.jpg'
+        assert page['items'][0]['image_url'] == '/api/astrodex/images/mars.jpg?size=thumb'
 
 
 class TestConstellationNames:

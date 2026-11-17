@@ -3437,8 +3437,6 @@
     "list_catalogues": "Cataloghi",
     "previous_objects": "{count} oggetti",
     "mosaic_heading": "Il mio {year} in immagini",
-    "share": "Condividi questa schermata",
-    "share_title": "Condividi questa schermata",
     "counter": "{index} / {total}",
     "previous": "Schermata precedente",
     "next": "Schermata successiva",
@@ -3454,7 +3452,11 @@
     "gained_short": "+{count}",
     "download_all": "Scarica tutto (ZIP)",
     "share_all": "Condividi tutto",
-    "preparing": "Preparazione delle immagini..."
+    "preparing": "Preparazione delle immagini...",
+    "options_hint": "Il formato, il tema e la firma valgono per tutte le schermate e per tutto ciò che scarichi o condividi.",
+    "facts_label": "Mostra in questa schermata",
+    "this_screen": "Questa schermata",
+    "all_screens": "Tutte le schermate ({count})"
   },
   "profile": {
     "tab": "Profilo",

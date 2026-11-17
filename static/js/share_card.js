@@ -26,7 +26,6 @@
  *     paragraph?: string,
  *     mosaicUrls?: string[],              several same-origin pictures, drawn as one montage
  *                                         when there is no imageUrl
- *     onClose?: Function,                 called when the share modal is closed
  *   }
  */
 
@@ -77,7 +76,7 @@ const SHARE_MAX_PARAGRAPH_LINES = 5;
 // Largest text scale a text-only card may use to fill itself (model.fill).
 const SHARE_MAX_FILL_SCALE = 1.7;
 
-// Number of share modals opened so far, used to build unique element ids.
+// Number of option control sets built so far, used to build unique element ids.
 let _shModalCount = 0;
 
 /**
@@ -651,6 +650,136 @@ function _shCheckbox(id, text, checked, onChange) {
     return wrapper;
 }
 
+// ── Option controls, shared by the share modal and the year in review ────────
+
+/** A new suffix that keeps the ids of a set of controls unique on the page. */
+function _shNextUid() {
+    _shModalCount += 1;
+    return String(_shModalCount);
+}
+
+/**
+ * Format picker, with a line naming where the chosen shape fits.
+ * @param {Object} options - share options, `format` is changed in place
+ * @param {Function} onChange - called after the format changed
+ * @returns {HTMLElement}
+ */
+function buildShareFormatControl(options, onChange) {
+    const hint = document.createElement('div');
+    hint.className = 'small text-muted mt-1';
+    const showHint = () => {
+        hint.textContent = _shT(SHARE_FORMATS[options.format].hint, SHARE_FORMAT_HINT_FALLBACKS[options.format]);
+    };
+    const group = _shRadioGroup(
+        `share-format-${_shNextUid()}`,
+        _shT('share.format', 'Format'),
+        Object.keys(SHARE_FORMATS).map((value) => ({ value, label: SHARE_FORMATS[value].label })),
+        options.format,
+        (value) => {
+            options.format = value;
+            showHint();
+            onChange();
+        }
+    );
+    group.appendChild(hint);
+    showHint();
+    return group;
+}
+
+/** Dark or light card. `options.theme` is changed in place. */
+function buildShareThemeControl(options, onChange) {
+    return _shRadioGroup(
+        `share-theme-${_shNextUid()}`,
+        _shT('share.theme', 'Theme'),
+        [
+            { value: 'dark', label: _shT('share.theme_dark', 'Dark') },
+            { value: 'light', label: _shT('share.theme_light', 'Light') },
+        ],
+        options.theme,
+        (value) => {
+            options.theme = value;
+            onChange();
+        }
+    );
+}
+
+/**
+ * One checkbox per non-empty fact of the model; `facts` ({id: boolean}) is changed in place.
+ * @returns {HTMLElement|null} null when the model has no fact to offer
+ */
+function buildShareFactsControl(model, facts, onChange, legend) {
+    const offered = (model.facts || []).filter((fact) => fact.value);
+    if (!offered.length) return null;
+    const uid = _shNextUid();
+    const group = document.createElement('div');
+    group.className = 'share-card-group';
+    const label = document.createElement('div');
+    label.className = 'share-card-group-label';
+    label.textContent = legend || _shT('share.include', 'Show on the card');
+    group.appendChild(label);
+    offered.forEach((fact) => {
+        group.appendChild(
+            _shCheckbox(`share-fact-${uid}-${fact.id}`, `${fact.label}: ${fact.value}`, facts[fact.id] !== false, (checked) => {
+                facts[fact.id] = checked;
+                onChange();
+            })
+        );
+    });
+    return group;
+}
+
+/** The MyAstroBoard signature band at the foot of the card. `options.brand` is changed in place. */
+function buildShareBrandControl(options, onChange) {
+    const group = document.createElement('div');
+    group.className = 'share-card-group';
+    group.appendChild(
+        _shCheckbox(`share-brand-${_shNextUid()}`, _shT('share.brand', 'MyAstroBoard signature'), options.brand, (checked) => {
+            options.brand = checked;
+            onChange();
+        })
+    );
+    const hint = document.createElement('div');
+    hint.className = 'form-text';
+    hint.textContent = _shT(
+        'share.brand_hint',
+        'Keeping it also supports the project: it is how other astronomers discover MyAstroBoard.'
+    );
+    group.appendChild(hint);
+    return group;
+}
+
+/** Toggle the preview shape classes (`<prefix>--4x5` ...) of a stage to *format*. */
+function setShareStageFormat(stage, prefix, format) {
+    Object.keys(SHARE_FORMATS).forEach((key) => stage.classList.toggle(`${prefix}--${key}`, key === format));
+}
+
+/** Save a blob under *filename* through a temporary link. */
+function downloadShareBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+}
+
+/**
+ * Whether the system share sheet takes *count* PNG files at once (mostly phones).
+ * @param {number} [count]
+ * @returns {boolean}
+ */
+function canShareImageFiles(count = 1) {
+    if (typeof File !== 'function' || typeof navigator.canShare !== 'function') return false;
+    const files = Array.from({ length: count }, () => new File([new Blob()], 'probe.png', { type: 'image/png' }));
+    try {
+        return navigator.canShare({ files });
+    } catch (_error) {
+        return false;
+    }
+}
+
 /**
  * Open the share modal for a card model: preview, format, theme, facts to include,
  * then download or share.
@@ -665,20 +794,14 @@ async function openShareCard(model) {
     titleEl.textContent = model.title || _shT('share.title', 'Share');
     DOMUtils.clear(bodyEl);
     bodyEl.appendChild(DOMUtils.createSpinnerWrapper(_shT('common.loading', 'Loading...')));
-    openModal(modalEl, { backdrop: true, onHidden: typeof model.onClose === 'function' ? model.onClose : null });
+    openModal(modalEl, { backdrop: true });
 
     const [image] = await Promise.all([
         loadShareCardImage(model),
         document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve(),
     ]);
 
-    // Suffix that keeps the ids of this modal's controls unique if it is opened again.
-    _shModalCount += 1;
-    const uid = String(_shModalCount);
     const options = { format: SHARE_DEFAULT_FORMAT, theme: 'dark', brand: true, facts: {} };
-    (model.facts || []).forEach((fact) => {
-        options.facts[fact.id] = true;
-    });
 
     DOMUtils.clear(bodyEl);
     const root = document.createElement('div');
@@ -706,77 +829,16 @@ async function openShareCard(model) {
 
     const redraw = () => drawShareCard(canvas, model, options, image);
 
-    const formatHint = document.createElement('div');
-    formatHint.className = 'small text-muted mt-1';
-    const showFormatHint = () => {
-        formatHint.textContent = _shT(SHARE_FORMATS[options.format].hint, SHARE_FORMAT_HINT_FALLBACKS[options.format]);
-    };
-    const formatGroup = _shRadioGroup(
-        `share-format-${uid}`,
-        _shT('share.format', 'Format'),
-        Object.keys(SHARE_FORMATS).map((value) => ({ value, label: SHARE_FORMATS[value].label })),
-        options.format,
-        (value) => {
-            Object.keys(SHARE_FORMATS).forEach((key) => stage.classList.toggle(`share-card-stage--${key}`, key === value));
-            options.format = value;
-            showFormatHint();
-            redraw();
-        }
-    );
-    formatGroup.appendChild(formatHint);
-    showFormatHint();
-    sideCol.appendChild(formatGroup);
     sideCol.appendChild(
-        _shRadioGroup(
-            `share-theme-${uid}`,
-            _shT('share.theme', 'Theme'),
-            [
-                { value: 'dark', label: _shT('share.theme_dark', 'Dark') },
-                { value: 'light', label: _shT('share.theme_light', 'Light') },
-            ],
-            options.theme,
-            (value) => {
-                options.theme = value;
-                redraw();
-            }
-        )
-    );
-
-    const facts = (model.facts || []).filter((fact) => fact.value);
-    if (facts.length) {
-        const group = document.createElement('div');
-        group.className = 'share-card-group';
-        const label = document.createElement('div');
-        label.className = 'share-card-group-label';
-        label.textContent = _shT('share.include', 'Show on the card');
-        group.appendChild(label);
-        facts.forEach((fact) => {
-            group.appendChild(
-                _shCheckbox(`share-fact-${uid}-${fact.id}`, `${fact.label}: ${fact.value}`, true, (checked) => {
-                    options.facts[fact.id] = checked;
-                    redraw();
-                })
-            );
-        });
-        sideCol.appendChild(group);
-    }
-
-    const brandGroup = document.createElement('div');
-    brandGroup.className = 'share-card-group';
-    brandGroup.appendChild(
-        _shCheckbox(`share-brand-${uid}`, _shT('share.brand', 'MyAstroBoard signature'), true, (checked) => {
-            options.brand = checked;
+        buildShareFormatControl(options, () => {
+            setShareStageFormat(stage, 'share-card-stage', options.format);
             redraw();
         })
     );
-    const brandHint = document.createElement('div');
-    brandHint.className = 'form-text';
-    brandHint.textContent = _shT(
-        'share.brand_hint',
-        'Keeping it also supports the project: it is how other astronomers discover MyAstroBoard.'
-    );
-    brandGroup.appendChild(brandHint);
-    sideCol.appendChild(brandGroup);
+    sideCol.appendChild(buildShareThemeControl(options, redraw));
+    const factsGroup = buildShareFactsControl(model, options.facts, redraw);
+    if (factsGroup) sideCol.appendChild(factsGroup);
+    sideCol.appendChild(buildShareBrandControl(options, redraw));
 
     const privacy = document.createElement('p');
     privacy.className = 'small text-muted';
@@ -797,20 +859,11 @@ async function openShareCard(model) {
     const filename = `${_shSlug(model.filename || model.heading)}.png`;
     downloadBtn.addEventListener('click', async () => {
         const blob = await _shCanvasToBlob(canvas);
-        if (!blob) return;
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(url);
+        if (blob) downloadShareBlob(blob, filename);
     });
 
     // The system share sheet, where the browser can share a file (mostly phones).
-    const probe = typeof File === 'function' ? new File([new Blob()], filename, { type: 'image/png' }) : null;
-    if (probe && typeof navigator.canShare === 'function' && navigator.canShare({ files: [probe] })) {
+    if (canShareImageFiles(1)) {
         const shareBtn = document.createElement('button');
         shareBtn.type = 'button';
         shareBtn.className = 'btn btn-outline-primary';

@@ -3437,8 +3437,6 @@
     "list_catalogues": "Catálogos",
     "previous_objects": "{count} objetos",
     "mosaic_heading": "O meu {year} em imagens",
-    "share": "Partilhar este ecrã",
-    "share_title": "Partilhar este ecrã",
     "counter": "{index} / {total}",
     "previous": "Ecrã anterior",
     "next": "Ecrã seguinte",
@@ -3454,7 +3452,11 @@
     "gained_short": "+{count}",
     "download_all": "Transferir tudo (ZIP)",
     "share_all": "Partilhar tudo",
-    "preparing": "A preparar as imagens..."
+    "preparing": "A preparar as imagens...",
+    "options_hint": "O formato, o tema e a assinatura aplicam-se a todos os ecrãs e a tudo o que transferir ou partilhar.",
+    "facts_label": "Mostrar neste ecrã",
+    "this_screen": "Este ecrã",
+    "all_screens": "Todos os ecrãs ({count})"
   },
   "profile": {
     "tab": "Perfil",

@@ -334,6 +334,119 @@ def test_get_astrodex_image_private_mode_blocks_other_user_images(client, monkey
         assert other_response.status_code == 403
 
 
+def _own_picture(monkeypatch, tmpdir, filename, content, private=False):
+    """Store *content* as a picture of the admin's Astrodex, in a temporary images directory."""
+    monkeypatch.setenv('DATA_DIR', tmpdir)
+    monkeypatch.setattr(astrodex, 'ASTRODEX_DIR', os.path.join(tmpdir, 'astrodex'))
+    monkeypatch.setattr(astrodex, 'ASTRODEX_IMAGES_DIR', os.path.join(tmpdir, 'astrodex', 'images'))
+    astrodex.ensure_astrodex_directories()
+    monkeypatch.setattr(astrodex_bp_module, 'load_config', lambda: {'astrodex': {'private': private}})
+    admin_user = user_manager.get_user_by_username('admin')
+    assert admin_user is not None
+    item = astrodex.create_astrodex_item(
+        admin_user.user_id, {'name': 'M33', 'type': 'Galaxy', 'catalogue': 'Messier'}, username=admin_user.username
+    )
+    assert item is not None
+    astrodex.add_picture_to_item(admin_user.user_id, item['id'], {'filename': filename})
+    with open(os.path.join(astrodex.ASTRODEX_IMAGES_DIR, filename), 'wb') as file_obj:
+        file_obj.write(content)
+
+
+def test_get_astrodex_image_thumb_serves_a_small_webp_preview(client, monkeypatch):
+    """``?size=thumb`` serves a WebP preview no larger than the preview size, cacheable privately."""
+    import io
+
+    from PIL import Image
+
+    from utils import image_thumbnails  # type: ignore[import-not-found]
+
+    image_thumbnails.clear_cache()
+    buffer = io.BytesIO()
+    Image.new('RGB', (2000, 1000), (30, 60, 90)).save(buffer, format='JPEG')
+    filename = f'thumb_{uuid.uuid4().hex[:8]}.jpg'
+    with tempfile.TemporaryDirectory() as tmpdir:
+        _own_picture(monkeypatch, tmpdir, filename, buffer.getvalue())
+
+        response = client.get(f'/api/astrodex/images/{filename}?size=thumb')
+        data = response.get_data()
+        response.close()
+
+        assert response.status_code == 200
+        assert response.mimetype == 'image/webp'
+        assert 'private' in response.headers['Cache-Control']
+        preview = Image.open(io.BytesIO(data))
+        assert max(preview.size) == image_thumbnails.THUMBNAIL_MAX_SIDE
+
+        original = client.get(f'/api/astrodex/images/{filename}')
+        original_data = original.get_data()
+        original.close()
+        assert original.mimetype == 'image/jpeg'
+        assert original_data == buffer.getvalue()
+
+
+def test_get_astrodex_image_medium_and_unknown_sizes(client, monkeypatch):
+    """``?size=medium`` serves a 1080 px preview; an unknown size serves the original."""
+    import io
+
+    from PIL import Image
+
+    from utils import image_thumbnails  # type: ignore[import-not-found]
+
+    image_thumbnails.clear_cache()
+    buffer = io.BytesIO()
+    Image.new('RGB', (3000, 2000), (30, 60, 90)).save(buffer, format='JPEG')
+    filename = f'medium_{uuid.uuid4().hex[:8]}.jpg'
+    with tempfile.TemporaryDirectory() as tmpdir:
+        _own_picture(monkeypatch, tmpdir, filename, buffer.getvalue())
+
+        medium = client.get(f'/api/astrodex/images/{filename}?size=medium')
+        medium_data = medium.get_data()
+        medium.close()
+        assert medium.mimetype == 'image/webp'
+        assert max(Image.open(io.BytesIO(medium_data)).size) == image_thumbnails.MEDIUM_MAX_SIDE
+
+        unknown = client.get(f'/api/astrodex/images/{filename}?size=huge')
+        unknown_data = unknown.get_data()
+        unknown.close()
+        assert unknown.mimetype == 'image/jpeg'
+        assert unknown_data == buffer.getvalue()
+
+
+def test_get_astrodex_image_thumb_falls_back_to_the_original_file(client, monkeypatch):
+    """A file Pillow cannot read is served as is rather than failing."""
+    filename = f'raw_{uuid.uuid4().hex[:8]}.jpg'
+    with tempfile.TemporaryDirectory() as tmpdir:
+        _own_picture(monkeypatch, tmpdir, filename, b'not a picture')
+
+        response = client.get(f'/api/astrodex/images/{filename}?size=thumb')
+        data = response.get_data()
+        response.close()
+
+        assert response.status_code == 200
+        assert data == b'not a picture'
+
+
+def test_get_astrodex_image_thumb_keeps_the_access_check(client, monkeypatch):
+    """The preview of a picture the user may not see is refused like the original."""
+    other_user = user_manager.create_user(f"user_{uuid.uuid4().hex[:8]}", 'test123', 'user')
+    filename = f'hidden_{uuid.uuid4().hex[:8]}.jpg'
+    with tempfile.TemporaryDirectory() as tmpdir:
+        _own_picture(monkeypatch, tmpdir, 'mine.jpg', b'img', private=True)
+        item = astrodex.create_astrodex_item(
+            other_user.user_id, {'name': 'M42', 'type': 'Nebula', 'catalogue': 'Messier'}, username=other_user.username
+        )
+        assert item is not None
+        astrodex.add_picture_to_item(other_user.user_id, item['id'], {'filename': filename})
+        with open(os.path.join(astrodex.ASTRODEX_IMAGES_DIR, filename), 'wb') as file_obj:
+            file_obj.write(b'img')
+
+        response = client.get(f'/api/astrodex/images/{filename}?size=thumb')
+        response.get_data()
+        response.close()
+
+        assert response.status_code == 403
+
+
 def test_resolve_picture_location_snapshot_falls_through_on_lookup_miss(monkeypatch):
     """Defensive branch: location_id resolves as accessible but a direct lookup
     still misses (e.g. a race with a concurrent delete) - must fall through to
@@ -441,7 +554,7 @@ def test_collection_page_api(client, monkeypatch):
 
         cards = {card['catalogue_id']: card for card in payload['items']}
         assert cards['M 31']['caught'] is True
-        assert cards['M 31']['image_url'] == '/api/astrodex/images/andromeda.jpg'
+        assert cards['M 31']['image_url'] == '/api/astrodex/images/andromeda.jpg?size=thumb'
         assert cards['M 42']['caught'] is False
         assert cards['M 42']['image_source'] == 'dss2'
 

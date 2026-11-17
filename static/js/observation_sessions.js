@@ -1054,7 +1054,7 @@ function _obsBuildEntryRow(session, entry) {
         thumbButton.className = 'observation-log-entry-thumb btn p-0 border-0';
         thumbButton.title = i18n.t('observation_log.view_photo');
         const thumbImg = document.createElement('img');
-        thumbImg.src = appUrl(`/api/astrodex/images/${resolvedPicture.picture.filename}`);
+        thumbImg.src = appUrl(`/api/astrodex/images/${resolvedPicture.picture.filename}?size=thumb`);
         thumbImg.alt = entry.name || '';
         thumbImg.loading = 'lazy';
         thumbButton.appendChild(thumbImg);

@@ -3437,8 +3437,6 @@
     "list_catalogues": "Catalogues",
     "previous_objects": "{count} objets",
     "mosaic_heading": "Mon {year} en images",
-    "share": "Partager cet écran",
-    "share_title": "Partager cet écran",
     "counter": "{index} / {total}",
     "previous": "Écran précédent",
     "next": "Écran suivant",
@@ -3454,7 +3452,11 @@
     "gained_short": "+{count}",
     "download_all": "Tout télécharger (ZIP)",
     "share_all": "Tout partager",
-    "preparing": "Préparation des images..."
+    "preparing": "Préparation des images...",
+    "options_hint": "Le format, le thème et la signature s'appliquent à tous les écrans, et à tout ce que vous téléchargez ou partagez.",
+    "facts_label": "Afficher sur cet écran",
+    "this_screen": "Cet écran",
+    "all_screens": "Tous les écrans ({count})"
   },
   "profile": {
     "tab": "Profil",

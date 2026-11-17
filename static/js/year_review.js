@@ -4,15 +4,18 @@
  * The server builds every figure (GET /api/session-analytics/year-review?year=) from the
  * user's own Observation Log and Astrodex; this module only turns each non-empty part into
  * a share card model and shows them one after the other, drawn on a canvas by the share
- * card engine (share_card.js), so each screen is also the image that gets shared. A screen
- * without data is left out, never shown empty, and no figure compares the user with anyone.
+ * card engine (share_card.js), so each screen is also the image that gets shared. The review
+ * is shared as one slideshow: format, theme and signature are chosen once for all screens.
+ * A screen without data is left out, never shown empty, and no figure compares the user
+ * with anyone.
  *
  * Opened from Your Sky, from the Progress page, and from the end-of-year highlight on the
  * Astrophotography tab (1 December - 15 January), which can be dismissed per year.
  */
 
-/* global DOMUtils, i18n, fetchJSON, appUrl, openModal, closeModal, openShareCard, drawShareCard,
-   loadShareCardImage, saveUserPreferences, setCurrentUserPreferences, currentUserPreferences,
+/* global DOMUtils, i18n, fetchJSON, appUrl, openModal, drawShareCard, loadShareCardImage,
+   buildShareFormatControl, buildShareThemeControl, buildShareBrandControl, buildShareFactsControl,
+   setShareStageFormat, downloadShareBlob, canShareImageFiles, saveUserPreferences, setCurrentUserPreferences, currentUserPreferences,
    progressCatalogueLabel, progressClassLabel, progressTypeLabel, progressConstellationLabel,
    progressDateLabel, progressHours */
 
@@ -27,6 +30,10 @@ const yearReviewState = {
     index: 0,
     images: new Map(),
     keyHandler: null,
+    // Format, theme and signature of every screen; kept when another year is opened.
+    options: { format: '4x5', theme: 'dark', brand: true },
+    // Facts left out, per screen id ({id: {factId: false}}); reset with the year.
+    factsByScreen: {},
 };
 
 function _yrT(key, fallback, params) {
@@ -59,7 +66,6 @@ function buildYearReviewScreens(payload) {
     const integration = Number(totals.integration_minutes) > 0 ? progressHours(totals.integration_minutes) : '';
     screens.push({
         id: 'year',
-        title: _yrT('year_review.share_title', 'Share this screen'),
         filename: filename('year'),
         kicker,
         heading: year,
@@ -81,7 +87,6 @@ function buildYearReviewScreens(payload) {
     const favourite = payload.favourite_class;
     screens.push({
         id: 'targets',
-        title: _yrT('year_review.share_title', 'Share this screen'),
         filename: filename('targets'),
         kicker,
         heading: _yrT('year_review.targets_heading', 'Your targets'),
@@ -104,8 +109,7 @@ function buildYearReviewScreens(payload) {
     if (target) {
         screens.push({
             id: 'target',
-            title: _yrT('year_review.share_title', 'Share this screen'),
-            filename: filename('target'),
+                filename: filename('target'),
             kicker: _yrT('year_review.target_kicker', 'Target of the year {year}', { year }),
             heading: target.preferred_name || target.name,
             subheading: [
@@ -131,8 +135,7 @@ function buildYearReviewScreens(payload) {
     if (night) {
         screens.push({
             id: 'night',
-            title: _yrT('year_review.share_title', 'Share this screen'),
-            filename: filename('best-night'),
+                filename: filename('best-night'),
             kicker: _yrT('year_review.night_kicker', 'Best night of {year}', { year }),
             heading: progressDateLabel(night.date, { weekday: 'long', day: 'numeric', month: 'long' }),
             subheading: night.combination_name || '',
@@ -162,8 +165,7 @@ function buildYearReviewScreens(payload) {
     if (equipment) {
         screens.push({
             id: 'equipment',
-            title: _yrT('year_review.share_title', 'Share this screen'),
-            filename: filename('equipment'),
+                filename: filename('equipment'),
             kicker: _yrT('year_review.equipment_kicker', 'Hardest-working equipment'),
             heading: equipment.combination_name,
             hero: { value: String(equipment.share_percent), unit: '%', label: _yrT('year_review.hero_share', 'of the light of the year') },
@@ -192,8 +194,7 @@ function buildYearReviewScreens(payload) {
             : '';
         screens.push({
             id: 'progress',
-            title: _yrT('year_review.share_title', 'Share this screen'),
-            filename: filename('progress'),
+                filename: filename('progress'),
             kicker,
             heading: _yrT('year_review.progress_heading', 'Your progress'),
             facts: [
@@ -219,11 +220,11 @@ function buildYearReviewScreens(payload) {
     if (mosaic.length) {
         screens.push({
             id: 'mosaic',
-            title: _yrT('year_review.share_title', 'Share this screen'),
-            filename: filename('pictures'),
+                filename: filename('pictures'),
             kicker,
             heading: _yrT('year_review.mosaic_heading', 'My {year} in pictures', { year }),
-            mosaicUrls: mosaic.map((picture) => appUrl(`/api/astrodex/images/${encodeURIComponent(picture.filename)}`)),
+            // Montage tiles are 540 px: the medium preview is enough, and far lighter than the originals.
+            mosaicUrls: mosaic.map((picture) => appUrl(`/api/astrodex/images/${encodeURIComponent(picture.filename)}?size=medium`)),
             facts: [
                 {
                     id: 'pictures',
@@ -242,7 +243,7 @@ function buildYearReviewScreens(payload) {
     return screens;
 }
 
-// ── Download or share every screen at once ──────────────────────────────────
+// ── ZIP archive of every screen ─────────────────────────────────────────────
 
 const _YR_CRC_TABLE = (() => {
     const table = new Uint32Array(256);
@@ -316,29 +317,44 @@ function _yrZip(files) {
     return new Blob([...parts, ...central, end.buffer], { type: 'application/zip' });
 }
 
-/** Every screen rendered as a PNG file, in order, with the viewer's format and theme. */
+// ── Share options and exports ───────────────────────────────────────────────
+// The review is shared as one slideshow: the format, the theme and the signature are set
+// once for every screen; each screen keeps its own choice of facts. The preview, "this
+// screen" and "all screens" all draw with these same options, so what is seen is what is
+// downloaded or shared.
+
+/** The share options of *screen*: the review's format, theme and signature, its own facts. */
+function _yrOptionsFor(screen) {
+    if (!yearReviewState.factsByScreen[screen.id]) yearReviewState.factsByScreen[screen.id] = {};
+    return { ...yearReviewState.options, facts: yearReviewState.factsByScreen[screen.id] };
+}
+
+function _yrFileName(index) {
+    const screen = yearReviewState.screens[index];
+    return `${String(index + 1).padStart(2, '0')}-${screen.filename || screen.id}.png`;
+}
+
+/** Screen *index* drawn as a PNG file, exactly as previewed. */
+async function _yrRenderFile(index) {
+    const screen = yearReviewState.screens[index];
+    const canvas = document.createElement('canvas');
+    drawShareCard(canvas, screen, _yrOptionsFor(screen), await _yrImageFor(screen));
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+    return blob ? new File([blob], _yrFileName(index), { type: 'image/png' }) : null;
+}
+
+/** Every screen rendered as a PNG file, in order. */
 async function _yrRenderAll() {
     const files = [];
     for (let index = 0; index < yearReviewState.screens.length; index += 1) {
-        const screen = yearReviewState.screens[index];
-        const canvas = document.createElement('canvas');
-        drawShareCard(canvas, screen, YEAR_REVIEW_OPTIONS, await _yrImageFor(screen));
-        const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
-        if (!blob) continue;
-        const name = `${String(index + 1).padStart(2, '0')}-${screen.filename || screen.id}.png`;
-        files.push(new File([blob], name, { type: 'image/png' }));
+        const file = await _yrRenderFile(index);
+        if (file) files.push(file);
     }
     return files;
 }
 
-function _yrCanShareFiles() {
-    if (typeof File !== 'function' || typeof navigator.canShare !== 'function') return false;
-    const probe = () => new File([new Blob()], 'probe.png', { type: 'image/png' });
-    try {
-        return navigator.canShare({ files: [probe(), probe()] });
-    } catch (_error) {
-        return false;
-    }
+function _yrShareTitle() {
+    return _yrT('year_review.title', 'My astro year {year}', { year: yearReviewState.payload.year });
 }
 
 /** Run *task* with the button disabled and showing that the images are being prepared. */
@@ -359,34 +375,31 @@ async function _yrBusy(button, task) {
     }
 }
 
+async function _yrDownloadScreen() {
+    const file = await _yrRenderFile(yearReviewState.index);
+    if (file) downloadShareBlob(file, file.name);
+}
+
+async function _yrShareScreen() {
+    const file = await _yrRenderFile(yearReviewState.index);
+    if (file) await navigator.share({ files: [file], title: _yrShareTitle() });
+}
+
 async function _yrDownloadAll() {
     const files = await _yrRenderAll();
     if (!files.length) return;
     const entries = await Promise.all(
         files.map(async (file) => ({ name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) }))
     );
-    const url = URL.createObjectURL(_yrZip(entries));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `my-astro-year-${yearReviewState.payload.year}.zip`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+    downloadShareBlob(_yrZip(entries), `my-astro-year-${yearReviewState.payload.year}-${yearReviewState.options.format}.zip`);
 }
 
 async function _yrShareAll() {
     const files = await _yrRenderAll();
-    if (!files.length) return;
-    await navigator.share({
-        files,
-        title: _yrT('year_review.title', 'My astro year {year}', { year: yearReviewState.payload.year }),
-    });
+    if (files.length) await navigator.share({ files, title: _yrShareTitle() });
 }
 
 // ── Viewer ──────────────────────────────────────────────────────────────────
-
-const YEAR_REVIEW_OPTIONS = { format: '4x5', theme: 'dark', brand: true, facts: {} };
 
 async function _yrImageFor(screen) {
     if (!yearReviewState.images.has(screen.id)) {
@@ -407,7 +420,7 @@ async function _yrDraw(canvas, counter, dots) {
     const index = yearReviewState.index;
     const image = await _yrImageFor(screen);
     if (index !== yearReviewState.index) return;
-    drawShareCard(canvas, screen, YEAR_REVIEW_OPTIONS, image);
+    drawShareCard(canvas, screen, _yrOptionsFor(screen), image);
 }
 
 function _yrYearSelect(payload, onChange) {
@@ -428,6 +441,29 @@ function _yrYearSelect(payload, onChange) {
     return select;
 }
 
+function _yrActionButton(className, icon, label, task) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = className;
+    DOMUtils.append(button, DOMUtils.createIcon(`${icon} icon-inline`), ` ${label}`);
+    button.addEventListener('click', () => _yrBusy(button, task));
+    return button;
+}
+
+/** A labelled row of export buttons ("This screen", "All screens"). */
+function _yrActionGroup(title, buttons) {
+    const group = document.createElement('div');
+    group.className = 'share-card-group';
+    const label = document.createElement('div');
+    label.className = 'share-card-group-label';
+    label.textContent = title;
+    const row = document.createElement('div');
+    row.className = 'year-review-actions';
+    DOMUtils.append(row, ...buttons);
+    DOMUtils.append(group, label, row);
+    return group;
+}
+
 function _yrRender(bodyEl) {
     const payload = yearReviewState.payload;
     DOMUtils.clear(bodyEl);
@@ -441,6 +477,7 @@ function _yrRender(bodyEl) {
     root.appendChild(toolbar);
 
     if (!yearReviewState.screens.length) {
+        root.classList.add('year-review--empty');
         const empty = document.createElement('div');
         empty.className = 'year-review-empty text-center';
         empty.appendChild(DOMUtils.createIcon('bi bi-calendar-heart year-review-empty-icon'));
@@ -460,13 +497,16 @@ function _yrRender(bodyEl) {
     counter.className = 'year-review-counter small text-muted';
     toolbar.appendChild(counter);
 
+    // Left (or top on a phone): the screen and its navigation.
+    const main = document.createElement('div');
+    main.className = 'year-review-main';
     const stage = document.createElement('div');
-    stage.className = 'year-review-stage';
+    stage.className = `year-review-stage year-review-stage--${yearReviewState.options.format}`;
     const canvas = document.createElement('canvas');
     canvas.className = 'year-review-canvas';
     canvas.setAttribute('role', 'img');
     stage.appendChild(canvas);
-    root.appendChild(stage);
+    main.appendChild(stage);
 
     const navigation = document.createElement('div');
     navigation.className = 'year-review-nav';
@@ -492,50 +532,81 @@ function _yrRender(bodyEl) {
         return dot;
     });
     DOMUtils.append(navigation, previous, dotsWrapper, next);
-    root.appendChild(navigation);
+    main.appendChild(navigation);
+    root.appendChild(main);
 
-    const actions = document.createElement('div');
-    actions.className = 'year-review-actions';
-    const share = document.createElement('button');
-    share.type = 'button';
-    share.className = 'btn btn-primary';
-    DOMUtils.append(share, DOMUtils.createIcon('bi bi-share icon-inline'), ` ${_yrT('year_review.share', 'Share this screen')}`);
-    share.addEventListener('click', () => {
-        const index = yearReviewState.index;
-        const screen = yearReviewState.screens[index];
-        // The share modal replaces this one (Bootstrap cannot stack modals); closing it
-        // brings the review back on the same screen.
-        openShareCard({ ...screen, onClose: () => _yrShow(index) });
-    });
-    actions.appendChild(share);
-    const downloadAll = document.createElement('button');
-    downloadAll.type = 'button';
-    downloadAll.className = 'btn btn-outline-primary';
-    DOMUtils.append(
-        downloadAll,
-        DOMUtils.createIcon('bi bi-file-earmark-zip icon-inline'),
-        ` ${_yrT('year_review.download_all', 'Download all (ZIP)')}`
+    // Right (or below): the options of the whole review, then the exports.
+    const side = document.createElement('div');
+    side.className = 'year-review-side';
+    const redraw = () => _yrDraw(canvas, counter, dots);
+    const optionsHint = document.createElement('p');
+    optionsHint.className = 'small text-muted';
+    optionsHint.textContent = _yrT(
+        'year_review.options_hint',
+        'The format, the theme and the signature apply to every screen, and to everything you download or share.'
     );
-    downloadAll.addEventListener('click', () => _yrBusy(downloadAll, _yrDownloadAll));
-    actions.appendChild(downloadAll);
+    side.appendChild(optionsHint);
+    side.appendChild(
+        buildShareFormatControl(yearReviewState.options, () => {
+            setShareStageFormat(stage, 'year-review-stage', yearReviewState.options.format);
+            redraw();
+        })
+    );
+    side.appendChild(buildShareThemeControl(yearReviewState.options, redraw));
+    side.appendChild(buildShareBrandControl(yearReviewState.options, redraw));
+    // Rebuilt for each screen: the facts it can show.
+    const factsSlot = document.createElement('div');
+    side.appendChild(factsSlot);
+
+    const screenButtons = [];
+    if (canShareImageFiles(1)) {
+        screenButtons.push(_yrActionButton('btn btn-primary', 'bi bi-share', _yrT('share.share', 'Share'), _yrShareScreen));
+    }
+    screenButtons.push(
+        _yrActionButton(
+            screenButtons.length ? 'btn btn-outline-primary' : 'btn btn-primary',
+            'bi bi-download',
+            _yrT('share.download', 'Download'),
+            _yrDownloadScreen
+        )
+    );
+    // Exports: after the options on a wide screen, right under the navigation on a phone.
+    const exports = document.createElement('div');
+    exports.className = 'year-review-exports';
+    exports.appendChild(_yrActionGroup(_yrT('year_review.this_screen', 'This screen'), screenButtons));
+
     // The system share sheet takes several pictures at once on most phones, which posts
     // the whole review as one carousel.
-    if (_yrCanShareFiles()) {
-        const shareAll = document.createElement('button');
-        shareAll.type = 'button';
-        shareAll.className = 'btn btn-outline-primary';
-        DOMUtils.append(shareAll, DOMUtils.createIcon('bi bi-images icon-inline'), ` ${_yrT('year_review.share_all', 'Share all')}`);
-        shareAll.addEventListener('click', () => _yrBusy(shareAll, _yrShareAll));
-        actions.appendChild(shareAll);
+    const allButtons = [];
+    if (canShareImageFiles(2)) {
+        allButtons.push(
+            _yrActionButton('btn btn-outline-primary', 'bi bi-images', _yrT('year_review.share_all', 'Share all'), _yrShareAll)
+        );
     }
+    allButtons.push(
+        _yrActionButton(
+            'btn btn-outline-primary',
+            'bi bi-file-earmark-zip',
+            _yrT('year_review.download_all', 'Download all (ZIP)'),
+            _yrDownloadAll
+        )
+    );
+    exports.appendChild(
+        _yrActionGroup(
+            _yrT('year_review.all_screens', 'All screens ({count})', { count: yearReviewState.screens.length }),
+            allButtons
+        )
+    );
+    side.appendChild(exports);
+
     const privacy = document.createElement('p');
     privacy.className = 'small text-muted mb-0';
     privacy.textContent = _yrT(
         'year_review.privacy',
         'Only you can see your review. It is drawn in your browser from your own log, and never shows your location.'
     );
-    root.appendChild(actions);
-    root.appendChild(privacy);
+    side.appendChild(privacy);
+    root.appendChild(side);
     bodyEl.appendChild(root);
 
     function go(position) {
@@ -543,7 +614,16 @@ function _yrRender(bodyEl) {
         yearReviewState.index = ((position % total) + total) % total;
         previous.disabled = yearReviewState.index === 0;
         next.disabled = yearReviewState.index === total - 1;
-        _yrDraw(canvas, counter, dots);
+        const screen = yearReviewState.screens[yearReviewState.index];
+        DOMUtils.clear(factsSlot);
+        const facts = buildShareFactsControl(
+            screen,
+            _yrOptionsFor(screen).facts,
+            redraw,
+            _yrT('year_review.facts_label', 'Show on this screen')
+        );
+        if (facts) factsSlot.appendChild(facts);
+        redraw();
     }
     previous.addEventListener('click', () => go(yearReviewState.index - 1));
     next.addEventListener('click', () => go(yearReviewState.index + 1));
@@ -556,7 +636,8 @@ function _yrBindKeys() {
     yearReviewState.keyHandler = (event) => {
         if (!document.getElementById(YEAR_REVIEW_MODAL_ID)?.classList.contains('show')) return;
         if (!document.querySelector('.year-review-canvas') || typeof yearReviewState.go !== 'function') return;
-        if (event.target instanceof HTMLSelectElement) return;
+        // Arrow keys also move between the choices of a focused option: leave them to it.
+        if (event.target instanceof HTMLSelectElement || event.target instanceof HTMLInputElement) return;
         if (event.key === 'ArrowRight' && yearReviewState.index < yearReviewState.screens.length - 1) {
             yearReviewState.go(yearReviewState.index + 1);
         } else if (event.key === 'ArrowLeft' && yearReviewState.index > 0) {
@@ -570,19 +651,6 @@ function _yrUnbindKeys() {
     if (!yearReviewState.keyHandler) return;
     document.removeEventListener('keydown', yearReviewState.keyHandler);
     yearReviewState.keyHandler = null;
-}
-
-/** Show the already loaded review, on *index*. */
-function _yrShow(index = 0) {
-    const modalEl = document.getElementById(YEAR_REVIEW_MODAL_ID);
-    const titleEl = document.getElementById(`${YEAR_REVIEW_MODAL_ID}_title`);
-    const bodyEl = document.getElementById(`${YEAR_REVIEW_MODAL_ID}_body`);
-    if (!modalEl || !titleEl || !bodyEl || !yearReviewState.payload) return;
-    titleEl.textContent = _yrT('year_review.title', 'My astro year {year}', { year: yearReviewState.payload.year });
-    yearReviewState.index = Math.min(index, Math.max(0, yearReviewState.screens.length - 1));
-    _yrRender(bodyEl);
-    _yrBindKeys();
-    openModal(modalEl, { backdrop: true, onHidden: _yrUnbindKeys });
 }
 
 /**
@@ -622,6 +690,7 @@ async function openYearReview(year) {
     yearReviewState.payload = payload;
     yearReviewState.screens = buildYearReviewScreens(payload);
     yearReviewState.images = new Map();
+    yearReviewState.factsByScreen = {};
     titleEl.textContent = _yrT('year_review.title', 'My astro year {year}', { year: payload.year });
     yearReviewState.index = 0;
     _yrRender(bodyEl);
