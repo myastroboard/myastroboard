@@ -753,7 +753,7 @@ function renderAstrodexGrid(items, isAllowedAstrodex) {
         const isOwnedByCurrentUser = item.is_owned_by_current_user !== false;
         const mainPicture = getCardMainPicture(item);
         const imageUrl = mainPicture
-            ? appUrl(`/api/astrodex/images/${mainPicture.filename}`)
+            ? appUrl(`/api/astrodex/images/${mainPicture.filename}?size=medium`)
             : appUrl('/static/img/default_astro_object.svg');
 
         const photoCount = Number(item.total_pictures ?? (item.pictures ? item.pictures.length : 0));
@@ -1591,7 +1591,8 @@ function renderPicturesGrid(item) {
     }
 
     return editablePictures.map(picture => {
-        const imageUrl = appUrl(`/api/astrodex/images/${picture.filename}`);
+        // A card preview; the slideshow shows the original.
+        const imageUrl = appUrl(`/api/astrodex/images/${picture.filename}?size=medium`);
         const escapedImageUrl = escapeHtml(imageUrl);
 
         // Equipment line: a linked combination wins over the free-text device

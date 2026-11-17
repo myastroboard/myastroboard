@@ -49,7 +49,8 @@ Shown in the main navigation when the admin has not turned it off.
   M 3, ..."). That list is the shared goal.
 - **Latest activity**: one card per member and day with something new - new objects, pictures
   added, badges earned - newest first, the latest 40 days with activity. Clicking a name opens the
-  profile.
+  profile. Pictures are shown as small previews (`?size=thumb`, see below); clicking one opens the
+  original.
 
 ### Members
 
@@ -120,3 +121,15 @@ name to show. Never show `username` to other members directly.
 
 The feed and totals read every listed member's log and Astrodex; they are cached for one minute per
 process, and dropped on any profile change.
+
+The feed and the profile gallery load pictures as previews: `GET /api/astrodex/images/<filename>?size=thumb`
+returns a WebP no larger than 400 px (`backend/utils/image_thumbnails.py`), with the same access check
+as the original. An Astrodex picture is often a 16-megapixel file of several MB; loading dozens of
+them whole made the tab slow to open and jerky to scroll. Previews are cached in memory only (16 MB
+per worker), never on disk, so they leave nothing behind when a picture or an account is deleted.
+
+The same previews serve every page that shows many pictures: `thumb` for the Observation Log entry
+thumbnails and the Catalogue Collection cards, `medium` (1080 px) for the Astrodex cards and the
+montages of the year in review and badge cards. The slideshow and the single-picture share card
+keep the original.
+Feed cards also use `content-visibility: auto`, so only the cards near the screen are laid out.

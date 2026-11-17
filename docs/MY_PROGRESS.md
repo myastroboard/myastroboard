@@ -32,16 +32,21 @@ that just ended, and a year without data falls back to the most recent year that
 | Your progress | Per catalogue, objects captured by the end of the year and how many that year; the previous year's figures when it has data | Nothing to report |
 | In pictures | A montage of up to nine of the year's Astrodex pictures, one per object, best rated first | No dated picture that year |
 
-Each screen is a [share card](SHARE_CARDS.md) drawn in the browser: **Share this screen** opens the
-usual share modal (formats, theme, facts to keep), and closing it brings the review back on the same
-screen. The montage centre-crops each picture to a square tile; a single-picture card is still never
+Each screen is a [share card](SHARE_CARDS.md) drawn in the browser, and the review is shared as one
+slideshow: beside the screen, the **format** (4:5, 1:1, 16:9, 9:16), the **theme** and the
+**MyAstroBoard signature** are chosen once and apply to every screen, while **Show on this screen**
+keeps or drops each fact of the screen shown. The preview always shows exactly what is exported:
+**This screen** downloads (or, on a phone, shares) the screen shown, and **All screens** does the same
+for the whole review. On a phone the export buttons come right under the screen, the options below
+them. The montage centre-crops each picture to a square tile; a single-picture card is still never
 cropped. Screens without a picture scale their text up to fill the card, and the progress screen
 draws one bar per catalogue with the year's gain.
 
 To post the whole review at once:
 
 - **Download all (ZIP)** saves every screen as a numbered PNG (`01-...png`, `02-...png`) in one ZIP
-  file, built in the browser (stored without compression: the PNGs are already compressed).
+  file named after the year and the format (`my-astro-year-2026-4x5.zip`), built in the browser
+  (stored without compression: the PNGs are already compressed).
 - **Share all** appears where the browser can hand several files to the system share sheet (most
   phones), which posts the screens as one carousel.
 

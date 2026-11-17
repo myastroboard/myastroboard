@@ -221,7 +221,7 @@ Brokers shared by the MQTT connectors (App settings -> Configuration). All admin
 - `DELETE /api/astrodex/items/<item_id>/pictures/<picture_id>`
 - `POST /api/astrodex/items/<item_id>/pictures/<picture_id>/main`
 - `POST /api/astrodex/upload`
-- `GET /api/astrodex/images/<filename>`
+- `GET /api/astrodex/images/<filename>` (`?size=thumb` / `?size=medium`: a WebP preview, at most 400 / 1080 px; any other value serves the original)
 - `GET /api/astrodex/check/<item_name>`
 - `GET /api/astrodex/constellations`
 - `GET /api/astrodex/catalogue-lookup`

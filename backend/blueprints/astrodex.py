@@ -4,7 +4,7 @@ import os
 import uuid
 from typing import Any
 
-from flask import Blueprint, jsonify, request, send_from_directory
+from flask import Blueprint, Response, jsonify, request, send_from_directory
 from werkzeug.utils import secure_filename
 
 from blueprints.plan_my_night import _resolve_requested_language
@@ -18,6 +18,7 @@ from utils import normalize_catalogue_key as _normalize_catalogue_key_for_diffic
 from utils.auth import get_current_user, login_required, user_manager, user_required
 from utils.constellation_names import full_constellation_name
 from utils.image_privacy import strip_image_metadata
+from utils.image_thumbnails import PREVIEW_SIZES, THUMBNAIL_MIMETYPE, thumbnail_bytes
 from utils.logging_config import get_logger
 from utils.repo_config import get_location_by_id, get_locations_for_user, load_config
 from utils.route_helpers import _resolve_active_location
@@ -759,10 +760,34 @@ def upload_astrodex_image():
         return jsonify({'error': 'Internal server error'}), 500
 
 
+# A picture's file name never changes content (each upload gets a new name), so its preview
+# can be kept by the browser; an hour bounds how long one stays after the picture is deleted.
+_PREVIEW_MAX_AGE_SECONDS = 3600
+
+
+def _astrodex_image_preview(filename: str, max_side: int) -> Response | None:
+    """The preview response of an Astrodex picture, or None to fall back to the original."""
+    base_dir = os.path.realpath(astrodex.ASTRODEX_IMAGES_DIR)
+    file_path = os.path.realpath(os.path.join(base_dir, filename))
+    if not file_path.startswith(base_dir + os.sep):
+        return None
+    data = thumbnail_bytes(file_path, max_side)
+    if data is None:
+        return None
+    response = Response(data, mimetype=THUMBNAIL_MIMETYPE)
+    response.headers['Cache-Control'] = f'private, max-age={_PREVIEW_MAX_AGE_SECONDS}'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    return response
+
+
 @astrodex_bp.route('/api/astrodex/images/<filename>', methods=['GET'])
 @login_required
 def get_astrodex_image(filename):
-    """Serve an astrodex image"""
+    """Serve an astrodex image; ``?size=thumb`` or ``?size=medium`` serves a WebP preview instead.
+
+    Previews are for pages that show many pictures at once (the Community feed, the Astrodex
+    grid, montages): the original file is often a multi-megabyte astrophoto.
+    """
     try:
         user = get_current_user()
         user_id = user.user_id if user else None
@@ -776,6 +801,11 @@ def get_astrodex_image(filename):
         if not astrodex.can_user_view_image(user_id, filename, private_mode, usernames_by_id):
             return jsonify({'error': 'Image not accessible'}), 403
 
+        max_side = PREVIEW_SIZES.get(request.args.get('size', ''))
+        if max_side:
+            preview = _astrodex_image_preview(filename, max_side)
+            if preview is not None:
+                return preview
         return send_from_directory(astrodex.ASTRODEX_IMAGES_DIR, filename)
     except Exception as e:
         logger.error(f"Error serving image: {e}")

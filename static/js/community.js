@@ -84,6 +84,11 @@ function _cmPictureUrl(filename) {
     return appUrl(`/api/astrodex/images/${encodeURIComponent(filename)}`);
 }
 
+/** The small preview of a picture: the feed shows dozens, the originals weigh megabytes each. */
+function _cmPreviewUrl(filename) {
+    return `${_cmPictureUrl(filename)}?size=thumb`;
+}
+
 function _cmThumb(picture, size = 'sm') {
     const link = _cmEl('a', `community-thumb community-thumb-${size}`);
     link.href = _cmPictureUrl(picture.filename);
@@ -91,7 +96,7 @@ function _cmThumb(picture, size = 'sm') {
     link.rel = 'noopener';
     link.title = picture.item_name || '';
     const img = _cmEl('img');
-    img.src = _cmPictureUrl(picture.filename);
+    img.src = _cmPreviewUrl(picture.filename);
     img.alt = picture.item_name || '';
     img.loading = 'lazy';
     img.decoding = 'async';

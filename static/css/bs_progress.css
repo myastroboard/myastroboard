@@ -289,6 +289,8 @@ html[data-theme="red"] {
 
 /* ── Year in review viewer ──────────────────────────────────────────────── */
 
+/* Phone: one column - toolbar, screen, navigation, then options and exports.
+   Wide screen: the screen on the left, options and exports beside it. */
 .year-review {
     display: flex;
     flex-direction: column;
@@ -296,6 +298,9 @@ html[data-theme="red"] {
     gap: var(--space-3);
     max-width: 44rem;
     margin: 0 auto;
+    /* Height taken around the screen (modal header, year picker, navigation): the screen
+       is scaled so the navigation stays visible without scrolling. */
+    --year-review-chrome: 17rem;
 }
 
 .year-review-toolbar {
@@ -314,16 +319,54 @@ html[data-theme="red"] {
     margin-left: auto;
 }
 
-/* The canvas is 1080 x 1350 (4:5); it is scaled to fit the screen height, minus the
-   modal header and footer, the year picker, the navigation, the share button and the
-   privacy line, so the share button stays on screen without scrolling. */
+.year-review-main {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3);
+    width: 100%;
+    min-width: 0;
+}
+
+.year-review-side {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+}
+
+/* On a phone the exports come first, so they are in reach without scrolling past the
+   options; on a wide screen they follow the options (see the media query below). */
+.year-review-exports {
+    order: -1;
+}
+
+/* The canvas has the shape of the chosen format (share_card.js, SHARE_FORMATS); the
+   preview keeps that shape and fits the screen height. */
 .year-review-stage {
-    width: min(100%, calc((100dvh - 25rem) * 0.8));
-    min-width: 15rem;
-    aspect-ratio: 4 / 5;
+    --year-review-ratio: 0.8;
+    width: min(100%, calc((100dvh - var(--year-review-chrome)) * var(--year-review-ratio)));
+    min-width: 12rem;
+    aspect-ratio: var(--year-review-ratio);
     border-radius: var(--border-radius);
     overflow: hidden;
     box-shadow: var(--shadow-md);
+}
+
+.year-review-stage--4x5 {
+    --year-review-ratio: 0.8;
+}
+
+.year-review-stage--1x1 {
+    --year-review-ratio: 1;
+}
+
+.year-review-stage--16x9 {
+    --year-review-ratio: 1.7778;
+}
+
+.year-review-stage--9x16 {
+    --year-review-ratio: 0.5625;
 }
 
 .year-review-canvas {
@@ -361,8 +404,37 @@ html[data-theme="red"] {
 .year-review-actions {
     display: flex;
     flex-wrap: wrap;
-    justify-content: center;
     gap: var(--space-2);
+}
+
+@media (min-width: 992px) {
+    .year-review:not(.year-review--empty) {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 19rem;
+        grid-template-areas:
+            'toolbar toolbar'
+            'main side';
+        align-items: start;
+        max-width: 72rem;
+        column-gap: var(--space-5);
+        --year-review-chrome: 14rem;
+    }
+
+    .year-review-toolbar {
+        grid-area: toolbar;
+    }
+
+    .year-review-main {
+        grid-area: main;
+    }
+
+    .year-review-side {
+        grid-area: side;
+    }
+
+    .year-review-exports {
+        order: 0;
+    }
 }
 
 .year-review-empty {

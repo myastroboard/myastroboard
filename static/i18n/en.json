@@ -3437,8 +3437,6 @@
     "list_catalogues": "Catalogues",
     "previous_objects": "{count} objects",
     "mosaic_heading": "My {year} in pictures",
-    "share": "Share this screen",
-    "share_title": "Share this screen",
     "counter": "{index} / {total}",
     "previous": "Previous screen",
     "next": "Next screen",
@@ -3454,7 +3452,11 @@
     "gained_short": "+{count}",
     "download_all": "Download all (ZIP)",
     "share_all": "Share all",
-    "preparing": "Preparing the images..."
+    "preparing": "Preparing the images...",
+    "options_hint": "The format, the theme and the signature apply to every screen, and to everything you download or share.",
+    "facts_label": "Show on this screen",
+    "this_screen": "This screen",
+    "all_screens": "All screens ({count})"
   },
   "profile": {
     "tab": "Profile",

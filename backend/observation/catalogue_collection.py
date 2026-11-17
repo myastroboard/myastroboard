@@ -276,7 +276,8 @@ def _annotate(
         picture_count = len(pictures) if isinstance(pictures, list) else 0
         filename = _main_picture_filename(matched)
         if filename:
-            image_url = f'/api/astrodex/images/{filename}'
+            # A small preview: the card is 90 px high, the original often several MB.
+            image_url = f'/api/astrodex/images/{filename}?size=thumb'
             image_source = 'astrodex'
 
     if image_url is None:
