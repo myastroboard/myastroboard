@@ -11,6 +11,7 @@ from datetime import timedelta
 from flask import (
     Flask,
     Response,
+    abort,
     g,
     redirect,
     render_template,
@@ -271,7 +272,17 @@ def inject_base_path():
     Templates write ``{{ base }}/static/...`` instead of ``/static/...`` and expose it in
     ``<meta name="app-base">``, which static/js/api_helper.js reads into ``APP_BASE_PATH`` (see appUrl()).
     """
-    return {'base': request.script_root, 'demo_mode': demo_mode.is_demo_mode()}
+    try:
+        privacy_link = _app_settings.privacy_notice_link(request.script_root)
+    except Exception as error:  # a settings read error must never break a page
+        logger.warning(f'Could not read the privacy notice setting: {error}')
+        privacy_link = None
+    return {
+        'base': request.script_root,
+        'demo_mode': demo_mode.is_demo_mode(),
+        # The operator's privacy notice (GDPR Art. 13), linked from the login page and the footer
+        'privacy_notice_link': privacy_link,
+    }
 
 
 @app.after_request
@@ -345,6 +356,26 @@ def login_page():
     seo_indexable = bool(_app_settings.get_app_settings().get('search_engine_indexing', False))
 
     return render_template('login.html', version=version, seo_indexable=seo_indexable)
+
+
+@app.route('/privacy')
+def privacy_notice_page():
+    """The operator's privacy notice: public, so it can be read before signing in (GDPR Art. 13).
+
+    An address set by the operator wins (redirect); else the text they wrote is shown here;
+    404 when neither is set.
+    """
+    notice = _app_settings.get_privacy_notice()
+    if notice['url']:
+        return redirect(notice['url'])
+    if not notice['text']:
+        abort(404)
+    return render_template(
+        'privacy.html',
+        version=get_repo_version(),
+        notice_text=notice['text'],
+        signed_in=_session_user() is not None,
+    )
 
 
 @app.route('/manifest.webmanifest')

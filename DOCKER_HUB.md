@@ -67,6 +67,12 @@ For complete installation instructions, see the [Installation Guide](https://doc
 
 ---
 
+## 🔒 Privacy
+
+Self-hosted, with nothing sent to the project: no analytics, no tracking, no CDN. Built to make the
+GDPR easy for the operator (private by default, data export and erasure per account, picture location
+data removed, log retention, your own privacy notice). Details: [PRIVACY.md](https://docs.myastroboard.org/PRIVACY.html).
+
 ## 📋 Requirements
 
 - Docker and Docker Compose

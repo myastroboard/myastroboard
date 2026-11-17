@@ -185,3 +185,48 @@ class TestMalformedInput:
         out = strip_image_metadata(_encode('WEBP', lossless=True, xmp=xmp))
         assert b'owner' not in out
         assert _pixels(out) == _pixels(_encode('WEBP', lossless=True))
+
+
+class TestStripStoredPictures:
+    """Pictures stored before the upload stripping existed are cleaned in place, safely."""
+
+    def _populate(self, root):
+        (root / 'u1_gps.jpg').write_bytes(_encode('JPEG', exif=_exif()))
+        (root / 'u1_clean.png').write_bytes(_encode('PNG'))
+        (root / 'u1_broken.jpg').write_bytes(b'not a picture')
+        (root / 'u1_notes.pdf').write_bytes(b'%PDF-1.4')
+        return root
+
+    def test_cleans_only_what_carries_metadata(self, tmp_path):
+        from utils.image_privacy import strip_stored_pictures
+
+        root = self._populate(tmp_path)
+        original_pixels = _pixels((root / 'u1_gps.jpg').read_bytes())
+        counts = strip_stored_pictures([str(root), str(tmp_path / 'missing')])
+        assert counts == {'scanned': 3, 'cleaned': 1, 'unchanged': 1, 'failed': 1}
+        cleaned = (root / 'u1_gps.jpg').read_bytes()
+        with Image.open(io.BytesIO(cleaned)) as img:
+            assert not img.getexif().get_ifd(_GPS_IFD)
+        assert _pixels(cleaned) == original_pixels
+        assert (root / 'u1_broken.jpg').read_bytes() == b'not a picture'
+        assert not list(root.glob('*.tmp'))
+        # A second pass finds nothing left to do
+        assert strip_stored_pictures([str(root)])['cleaned'] == 0
+
+    def test_dry_run_writes_nothing(self, tmp_path):
+        from utils.image_privacy import strip_stored_pictures
+
+        root = self._populate(tmp_path)
+        before = (root / 'u1_gps.jpg').read_bytes()
+        assert strip_stored_pictures([str(root)], dry_run=True)['cleaned'] == 1
+        assert (root / 'u1_gps.jpg').read_bytes() == before
+
+    def test_a_result_that_no_longer_decodes_is_not_written(self, tmp_path, monkeypatch):
+        from utils import image_privacy
+
+        root = self._populate(tmp_path)
+        before = (root / 'u1_gps.jpg').read_bytes()
+        monkeypatch.setattr(image_privacy, '_decodes', lambda _data: False)
+        counts = image_privacy.strip_stored_pictures([str(root)])
+        assert counts['cleaned'] == 0 and counts['failed'] == 2
+        assert (root / 'u1_gps.jpg').read_bytes() == before

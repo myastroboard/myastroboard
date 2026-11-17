@@ -19,7 +19,14 @@ Anything after the end-of-image marker is dropped (phones append secondary image
 maps, depth maps - each with its own EXIF). GIF has no EXIF/GPS in practice and is returned as is.
 """
 
+import io
+import os
+
 from PIL import Image
+
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 _EXIF_ORIENTATION_TAG = 0x0112
 _EXIF_HEADER = b'Exif\x00\x00'
@@ -205,3 +212,65 @@ def strip_image_metadata(data: bytes) -> bytes:
     if data[:6] in (b'GIF87a', b'GIF89a'):
         return data
     raise ValueError('Unsupported or unrecognised image format')
+
+
+# ---------------------------------------------------------------------------
+# Pictures stored before the upload stripping existed (before 1.6.4)
+# ---------------------------------------------------------------------------
+
+_PICTURE_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.webp')
+
+
+def _decodes(data: bytes) -> bool:
+    """True when ``data`` still opens as an image (a safety net before replacing a file)."""
+    try:
+        with Image.open(io.BytesIO(data)) as image:
+            image.verify()
+        return True
+    except Exception:
+        return False
+
+
+def strip_stored_pictures(directories, dry_run: bool = False) -> dict:
+    """Strip the metadata of every picture already stored in ``directories`` (not recursive).
+
+    For pictures uploaded before the upload stripping existed. Same lossless stripping as on
+    upload; a file is replaced only when something was removed and the result still decodes,
+    and the replacement is atomic (temporary file, then rename). Files that are not pictures
+    are left alone. ``dry_run`` counts without writing (and skips the decode check, which only
+    guards a write).
+
+    Returns ``{'scanned', 'cleaned', 'unchanged', 'failed'}``.
+    """
+    counts = {'scanned': 0, 'cleaned': 0, 'unchanged': 0, 'failed': 0}
+    for directory in directories:
+        base_dir = os.path.realpath(directory)
+        if not os.path.isdir(base_dir):
+            continue
+        for filename in sorted(os.listdir(base_dir)):
+            if not filename.lower().endswith(_PICTURE_EXTENSIONS):
+                continue
+            path = os.path.realpath(os.path.join(base_dir, filename))
+            if not path.startswith(base_dir + os.sep) or not os.path.isfile(path):
+                continue
+            counts['scanned'] += 1
+            try:
+                with open(path, 'rb') as handle:
+                    original = handle.read()
+                cleaned = strip_image_metadata(original)
+                if cleaned == original:
+                    counts['unchanged'] += 1
+                    continue
+                # Decoding is the slow part: only done before a file is actually replaced
+                if not dry_run:
+                    if not _decodes(cleaned):
+                        raise ValueError('stripped picture no longer decodes')
+                    temporary = f'{path}.tmp'
+                    with open(temporary, 'wb') as handle:
+                        handle.write(cleaned)
+                    os.replace(temporary, path)
+                counts['cleaned'] += 1
+            except Exception as error:
+                counts['failed'] += 1
+                logger.warning(f'Picture metadata: could not clean {filename}: {error}')
+    return counts

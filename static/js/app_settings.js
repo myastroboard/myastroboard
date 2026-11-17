@@ -13,6 +13,13 @@ async function loadAppSettings() {
         if (secureEl) secureEl.checked = !!settings.session_cookie_secure;
         if (indexingEl) indexingEl.checked = !!settings.search_engine_indexing;
         if (externalUrlEl) externalUrlEl.value = settings.external_base_url || '';
+        const privacyUrlEl = document.getElementById('app-setting-privacy-url');
+        const privacyTextEl = document.getElementById('app-setting-privacy-text');
+        if (privacyUrlEl) privacyUrlEl.value = settings.privacy_notice_url || '';
+        if (privacyTextEl) {
+            privacyTextEl.value = settings.privacy_notice_text || '';
+            if (settings.privacy_notice_text_max_length) privacyTextEl.maxLength = settings.privacy_notice_text_max_length;
+        }
     } catch (err) {
         console.error('Failed to load app settings:', err);
     }
@@ -25,7 +32,12 @@ async function saveAppSettingsNotifications() {
 
 async function saveAppSettingsPrivacy() {
     const indexing = document.getElementById('app-setting-search-indexing')?.checked ?? false;
-    await _saveAppSettings({ search_engine_indexing: indexing }, 'privacy');
+    const privacyUrl = (document.getElementById('app-setting-privacy-url')?.value || '').trim();
+    const privacyText = document.getElementById('app-setting-privacy-text')?.value || '';
+    await _saveAppSettings(
+        { search_engine_indexing: indexing, privacy_notice_url: privacyUrl, privacy_notice_text: privacyText },
+        'privacy',
+    );
 }
 
 // Log levels and retention (Parameters -> Logs). A LOG_LEVEL / CONSOLE_LOG_LEVEL environment
@@ -121,7 +133,61 @@ async function _saveAppSettings(partial, section) {
                 : 'settings.app_settings_external_base_url_invalid'));
             // A refused HTTPS-only cookie switch: show the setting as it really is (still off)
             loadAppSettings();
+        } else if (err.status === 400 && section === 'privacy') {
+            const errorKey = err.data?.error_key;
+            showMessage('error', i18n.t(errorKey && i18n.has(errorKey) ? errorKey : 'settings.privacy_notice_url_invalid'));
         }
+    }
+}
+
+// Location data in older pictures: count first, ask, then clean (App settings -> Configuration)
+// Shows where the cleanup stands: a spinner while it runs, then the outcome in an alert.
+function _showPictureMetadataStatus(variant, text, busy = false) {
+    const result = document.getElementById('picture-metadata-result');
+    if (!result) return;
+    result.className = `alert alert-${variant} mt-3 mb-0 d-flex align-items-center gap-2`;
+    result.replaceChildren();
+    if (busy) {
+        const spinner = document.createElement('span');
+        spinner.className = 'spinner-border spinner-border-sm flex-shrink-0';
+        spinner.setAttribute('aria-hidden', 'true');
+        result.appendChild(spinner);
+    }
+    const message = document.createElement('span');
+    message.textContent = text;
+    result.appendChild(message);
+}
+
+async function stripPictureMetadata() {
+    const button = document.getElementById('btn-strip-picture-metadata');
+    // One attempt (never re-run a write), with time for a large picture library
+    const run = (dryRun) => fetchJSONWithRetry('/api/admin/privacy/strip-picture-metadata', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dry_run: dryRun }),
+    }, { maxAttempts: 1, timeoutMs: 600000 });
+    if (button) button.disabled = true;
+    try {
+        _showPictureMetadataStatus('info', i18n.t('settings.picture_metadata_checking'), true);
+        const check = await run(true);
+        if (!check.cleaned) {
+            _showPictureMetadataStatus('success', i18n.t('settings.picture_metadata_none', { count: check.scanned }));
+            return;
+        }
+        if (!confirm(i18n.t('settings.picture_metadata_confirm', { count: check.cleaned }))) {
+            _showPictureMetadataStatus('secondary', i18n.t('settings.picture_metadata_cancelled', { count: check.cleaned }));
+            return;
+        }
+        _showPictureMetadataStatus('info', i18n.t('settings.picture_metadata_cleaning'), true);
+        const done = await run(false);
+        _showPictureMetadataStatus(done.failed ? 'warning' : 'success', i18n.t('settings.picture_metadata_done', {
+            count: done.cleaned, failed: done.failed,
+        }));
+    } catch (err) {
+        console.error('Picture metadata cleanup failed:', err);
+        _showPictureMetadataStatus('danger', i18n.t('settings.picture_metadata_error'));
+    } finally {
+        if (button) button.disabled = false;
     }
 }
 
@@ -168,6 +234,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('save-app-settings-privacy')
         ?.addEventListener('click', saveAppSettingsPrivacy);
+
+    document.getElementById('btn-strip-picture-metadata')
+        ?.addEventListener('click', stripPictureMetadata);
 
     document.getElementById('save-app-settings-proxy')
         ?.addEventListener('click', saveAppSettingsProxy);

@@ -70,3 +70,18 @@ def test_status_reports_the_legacy_import(capsys):
         legacy_import._record_status(conn, 'users.json', 'abc', 'deleted')
     assert manage.main(['status']) == 0
     assert 'Legacy JSON import: 1 deleted' in capsys.readouterr().out
+
+
+def test_strip_picture_metadata(capsys, monkeypatch):
+    """The command runs the cleanup over every per-user directory and reports the counts."""
+    seen = {}
+
+    def fake_strip(directories, dry_run=False):
+        seen['directories'], seen['dry_run'] = directories, dry_run
+        return {'scanned': 3, 'cleaned': 1, 'unchanged': 1, 'failed': 1}
+
+    monkeypatch.setattr('utils.image_privacy.strip_stored_pictures', fake_strip)
+    assert manage.main(['strip-picture-metadata', '--dry-run']) == 0
+    out = capsys.readouterr().out
+    assert '3 picture(s) checked: 1 would be cleaned, 1 already clean, 1 not readable' in out
+    assert seen['dry_run'] is True and len(seen['directories']) >= 3

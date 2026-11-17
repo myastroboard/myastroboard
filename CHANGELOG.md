@@ -16,6 +16,9 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Profiles and Community: a display name and picture shown wherever others see you, and a Community tab
   (opt-in) with a member directory, profiles, an activity feed and shared "together" totals, never a
   ranking; also a step of the first-run wizard ([docs/COMMUNITY.md](docs/COMMUNITY.md)).
+- Privacy: optionally publish your own privacy notice (an address, or a text served at `/privacy`), linked from the login
+  page, the footer and My settings -> Security; and clean the location data still in pictures uploaded before
+  1.6.4, in App settings -> Configuration ([docs/PRIVACY.md](docs/PRIVACY.md#publishing-your-privacy-notice)).
 - A cleaner footer (logo, version, links, compact language and theme pickers, readable in every theme),
   and a language picker on the login page ([docs/USER_SETTINGS.md](docs/USER_SETTINGS.md)).
 

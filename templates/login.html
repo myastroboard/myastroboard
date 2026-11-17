@@ -136,6 +136,12 @@
                 <i class="bi bi-globe2" aria-hidden="true"></i>
                 <span data-i18n="auth.powered_by_myastroboard">Powered by MyAstroBoard</span>
             </a>
+            {% if privacy_notice_link %}
+            <a class="login-powered-by" href="{{ privacy_notice_link }}"{% if privacy_notice_link.startswith('http') %} target="_blank" rel="noopener noreferrer"{% endif %}>
+                <i class="bi bi-shield-check" aria-hidden="true"></i>
+                <span data-i18n="privacy_notice.link">Privacy notice</span>
+            </a>
+            {% endif %}
         </div>
     </div>
 

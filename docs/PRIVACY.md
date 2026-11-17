@@ -64,9 +64,13 @@ Astrodex pictures and session attachments can be seen by other users of the inst
   the ICC colour profile and the orientation;
 - GIF files are stored as sent (the format carries no EXIF/GPS).
 
-Pictures uploaded before this protection existed still carry their original metadata. Non-image
-attachments (PDF, Word, text) are stored as sent: remove author metadata before uploading them if
-it matters.
+Pictures uploaded before this protection existed (before 1.6.4) may still carry their original
+metadata. *App settings -> Configuration -> Privacy & search engines -> Check and clean older pictures*
+removes it the same lossless way: it first counts the pictures concerned and asks before changing
+anything; a file is replaced only when the cleaned copy still opens as an image. From a terminal:
+`docker exec -u appuser myastroboard python backend/db/manage.py strip-picture-metadata` (add
+`--dry-run` to count only). Non-image attachments (PDF, Word, text) are stored as sent: remove author
+metadata before uploading them if it matters.
 
 Profile pictures go further: they are decoded and re-encoded as a small square WebP, so nothing of
 the original file is kept but its pixels.
@@ -174,6 +178,21 @@ prefixes of the files in `astrodex/images/` and `observation_sessions/attachment
 Protect the `data/` volume and your backups: they hold everything on this page.
 
 ---
+
+## Publishing your privacy notice
+
+Optional: an instance run for yourself and your household needs no notice (see
+[Who is responsible?](#who-is-responsible)), and nothing is shown until one is set. When you run it
+for others, the GDPR (Art. 13) asks you to tell them how their data is handled when it is
+collected. *App settings -> Configuration -> Privacy & search engines* takes either:
+
+- the **address** of a notice you already publish (club website, association page), or
+- the **text** of the notice, which the instance then serves at `/privacy`, readable without an
+  account.
+
+Either way, a **Privacy notice** link appears on the login page, in the footer and in
+*My settings -> Security -> Your data*. With neither set, no link is shown. The template below is a
+starting point for the text.
 
 ## Privacy notice template
 

@@ -1918,6 +1918,13 @@
                         <i class="bi bi-download icon-inline" aria-hidden="true"></i>
                         <span data-i18n="settings.my_data_export_btn">Download my data</span>
                     </button>
+                    {% if privacy_notice_link %}
+                    <p class="mt-3 mb-0">
+                        <i class="bi bi-shield-check icon-inline" aria-hidden="true"></i>
+                        <span data-i18n="privacy_notice.how_we_handle">How this instance handles your data:</span>
+                        <a href="{{ privacy_notice_link }}"{% if privacy_notice_link.startswith('http') %} target="_blank" rel="noopener noreferrer"{% endif %} data-i18n="privacy_notice.link">Privacy notice</a>
+                    </p>
+                    {% endif %}
                 </div>
             </div>
 
@@ -2211,6 +2218,28 @@
                             </div>
                         </div>
                     </div>
+
+                    <h3 class="h5 mt-4">
+                        <i class="bi bi-shield-check text-success icon-inline" aria-hidden="true"></i>
+                        <span data-i18n="settings.privacy_notice_title">Privacy notice</span>
+                    </h3>
+                    <p class="form-text">
+                        <span data-i18n="settings.privacy_notice_desc">Optional. For yourself and your household, nothing is required (the GDPR does not apply). If you run the instance for others (a club, an association), you must tell them how their data is handled (GDPR, Art. 13): give the address of your notice, or write it below, and it is shown at /privacy. A "Privacy notice" link then appears on the login page, in the footer and in My settings -> Security.</span>
+                        <a href="https://github.com/myastroboard/myastroboard/blob/main/docs/PRIVACY.md#privacy-notice-template" target="_blank" rel="noopener noreferrer" data-i18n="settings.privacy_notice_template_link">Template to adapt</a>
+                    </p>
+                    <div class="row g-3 mb-2">
+                        <div class="col-12">
+                            <label class="form-label" for="app-setting-privacy-url" data-i18n="settings.privacy_notice_url_label">Address of your privacy notice</label>
+                            <input type="url" class="form-control" id="app-setting-privacy-url" placeholder="https://" autocomplete="off">
+                            <div class="form-text" data-i18n="settings.privacy_notice_url_help">Optional. When set, it is used instead of the text below.</div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="app-setting-privacy-text" data-i18n="settings.privacy_notice_text_label">Text of your privacy notice</label>
+                            <textarea class="form-control" id="app-setting-privacy-text" rows="10"></textarea>
+                            <div class="form-text" data-i18n="settings.privacy_notice_text_help">Shown as written, line breaks kept, to anyone, even before they sign in.</div>
+                        </div>
+                    </div>
+
                     <div class="button-group mt-2">
                         <button type="button" id="save-app-settings-privacy" class="btn btn-primary">
                             <i class="bi bi-save icon-inline" aria-hidden="true"></i>
@@ -2218,6 +2247,17 @@
                         </button>
                         <span id="app-settings-privacy-feedback" class="ms-3 text-success" style="display:none;" data-i18n="settings.app_settings_saved">Settings saved.</span>
                     </div>
+
+                    <h3 class="h5 mt-4 pt-3 border-top">
+                        <i class="bi bi-geo-alt text-danger icon-inline" aria-hidden="true"></i>
+                        <span data-i18n="settings.picture_metadata_title">Metadata of older pictures</span>
+                    </h3>
+                    <p class="form-text" data-i18n="settings.picture_metadata_desc">Since version 1.6.4, the GPS position and camera details of every uploaded picture are removed. Pictures uploaded earlier may still carry them: this removes them the same way, without touching the image itself.</p>
+                    <button type="button" id="btn-strip-picture-metadata" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-eraser icon-inline" aria-hidden="true"></i>
+                        <span data-i18n="settings.picture_metadata_btn">Check and clean older pictures</span>
+                    </button>
+                    <div id="picture-metadata-result" class="d-none mt-3" role="status" aria-live="polite"></div>
                 </div>
 
                 <!-- Reverse Proxy -->
@@ -3501,6 +3541,12 @@
                         <i class="bi bi-info-circle" aria-hidden="true"></i>
                         <span data-i18n="navbar.about">About</span>
                     </a>
+                    {% if privacy_notice_link %}
+                    <a href="{{ privacy_notice_link }}" class="footer-link"{% if privacy_notice_link.startswith('http') %} target="_blank" rel="noopener noreferrer"{% endif %}>
+                        <i class="bi bi-shield-check" aria-hidden="true"></i>
+                        <span data-i18n="privacy_notice.link">Privacy notice</span>
+                    </a>
+                    {% endif %}
                 </nav>
             </div>
             <div class="footer-update">

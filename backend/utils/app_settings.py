@@ -35,7 +35,13 @@ _DEFAULTS: dict = {
     # Address other software reaches this instance at (Astrodex stream, MyAstroShine return
     # address); "" = derived from the request. Required under HA ingress, whose URL needs an HA login.
     "external_base_url": "",
+    # The operator's privacy notice (GDPR Art. 13): an address of their own, or a text served at
+    # /privacy. Linked from the login page, the footer and My settings -> Security when set.
+    "privacy_notice_url": "",
+    "privacy_notice_text": "",
 }
+
+PRIVACY_NOTICE_TEXT_MAX_LENGTH = 20000
 
 LOG_RETENTION_MAX_DAYS = 3650
 
@@ -157,6 +163,50 @@ def normalize_external_base_url(value) -> str | None:
 def get_external_base_url() -> str:
     """Saved external base URL (validated), or ``""`` when unset."""
     return normalize_external_base_url(get_app_settings().get("external_base_url")) or ''
+
+
+def normalize_privacy_notice_url(value) -> str | None:
+    """An ``http(s)://`` address (path, query and anchor allowed), ``""`` when blank, None when invalid."""
+    text = value.strip() if isinstance(value, str) else ''
+    if not text:
+        return ''
+    try:
+        parts = urlsplit(text)
+        _ = parts.port  # raises ValueError on a malformed port
+    except ValueError:
+        return None
+    if parts.scheme not in ('http', 'https') or not parts.hostname or parts.username or parts.password:
+        return None
+    if any(char.isspace() or ord(char) < 32 for char in text):
+        return None
+    return text
+
+
+def normalize_privacy_notice_text(value) -> str | None:
+    """The notice text with line breaks kept and other control characters removed; None when too long."""
+    text = value if isinstance(value, str) else ''
+    text = text.replace('\r\n', '\n').replace('\r', '\n')
+    text = ''.join(char for char in text if char in '\n\t' or ord(char) >= 32).strip()
+    return text if len(text) <= PRIVACY_NOTICE_TEXT_MAX_LENGTH else None
+
+
+def get_privacy_notice() -> dict:
+    """``{'url', 'text'}`` as saved (validated; an invalid stored value counts as unset)."""
+    settings = get_app_settings()
+    return {
+        'url': normalize_privacy_notice_url(settings.get('privacy_notice_url')) or '',
+        'text': normalize_privacy_notice_text(settings.get('privacy_notice_text')) or '',
+    }
+
+
+def privacy_notice_link(base: str = '') -> str | None:
+    """Where the "Privacy notice" links point: the operator's address, else /privacy, else None."""
+    notice = get_privacy_notice()
+    if notice['url']:
+        return notice['url']
+    if notice['text']:
+        return f'{base}/privacy'
+    return None
 
 
 def reload_app_settings() -> dict:

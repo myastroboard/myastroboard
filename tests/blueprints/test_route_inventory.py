@@ -22,6 +22,7 @@ EXPECTED_ROUTES = {
     ('/manifest.webmanifest', ('GET',)),
     ('/manifest.<lang>.webmanifest', ('GET',)),
     ('/offline.html', ('GET',)),
+    ('/privacy', ('GET',)),
     ('/robots.txt', ('GET',)),
     ('/static/<path:filename>', ('GET',)),
     ('/sw.js', ('GET',)),
@@ -71,6 +72,7 @@ EXPECTED_ROUTES = {
     # --- admin ---
     ('/api/admin/app-settings', ('GET',)),
     ('/api/admin/app-settings', ('POST',)),
+    ('/api/admin/privacy/strip-picture-metadata', ('POST',)),
     ('/api/admin/restart', ('POST',)),
     ('/api/admin/database/integrity-check', ('POST',)),
     ('/api/admin/migration-backups', ('GET',)),

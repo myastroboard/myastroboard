@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light" data-theme="light">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0b1220">
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="app-base" content="{{ base }}">
+    <script src="{{ base }}/static/js/theme.js?v={{ version }}"></script>
+    <title data-i18n="privacy_notice.page_title">Privacy notice - MyAstroBoard</title>
+    <link rel="icon" type="image/svg+xml" href="{{ base }}/static/favicon.svg">
+    <link rel="icon" type="image/x-icon" href="{{ base }}/static/favicon.ico">
+    <link href="{{ base }}/static/vendor/bootstrap/css/bootstrap.min.css?v={{ version }}" rel="stylesheet">
+    <link href="{{ base }}/static/vendor/bootstrap-icons/font/bootstrap-icons.min.css?v={{ version }}" rel="stylesheet">
+    <link rel="stylesheet" href="{{ base }}/static/css/bs_variables.css?v={{ version }}">
+    <link rel="stylesheet" href="{{ base }}/static/css/bs_main.css?v={{ version }}">
+    <link rel="stylesheet" href="{{ base }}/static/css/bs_login.css?v={{ version }}">
+</head>
+<body class="login-page">
+    <main class="login-container privacy-container">
+        <div class="login-header">
+            <h1><img src="{{ base }}/static/img/favicon-animated.svg" alt="MyAstroBoard Logo" width="48" height="48" class="login-logo-icon"> MyAstroBoard</h1>
+            <p data-i18n="privacy_notice.title">Privacy notice</p>
+        </div>
+
+        <!-- Written by the administrator of this instance; Jinja escapes it, CSS keeps its line breaks -->
+        <div class="privacy-notice-text">{{ notice_text }}</div>
+
+        <div class="login-footer">
+            {% if signed_in %}
+            <a class="login-powered-by" href="{{ base }}/">
+                <i class="bi bi-arrow-left" aria-hidden="true"></i>
+                <span data-i18n="privacy_notice.back_to_app">Back to the application</span>
+            </a>
+            {% else %}
+            <a class="login-powered-by" href="{{ base }}/login">
+                <i class="bi bi-arrow-left" aria-hidden="true"></i>
+                <span data-i18n="privacy_notice.back_to_login">Back to sign in</span>
+            </a>
+            {% endif %}
+        </div>
+    </main>
+
+    <script src="{{ base }}/static/js/api_helper.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/i18n.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/privacy_page.js?v={{ version }}"></script>
+</body>
+</html>

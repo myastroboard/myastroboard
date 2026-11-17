@@ -402,3 +402,51 @@ class TestLogLevels:
 
         _set_cache(monkeypatch, {'log_level': 'debug', 'console_log_level': 'nonsense'})
         assert app_settings.get_log_levels() == ('DEBUG', 'WARNING')
+
+
+class TestPrivacyNotice:
+    """The operator's privacy notice: an address of their own, or a text served at /privacy."""
+
+    @pytest.mark.parametrize(
+        ('value', 'expected'),
+        [
+            ('', ''),
+            ('  https://club.example.org/privacy#members  ', 'https://club.example.org/privacy#members'),
+            ('http://club.example.org/legal?page=privacy', 'http://club.example.org/legal?page=privacy'),
+            ('javascript:alert(1)', None),
+            ('ftp://club.example.org/privacy', None),
+            ('https://user:pw@club.example.org/', None),
+            ('https://club.example.org/a b', None),
+            ('https://', None),
+            ('https://club.example.org:99999/', None),
+            (None, ''),
+        ],
+    )
+    def test_url(self, value, expected):
+        from utils import app_settings
+
+        assert app_settings.normalize_privacy_notice_url(value) == expected
+
+    def test_text(self):
+        from utils import app_settings
+
+        assert app_settings.normalize_privacy_notice_text('  Line 1\r\nLine 2\x07\tend  ') == 'Line 1\nLine 2\tend'
+        assert app_settings.normalize_privacy_notice_text(None) == ''
+        assert (
+            app_settings.normalize_privacy_notice_text('x' * (app_settings.PRIVACY_NOTICE_TEXT_MAX_LENGTH + 1)) is None
+        )
+
+    @pytest.mark.parametrize(
+        ('url', 'text', 'link'),
+        [
+            ('', '', None),
+            ('', 'Our notice', '/base/privacy'),
+            ('https://club.example.org/privacy', 'Our notice', 'https://club.example.org/privacy'),
+            ('javascript:alert(1)', 'Our notice', '/base/privacy'),
+        ],
+    )
+    def test_link(self, monkeypatch, url, text, link):
+        from utils import app_settings
+
+        _set_cache(monkeypatch, {'privacy_notice_url': url, 'privacy_notice_text': text})
+        assert app_settings.privacy_notice_link('/base') == link
