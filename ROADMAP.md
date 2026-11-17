@@ -435,7 +435,6 @@ and can be turned off.
 - Each screen exports as a share card
 - Available all year for any past year; highlighted on the dashboard around the end of the year
 - Strictly private, like the Observation Log; a screen with no data is hidden, never shown empty
-- Date-sensitive: it is only worth publishing in December, so it may ship ahead of v1.8
 
 #### Achievements and challenges
 
