@@ -483,6 +483,15 @@ class TestParseHourly:
         result = wom.parse_hourly(response, _FULL_HOURLY_VARS)
         assert all(result["fog"] > 0)
 
+    @pytest.mark.parametrize(("humidity", "expected_fog"), [(96.38, 63.8), (85.5, 27.5)])
+    def test_fog_keeps_fractional_percentages(self, humidity, expected_fog):
+        """A humidity with decimals, as Open-Meteo sends it, gives a fractional fog percentage
+        instead of failing the whole forecast decode (pandas 3 refuses to write floats into an
+        integer series)."""
+        response = _make_parse_hourly_response(humidity=humidity)
+        result = wom.parse_hourly(response, _FULL_HOURLY_VARS)
+        assert result["fog"].tolist() == pytest.approx([expected_fog] * len(result))
+
     def test_row_count_matches_n_hours(self):
         response = _make_parse_hourly_response(n_hours=6)
         result = wom.parse_hourly(response, _FULL_HOURLY_VARS)

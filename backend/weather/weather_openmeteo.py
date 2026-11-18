@@ -235,7 +235,9 @@ def _enrich_hourly_dataframe(df: pd.DataFrame, timezone_str: str | None = "UTC")
     # -----------------------------
     # Fog probability (%)
     # -----------------------------
-    fog_percent = pd.Series(0, index=df.index)
+    # Float from the start: pandas 3 refuses to upcast an int64 series when the masked
+    # assignments below write fractional percentages into it.
+    fog_percent = pd.Series(0.0, index=df.index)
 
     mask1 = df["relative_humidity_2m"] > 90
     fog_percent.loc[mask1] = ((df["relative_humidity_2m"] - 90) * 10).clip(0, 100)

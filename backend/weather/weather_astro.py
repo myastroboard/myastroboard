@@ -126,13 +126,10 @@ class AstroWeatherAnalyzer:
                 # Solar/UV
                 "is_day",
                 "uv_index",
-                # Jet stream data (critical for astro analysis)
-                "geopotential_height_500hPa",
-                "geopotential_height_850hPa",
-                "temperature_500hPa",
-                "temperature_850hPa",
+                # Jet stream wind, read by the seeing estimate. Only request what is read: an
+                # unused pressure-level variable (geopotential_height_850hPa) once made
+                # Open-Meteo answer 500 for some locations, forcing the core-only retry.
                 "wind_speed_500hPa",
-                "wind_direction_500hPa",
             ]
 
             # Fallback: core variables only (if full request fails)
@@ -184,7 +181,9 @@ class AstroWeatherAnalyzer:
                 if _is_openmeteo_concurrency_error(full_error):
                     raise  # Don't retry on concurrency errors, let main handler deal with it
 
-                logger.warning("Full astro weather request failed, retrying with core variables only")
+                # The error text ends with the request URL, which carries the coordinates: keep it out.
+                reason = str(full_error).split(" for url:", 1)[0][:120]
+                logger.warning(f"Full astro weather request failed, retrying with core variables only - {reason}")
                 params["hourly"] = hourly_vars_core
 
                 try:

@@ -14,6 +14,10 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
+- Astro weather no longer falls back to its reduced forecast for some locations: it stopped requesting
+  unused upper-air variables, one of which made Open-Meteo answer with an error.
+- The weather forecast decodes again on humid nights: a fractional fog percentage made the fast decoder
+  fail and fall back to the slower JSON request, which drops several variables.
 - SkyTonight no longer stops calculating until the next restart after a worker was killed for lack of
   memory (every run then failed with "Working outside of application context").
 - Signing in at a local `http://` address works again with the HTTPS-only session cookie on: the page
