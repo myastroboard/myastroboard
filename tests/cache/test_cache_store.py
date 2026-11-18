@@ -20,7 +20,6 @@ from utils.constants import CACHE_TTL, DATA_DIR_CACHE
 is_cache_valid = cache_store.is_cache_valid
 is_astronomical_cache_ready = cache_store.is_astronomical_cache_ready
 has_location_changed = cache_store.has_location_changed
-reset_all_caches = cache_store.reset_all_caches
 update_location_config = cache_store.update_location_config
 get_current_location_signature = cache_store.get_current_location_signature
 get_cache_init_status = cache_store.get_cache_init_status
@@ -197,17 +196,6 @@ class TestLocationChangeDetection:
 class TestCacheReset:
     """Test cache reset functionality (per-location slots, v1.2)"""
 
-    def test_reset_all_caches_clears_every_location_slot(self):
-        loc_a, loc_b = str(uuid.uuid4()), str(uuid.uuid4())
-        cache_store.update_location_cache("moon_report", loc_a, {"test": "a"})
-        cache_store.update_location_cache("sun_report", loc_b, {"test": "b"})
-
-        reset_all_caches()
-
-        assert cache_store.get_location_cache_entry("moon_report", loc_a)["data"] is None
-        assert cache_store.get_location_cache_entry("moon_report", loc_a)["timestamp"] == 0
-        assert cache_store.get_location_cache_entry("sun_report", loc_b)["data"] is None
-
     def test_reset_caches_for_location_only_touches_that_preset(self):
         loc_a, loc_b = str(uuid.uuid4()), str(uuid.uuid4())
         cache_store.update_location_cache("horizon_graph", loc_a, {"v": 1})
@@ -217,16 +205,6 @@ class TestCacheReset:
 
         assert cache_store.load_location_cache("horizon_graph", loc_a)["data"] is None
         assert cache_store.load_location_cache("horizon_graph", loc_b)["data"] == {"v": 2}
-
-    def test_reset_all_caches_skips_unrecognized_shared_keys(self):
-        """A shared-cache key whose base name isn't a known scoped cache or
-        spaceflight entry (e.g. leftover/foreign data) must be left untouched."""
-        cache_store.update_shared_cache_entry("totally_unrelated_key", {"kept": True}, 111.0)
-
-        reset_all_caches()
-
-        entry = cache_store.load_shared_cache_entry("totally_unrelated_key")
-        assert entry["data"] == {"kept": True}
 
 
 class TestCacheInitStatus:
@@ -297,7 +275,9 @@ class TestCacheInitStatus:
 
     def test_is_astronomical_cache_ready_when_empty(self):
         """Test cache ready status when caches are empty"""
-        reset_all_caches()
+        location_ids = cache_store._default_status_location_ids()
+        for location_id in location_ids:
+            cache_store.reset_caches_for_location(location_id)
         assert is_astronomical_cache_ready() is False
 
     def test_is_astronomical_cache_ready_explicit_ids(self):

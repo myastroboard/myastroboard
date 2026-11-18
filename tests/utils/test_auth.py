@@ -164,17 +164,14 @@ class TestUserModel:
         u = auth.User(username='admin', password_hash='h', role=auth.ROLE_ADMIN)
         assert u.is_admin() is True
         assert u.is_user() is False
-        assert u.is_read_only() is False
 
     def test_is_user_true(self):
         u = auth.User(username='alice', password_hash='h', role=auth.ROLE_USER)
         assert u.is_user() is True
         assert u.is_admin() is False
-        assert u.is_read_only() is False
 
-    def test_is_read_only_true(self):
+    def test_read_only_role_is_neither_user_nor_admin(self):
         u = auth.User(username='viewer', password_hash='h', role=auth.ROLE_READ_ONLY)
-        assert u.is_read_only() is True
         assert u.is_user() is False
         assert u.is_admin() is False
 
@@ -1113,18 +1110,6 @@ class TestAuthDecorators:
             user = auth.get_current_user()
             assert user is not None
             assert user.username == auth.DEFAULT_ADMIN_USERNAME
-
-    def test_is_user_admin_true(self, flask_app):
-        with flask_app.test_request_context('/'):
-            from flask import session
-
-            session['username'] = auth.DEFAULT_ADMIN_USERNAME
-            assert auth.is_user_admin() is True
-
-    def test_is_user_admin_false_no_session(self, flask_app):
-        with flask_app.test_request_context('/'):
-            # is_user_admin returns None (falsy) when no session; `and` short-circuits
-            assert not auth.is_user_admin()
 
 
 # ===========================================================================

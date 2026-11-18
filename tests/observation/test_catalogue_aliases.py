@@ -5,8 +5,6 @@ from unittest.mock import mock_open, patch
 from observation import catalogue_aliases as module
 
 get_alias_entry = module.get_alias_entry
-get_aliases_map = module.get_aliases_map
-get_group_id = module.get_group_id
 load_aliases_table = module.load_aliases_table
 make_lookup_key = module.make_lookup_key
 merge_item_with_alias_entry = module.merge_item_with_alias_entry
@@ -70,12 +68,9 @@ def test_get_alias_helpers_return_expected_values():
         patch("observation.catalogue_aliases.skytonight_targets.get_lookup_entry", return_value={}),
     ):
         entry = get_alias_entry("Messier", "M 31")
-        aliases = get_aliases_map("Messier", "M 31")
-        group_id = get_group_id("Messier", "M 31")
 
     assert entry["group_id"] == "grp-1"
-    assert aliases == {"openngc": "NGC224"}
-    assert group_id == "grp-1"
+    assert entry["aliases"] == {"openngc": "NGC224"}
 
 
 def test_get_alias_entry_invalid_input_returns_empty_dict():

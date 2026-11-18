@@ -78,7 +78,7 @@ def clear_caches() -> None:
 
 
 def _remember(cache: LruCache, key: Any, value: Any) -> Any:
-    return cache.put(key, value, _MAX_CACHE_ENTRIES)
+    return cache.put(key, value)
 
 
 # ---------------------------------------------------------------------------

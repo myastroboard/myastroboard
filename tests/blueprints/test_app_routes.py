@@ -598,7 +598,7 @@ class TestAdminEndpoints:
         """Turning it on from http://<lan address> would lock the admin out: refused, setting stays off."""
         from blueprints import admin as admin_bp_module
 
-        monkeypatch.setattr(admin_bp_module, '_request_can_keep_secure_cookies', lambda: False)
+        monkeypatch.setattr(admin_bp_module, 'browser_keeps_secure_cookies', lambda: False)
 
         resp = client_admin.post('/api/admin/app-settings', json={'session_cookie_secure': True})
 
@@ -611,7 +611,7 @@ class TestAdminEndpoints:
         """From an HTTPS (or loopback) page the setting turns on and applies at once."""
         from blueprints import admin as admin_bp_module
 
-        monkeypatch.setattr(admin_bp_module, '_request_can_keep_secure_cookies', lambda: True)
+        monkeypatch.setattr(admin_bp_module, 'browser_keeps_secure_cookies', lambda: True)
 
         resp = client_admin.post('/api/admin/app-settings', json={'session_cookie_secure': True})
 
@@ -624,9 +624,9 @@ class TestAdminEndpoints:
         """Only the switch from off to on is checked: an instance already on still saves its other settings."""
         from blueprints import admin as admin_bp_module
 
-        monkeypatch.setattr(admin_bp_module, '_request_can_keep_secure_cookies', lambda: True)
+        monkeypatch.setattr(admin_bp_module, 'browser_keeps_secure_cookies', lambda: True)
         client_admin.post('/api/admin/app-settings', json={'session_cookie_secure': True})
-        monkeypatch.setattr(admin_bp_module, '_request_can_keep_secure_cookies', lambda: False)
+        monkeypatch.setattr(admin_bp_module, 'browser_keeps_secure_cookies', lambda: False)
 
         resp = client_admin.post(
             '/api/admin/app-settings', json={'session_cookie_secure': True, 'log_retention_days': 30}
@@ -7313,7 +7313,6 @@ class TestConfigPostAdditionalBranches:
     def test_config_with_astrodex_present_skips_default(self, client_admin, monkeypatch):
         """'astrodex' IS in submitted config → if-body skipped."""
         monkeypatch.setattr(_locations_mod, 'save_config', lambda *a, **kw: None)
-        monkeypatch.setattr(_app_mod.cache_store, 'reset_all_caches', lambda: None)
         resp = client_admin.post(
             '/api/config',
             json={
@@ -7331,7 +7330,6 @@ class TestConfigPostAdditionalBranches:
         }  # non-dict skytonight
         monkeypatch.setattr(_locations_mod, 'load_config', lambda: old_cfg)
         monkeypatch.setattr(_locations_mod, 'save_config', lambda *a, **kw: None)
-        monkeypatch.setattr(_app_mod.cache_store, 'reset_all_caches', lambda: None)
         resp = client_admin.post(
             '/api/config',
             json={
@@ -7346,7 +7344,6 @@ class TestConfigPostAdditionalBranches:
         monkeypatch.setattr(_locations_mod, 'load_config', lambda: old_cfg)
         saved = {}
         monkeypatch.setattr(_locations_mod, 'save_config', lambda cfg: saved.update({'cfg': cfg}))
-        monkeypatch.setattr(_app_mod.cache_store, 'reset_all_caches', lambda: None)
         resp = client_admin.post(
             '/api/config',
             json={

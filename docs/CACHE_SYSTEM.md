@@ -123,7 +123,8 @@ Signatures are tracked per preset id in `data/cache/location_cache.json`
     the Open-Meteo-backed slots (`weather_forecast`, `astro_weather`) are excluded - they have
     a live-fetch fallback and must not gate readiness (`_READINESS_LOCATION_CACHES`)
   - `has_location_changed(location_config)` - detect location parameter changes
-  - `reset_all_caches()` - immediately reset all astronomical caches
+  - `reset_caches_for_location(location_id)` - reset one location preset's caches (its settings changed);
+    `drop_location_caches(location_id)` removes them when the preset is deleted
   - `get_cache_init_status()` - detailed cache status including `ttls` and `execution_metrics`
 
 #### 2. **`cache/cache_updater.py`** - Cache Calculation (Selective)
@@ -174,10 +175,10 @@ Next poll (300s later)...
 
 When location is updated via `/api/config` POST endpoint:
 
-1. **System detects change** in latitude, longitude, elevation, or timezone
-2. **All cache timestamps zeroed** (`reset_all_caches()`)
+1. **System detects change** in a preset's latitude, longitude, elevation, or timezone
+2. **That preset's caches are reset** (`reset_caches_for_location(location_id)`); other presets keep theirs
 3. **Configuration saved** to file
-4. **Next scheduler poll** will run all 16 jobs (all timestamps = 0)
+4. **Next scheduler poll** runs that preset's location-scoped jobs again
 5. **Browser receives confirmation** including `"cache_reset": true`
 
 ## API Endpoints
@@ -382,7 +383,7 @@ Per-job metrics are stored under the `_cache_metrics` key in `data/cache/astro_c
 ```python
 # Signature-based comparison
 new_signature = {"latitude": 45.5, "longitude": -73.5, "elevation": 100, "timezone": "America/Montreal"}
-# If any value differs -> reset_all_caches() -> all timestamps zeroed
+# If any value differs -> reset_caches_for_location(location_id) -> that preset's slots zeroed
 ```
 
 ### Adding a New Cache Job
@@ -391,7 +392,7 @@ new_signature = {"latitude": 45.5, "longitude": -73.5, "elevation": 100, "timezo
 3. Add `update_<name>_cache(config=None)` in `cache/cache_updater.py` - guard with `if config is None: config = load_config()`
 4. Register it in the `cache_jobs` list in `fully_initialize_caches()` using `partial(update_<name>_cache, config=config)`
 5. Add it to `is_astronomical_cache_ready()` and `get_cache_init_status()` with its TTL constant
-6. Add it to `reset_all_caches()` and `_write_all_astronomical_caches_to_shared()`
+6. A location-dependent cache: add its name and TTL to `LOCATION_SCOPED_CACHE_TTLS` in `cache/cache_store.py`, which gives it a slot per preset, reset and dropped with the preset
 7. Document the TTL rationale in this file and `.github/instructions/copilot.instructions.md`
 
 ### Computation Optimisations

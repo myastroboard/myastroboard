@@ -17,7 +17,7 @@ _MISSING = object()
 
 
 class LruCache:
-    """A bounded LRU mapping; ``limit`` is read on every ``put`` so tests can lower it."""
+    """A bounded LRU mapping holding at most ``limit`` entries (read on every ``put``)."""
 
     def __init__(self, limit: int):
         self.limit = limit
@@ -33,9 +33,9 @@ class LruCache:
             self._entries.move_to_end(key)
             return value
 
-    def put(self, key: Hashable, value: Any, limit: int | None = None) -> Any:
+    def put(self, key: Hashable, value: Any) -> Any:
         """Store *value*, evict the least recently used entries past the limit, return *value*."""
-        bound = max(1, int(self.limit if limit is None else limit))
+        bound = max(1, int(self.limit))
         with self._lock:
             self._entries[key] = value
             self._entries.move_to_end(key)

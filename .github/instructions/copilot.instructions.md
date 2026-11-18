@@ -1342,7 +1342,7 @@ The background cache is **selective-refresh**: the scheduler polls every 25 min 
 2. **Register** in `cache/cache_updater.py` -> `fully_initialize_caches()` `cache_jobs` list with `(name, shared_key, partial(fn, config=config), ttl, cache_entry_ref)`
 3. **Accept `config=None`** in the update function and guard with `if config is None: config = load_config()`
 4. **Add validity check** in `cache_store.is_astronomical_cache_ready()` and `get_cache_init_status()` using the job's own TTL constant
-5. **Add to `reset_all_caches()`** and `_write_all_astronomical_caches_to_shared()` in `cache/cache_store.py`
+5. **A location-dependent cache goes in `LOCATION_SCOPED_CACHE_TTLS`** (`cache/cache_store.py`): one slot per preset, reset by `reset_caches_for_location()` and dropped by `drop_location_caches()`
 6. **Document TTL rationale** in `docs/CACHE_SYSTEM.md` TTL table
 
 ### Cache Metrics

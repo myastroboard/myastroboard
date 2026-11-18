@@ -1143,16 +1143,6 @@ class TestReferenceCounts:
         """No stored session counts as zero references."""
         assert observation_sessions.count_sessions_for_combination('combo-1') == 0
 
-    def test_load_all_users_sessions(self, temp_data_dir, user_id):
-        """Every user's file is picked up by the all-users loader."""
-        _create_session(user_id)
-        other_user = str(uuid.uuid4())
-        _create_session(other_user)
-
-        collections = observation_sessions.load_all_users_sessions({user_id: 'tester'})
-        assert {collection['user_id'] for collection in collections} == {user_id, other_user}
-        assert all(len(collection['sessions']) == 1 for collection in collections)
-
     def test_scan_skips_malformed_documents(self, temp_data_dir, user_id):
         """A malformed stored value of another user is ignored rather than breaking the scan."""
         _create_session(user_id, combination_id='combo-1')

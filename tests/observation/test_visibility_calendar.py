@@ -316,7 +316,7 @@ def test_result_is_cached_and_lru_evicts(monkeypatch):
     second = visibility_calendar.get_visibility_calendar('NGC 224', _PARIS, _YEAR)
     assert first is second  # served from the LRU, not recomputed
 
-    monkeypatch.setattr(visibility_calendar, '_MAX_CACHE_ENTRIES', 2)
+    monkeypatch.setattr(visibility_calendar._calendar_cache, 'limit', 2)
     visibility_calendar.get_visibility_calendar('NGC 224', _PARIS, _YEAR + 1)
     visibility_calendar.get_visibility_calendar('NGC 224', _PARIS, _YEAR + 2)
     assert ('ngc 224', 'loc-paris', _YEAR) not in visibility_calendar._calendar_cache
@@ -408,7 +408,7 @@ class TestDarkHoursByMonth:
         assert all(row['moon_illumination_pct'] is None for row in rows)
 
     def test_dark_hours_cache_evicts_the_oldest_entry(self, monkeypatch):
-        monkeypatch.setattr(visibility_calendar, '_MAX_CACHE_ENTRIES', 1)
+        monkeypatch.setattr(visibility_calendar._dark_hours_cache, 'limit', 1)
         visibility_calendar.clear_batch_caches()
         visibility_calendar.dark_hours_by_month(
             {'id': 'loc-a', 'latitude': 48.0, 'longitude': 2.0, 'timezone': 'Europe/Paris'}, 2026
@@ -531,7 +531,7 @@ class TestNextVisibilityBatch:
     def test_context_cache_evicts_the_oldest_entry(self, monkeypatch):
         from datetime import date as _date
 
-        monkeypatch.setattr(visibility_calendar, '_MAX_CONTEXT_ENTRIES', 1)
+        monkeypatch.setattr(visibility_calendar._context_cache, 'limit', 1)
         visibility_calendar.clear_batch_caches()
         location_id = self._location()['id']
         visibility_calendar._cached_night_context(location_id, 48.0, 2.0, 'Europe/Paris', _date(2026, 1, 1))

@@ -295,10 +295,6 @@ class User:
         """Check if user is a regular user"""
         return self.role == ROLE_USER
 
-    def is_read_only(self):
-        """Check if user is read-only"""
-        return self.role == ROLE_READ_ONLY
-
     def is_using_default_password(self):
         """Check if user is still using default password"""
         global _default_password_check
@@ -1289,9 +1285,3 @@ def get_current_user():
     if 'username' in session:
         return user_manager.get_user(session['username'])
     return None
-
-
-def is_user_admin():
-    """Check if current user is admin"""
-    user = get_current_user()
-    return user and user.is_admin()

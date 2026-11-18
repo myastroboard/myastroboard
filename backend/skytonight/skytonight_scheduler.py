@@ -202,7 +202,6 @@ class SkyTonightScheduler:
         self.execution_start_time: datetime | None = None
         self.is_executing = False
         self.current_mode = 'idle'
-        self.current_reason = ''
         self._triggered_mode: str | None = None
         self._triggered_reason: str | None = None
         self._execution_lock = threading.Lock()
@@ -341,7 +340,6 @@ class SkyTonightScheduler:
             skytonight_config = config.get('skytonight', {}) if isinstance(config, dict) else {}
             if not bool(skytonight_config.get('enabled', False)):
                 self.current_mode = 'disabled'
-                self.current_reason = 'SkyTonight is disabled in configuration.'
                 self._write_status()
                 time.sleep(SKYTONIGHT_SCHEDULER_POLL_INTERVAL_SECONDS)
                 continue
@@ -358,7 +356,6 @@ class SkyTonightScheduler:
 
             schedule = resolve_schedule(config)
             self.current_mode = schedule.mode
-            self.current_reason = schedule.reason
 
             should_run = manual_trigger or self.last_run is None
             if not should_run and _any_location_missing_results(config):
@@ -442,7 +439,6 @@ class SkyTonightScheduler:
         config = self.config_loader()
         if not bool(config.get('skytonight', {}).get('enabled', False)):
             self.current_mode = 'disabled'
-            self.current_reason = 'SkyTonight is disabled in configuration.'
             self._write_status()
             return
 

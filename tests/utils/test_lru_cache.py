@@ -32,11 +32,13 @@ class TestLruCacheBehaviour:
         assert 'b' not in cache
         assert list(cache) == ['a', 'c']
 
-    def test_limit_passed_to_put_wins_over_the_constructor_one(self):
-        """Modules pass their limit constant on every put, so a test can lower it at runtime."""
+    def test_a_lowered_limit_applies_from_the_next_put(self):
+        """The limit is read on every put, so lowering it shrinks the cache at the next write."""
         cache = LruCache(10)
-        for key in range(5):
-            cache.put(key, key, limit=2)
+        for key in range(4):
+            cache.put(key, key)
+        cache.limit = 2
+        cache.put(4, 4)
         assert list(cache) == [3, 4]
 
     def test_limit_is_at_least_one(self):

@@ -18,7 +18,7 @@ from utils.auth import admin_required
 from utils.constants import DATA_DIR, SKYTONIGHT_LOGS_DIR, SKYTONIGHT_SCHEDULER_STATUS_FILE
 from utils.file_lock import interprocess_lock
 from utils.image_privacy import strip_stored_pictures
-from utils.ingress import browser_keeps_secure_cookies as _request_can_keep_secure_cookies
+from utils.ingress import browser_keeps_secure_cookies
 from utils.logging_config import apply_log_retention, env_log_level, get_logger, refresh_log_levels
 from utils.metrics_collector import collect_metrics
 from utils.user_data import user_data_dirs
@@ -98,7 +98,7 @@ def update_app_settings_api():
     # drops every Secure cookie the server sends to that page, so signing in (and out) stops
     # working there. Only the switch from off to on is refused; a value already on is kept.
     secure_requested = bool(data.get('session_cookie_secure', old_settings.get('session_cookie_secure', False)))
-    if secure_requested and not old_settings.get('session_cookie_secure') and not _request_can_keep_secure_cookies():
+    if secure_requested and not old_settings.get('session_cookie_secure') and not browser_keeps_secure_cookies():
         logger.warning(
             f"Refused to turn on HTTPS-only session cookies from a plain-HTTP page ({request.host}), "
             f"requested by {session.get('username', '?')}"

@@ -316,29 +316,6 @@ def save_user_sessions(user_id: str, sessions_data: dict, username: str | None =
         return False
 
 
-def load_all_users_sessions(usernames_by_id: dict[str, str] | None = None) -> list[dict]:
-    """Load every user's sessions.
-
-    Used by the delete-guard scans below, not by any UI route - sessions are private and
-    never shown across users.
-    """
-    usernames_by_id = usernames_by_id or {}
-
-    collections: list[dict] = []
-    for user_id, _doc_key, _data in documents.list_documents(SESSIONS_KIND):
-        data = load_user_sessions(user_id, usernames_by_id.get(user_id))
-        collections.append(
-            {
-                'user_id': user_id,
-                'username': data.get('username') or usernames_by_id.get(user_id) or 'unknown',
-                'created_at': data.get('created_at'),
-                'updated_at': data.get('updated_at'),
-                'sessions': data.get('sessions', []),
-            }
-        )
-    return collections
-
-
 def _session_sort_key(session: dict) -> tuple[str, str]:
     """Sort key placing the most recent observation date (then creation) first.
 

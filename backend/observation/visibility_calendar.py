@@ -439,7 +439,7 @@ def get_visibility_calendar(identifier: str, location: dict[str, Any], year: int
     if cached is not None:
         return cached
 
-    return _calendar_cache.put(cache_key, _compute_visibility_calendar(identifier, location, year), _MAX_CACHE_ENTRIES)
+    return _calendar_cache.put(cache_key, _compute_visibility_calendar(identifier, location, year))
 
 
 # ---------------------------------------------------------------------------
@@ -480,9 +480,7 @@ def _cached_night_context(
     if cached is not None:
         return cached
 
-    return _context_cache.put(
-        cache_key, build_night_context(lat_deg, lon_deg, timezone_name, night_date), _MAX_CONTEXT_ENTRIES
-    )
+    return _context_cache.put(cache_key, build_night_context(lat_deg, lon_deg, timezone_name, night_date))
 
 
 def night_context_for(location: dict[str, Any], night_date: date) -> dict[str, Any]:
@@ -582,7 +580,7 @@ def dark_hours_by_month(location: dict[str, Any], year: int) -> list[dict[str, A
             }
         )
 
-    return _dark_hours_cache.put(cache_key, rows, _MAX_CACHE_ENTRIES)
+    return _dark_hours_cache.put(cache_key, rows)
 
 
 def next_visibility_batch(
