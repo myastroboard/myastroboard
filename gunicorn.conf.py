@@ -13,21 +13,6 @@ resources the container sees; WEB_CONCURRENCY=1 or 2 sets it explicitly.
 import os
 import sys
 
-# Listen on IPv6 as well as IPv4: Home Assistant's "Open web UI" link uses the name the
-# browser reached Home Assistant with, and homeassistant.local often resolves to an
-# IPv6 address. "[::]" also accepts IPv4 unless the kernel is set to IPv6-only sockets
-# (bindv6only=1), in which case both addresses are bound. With IPv6 disabled in the
-# kernel, binding "[::]" would fail, so fall back to IPv4 only.
-if not os.path.exists("/proc/net/if_inet6"):
-    bind = ["0.0.0.0:5000"]
-else:
-    try:
-        with open("/proc/sys/net/ipv6/bindv6only", encoding="ascii") as fh:
-            v6only = fh.read().strip() == "1"
-    except OSError:
-        v6only = False
-    bind = ["0.0.0.0:5000", "[::]:5000"] if v6only else ["[::]:5000"]
-
 # A second worker process needs both: another CPU to run on while the first one calculates,
 # and memory for a second copy of everything (the host's total when the container has no
 # limit, which other services share - hence the margin).
@@ -41,6 +26,23 @@ def _read(path):
             return fh.read().strip()
     except OSError:
         return None
+
+
+# Listen on IPv6 as well as IPv4: Home Assistant's "Open web UI" link uses the name the
+# browser reached Home Assistant with, and homeassistant.local often resolves to an
+# IPv6 address. "[::]" also accepts IPv4 unless the kernel is set to IPv6-only sockets
+# (bindv6only=1), in which case both addresses are bound. With IPv6 disabled in the
+# kernel, binding "[::]" would fail, so fall back to IPv4 only.
+def choose_bind(if_inet6="/proc/net/if_inet6", bindv6only="/proc/sys/net/ipv6/bindv6only"):
+    """The addresses to listen on, from the kernel's IPv6 support and settings."""
+    if not os.path.exists(if_inet6):
+        return ["0.0.0.0:5000"]
+    if _read(bindv6only) == "1":
+        return ["0.0.0.0:5000", "[::]:5000"]
+    return ["[::]:5000"]
+
+
+bind = choose_bind()
 
 
 def available_cpus(cgroup_root="/sys/fs/cgroup"):

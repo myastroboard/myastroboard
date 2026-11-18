@@ -1,6 +1,8 @@
 """Tests for scripts/build_skytonight_catalogue.py: the offline SkyTonight dataset builder entry point."""
 
 import importlib.util
+import runpy
+import sys
 from pathlib import Path
 
 import pytest
@@ -47,3 +49,27 @@ def test_main_tolerates_missing_metadata_fields(monkeypatch, capsys):
     assert 'Generated at: unknown' in out
     assert 'Deep sky targets: 0' in out
     assert 'Comets: 0' in out
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize('backend_on_path', [True, False])
+def test_running_the_script_builds_and_exits_with_success(monkeypatch, capsys, backend_on_path):
+    """`python scripts/build_skytonight_catalogue.py` puts backend/ on the import path when
+    missing (once only), builds the dataset and exits with status 0."""
+    from skytonight import skytonight_catalogue_builder
+
+    backend_dir = str(ROOT / 'backend')
+    paths = [path for path in sys.path if path != backend_dir]
+    if backend_on_path:
+        paths.insert(0, backend_dir)
+    monkeypatch.setattr(sys, 'path', paths)
+    monkeypatch.setattr(
+        skytonight_catalogue_builder, 'build_and_save_default_dataset', lambda: {'metadata': {'counts': {}}}
+    )
+
+    with pytest.raises(SystemExit) as exit_info:
+        runpy.run_path(str(ROOT / 'scripts' / 'build_skytonight_catalogue.py'), run_name='__main__')
+
+    assert exit_info.value.code == 0
+    assert sys.path.count(backend_dir) == 1
+    assert 'SkyTonight dataset generated successfully' in capsys.readouterr().out

@@ -299,14 +299,13 @@ def main() -> int:
             for key in sorted(lang_keys - ref_keys):
                 errors.append(f"[{lang}] Extra key not in reference: '{key}'")
 
-            # Check 8: leaf value type mismatches
-            if ref_types:
-                lang_types = get_leaf_types(lang_json)
-                for key in sorted(set(ref_types) & set(lang_types)):
-                    if ref_types[key] != lang_types[key]:
-                        errors.append(
-                            f"[{lang}] Type mismatch at '{key}': expected {ref_types[key]}, got {lang_types[key]}"
-                        )
+            # Check 8: leaf value type mismatches (ref_keys is not empty, so neither is ref_types)
+            lang_types = get_leaf_types(lang_json)
+            for key in sorted(set(ref_types) & set(lang_types)):
+                if ref_types[key] != lang_types[key]:
+                    errors.append(
+                        f"[{lang}] Type mismatch at '{key}': expected {ref_types[key]}, got {lang_types[key]}"
+                    )
 
     # --- Report ---
     if errors:

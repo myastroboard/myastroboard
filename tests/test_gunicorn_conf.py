@@ -72,6 +72,20 @@ class TestResourceDetection:
         assert conf['available_memory_bytes'](str(tmp_path), str(meminfo)) == 4096000 * 1024
         assert conf['available_memory_bytes'](str(tmp_path / 'x'), str(tmp_path / 'y')) is None
 
+    def test_unreadable_cpu_quota_falls_back_to_the_cpu_count(self, conf, tmp_path):
+        """A quota that is not two numbers, or a zero period, is ignored."""
+        for content in ('lots 100000\n', '100000 0\n'):
+            (tmp_path / 'cpu.max').write_text(content)
+            assert conf['available_cpus'](str(tmp_path)) == float(os.cpu_count() or 1)
+
+    def test_host_total_is_found_anywhere_in_meminfo(self, conf, tmp_path):
+        """MemTotal is looked for line by line; a malformed one means the memory is unknown."""
+        meminfo = tmp_path / 'meminfo'
+        meminfo.write_text('MemFree:  1 kB\nMemTotal:        2048000 kB\n')
+        assert conf['available_memory_bytes'](str(tmp_path / 'x'), str(meminfo)) == 2048000 * 1024
+        meminfo.write_text('MemTotal: lots\nMemFree:  1 kB\n')
+        assert conf['available_memory_bytes'](str(tmp_path / 'x'), str(meminfo)) is None
+
 
 def test_worker_init_shortens_the_gil_switch_interval(conf):
     """Each worker hands the GIL over faster than Python's 5 ms default, so request threads
@@ -87,3 +101,25 @@ def test_worker_init_shortens_the_gil_switch_interval(conf):
 
 def test_binds_port_5000(conf):
     assert all(address.endswith(':5000') for address in conf['bind'])
+
+
+class TestBind:
+    """Port 5000 on IPv6 and IPv4 where the kernel allows it."""
+
+    def test_ipv4_only_when_the_kernel_has_no_ipv6(self, conf, tmp_path):
+        assert conf['choose_bind'](str(tmp_path / 'if_inet6'), str(tmp_path / 'v6only')) == ['0.0.0.0:5000']
+
+    def test_one_dual_stack_address_by_default(self, conf, tmp_path):
+        """ "[::]" also accepts IPv4 connections, also when the setting cannot be read."""
+        (tmp_path / 'if_inet6').write_text('')
+        (tmp_path / 'v6only').write_text('0\n')
+        assert conf['choose_bind'](str(tmp_path / 'if_inet6'), str(tmp_path / 'v6only')) == ['[::]:5000']
+        assert conf['choose_bind'](str(tmp_path / 'if_inet6'), str(tmp_path / 'missing')) == ['[::]:5000']
+
+    def test_both_addresses_when_ipv6_sockets_are_ipv6_only(self, conf, tmp_path):
+        (tmp_path / 'if_inet6').write_text('')
+        (tmp_path / 'v6only').write_text('1\n')
+        assert conf['choose_bind'](str(tmp_path / 'if_inet6'), str(tmp_path / 'v6only')) == [
+            '0.0.0.0:5000',
+            '[::]:5000',
+        ]

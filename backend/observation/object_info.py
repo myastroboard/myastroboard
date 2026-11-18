@@ -14,7 +14,7 @@ import sys
 import time
 import urllib.parse
 import uuid
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from typing import Any
 
 import requests
@@ -650,6 +650,23 @@ def download_dss_image(
     return _render_from_hips_mirrors(ra, dec, size_deg, size_px, local_path, label)
 
 
+def _install_download(tmp_path: str, local_path: str) -> None:
+    """Move a finished download from its temporary file to *local_path*.
+
+    Two request threads can fetch the same image at once. On Linux the second rename
+    simply replaces the first one; Windows refuses a rename onto a file another rename is
+    replacing ("Access is denied"). The image is in place all the same, so that counts as
+    done: only this copy is dropped. Any other failure is raised.
+    """
+    try:
+        os.replace(tmp_path, local_path)
+    except OSError:
+        if not os.path.isfile(local_path):
+            raise
+        with suppress(OSError):
+            os.remove(tmp_path)
+
+
 def _render_from_hips_mirrors(
     ra: float, dec: float, size_deg: float, size_px: int, local_path: str, label: str
 ) -> bool:
@@ -666,7 +683,7 @@ def _render_from_hips_mirrors(
             tmp_path = f'{local_path}.tmp-{os.getpid()}-{uuid.uuid4().hex[:8]}'
             with open(tmp_path, 'wb') as f:
                 f.write(data)
-            os.replace(tmp_path, local_path)
+            _install_download(tmp_path, local_path)
         except (requests.RequestException, OSError, ValueError) as exc:
             logger.warning(f'DSS2 HiPS mirror {mirror_id} failed for {label}: {exc}')
             _trigger_backoff(service)
@@ -698,7 +715,7 @@ def download_hips2fits_image(
         with open(tmp_path, 'wb') as f:
             for chunk in resp.iter_content(chunk_size=8192):
                 f.write(chunk)
-        os.replace(tmp_path, local_path)
+        _install_download(tmp_path, local_path)
         _clear_backoff('hips2fits')
         return True
     except (requests.RequestException, OSError) as exc:
