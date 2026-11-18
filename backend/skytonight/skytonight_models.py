@@ -36,11 +36,20 @@ class SkyTonightTarget:
     metadata: dict[str, Any] = field(default_factory=dict)
     difficulty_score: int = 0
     difficulty: str = 'intermediate'
+    # Outline of an elongated object: minor axis and position angle of the major axis
+    # (degrees from north through east), as OpenNGC gives them. None when unknown.
+    size_minor_arcmin: float | None = None
+    position_angle_deg: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
         if self.coordinates is None:
             payload['coordinates'] = None
+        # Most targets have no outline: leave the keys out rather than writing nulls into
+        # every record of the dataset file.
+        for key in ('size_minor_arcmin', 'position_angle_deg'):
+            if payload[key] is None:
+                del payload[key]
         return payload
 
     @classmethod
@@ -82,4 +91,8 @@ class SkyTonightTarget:
             metadata=metadata if isinstance(metadata, dict) else {},
             difficulty_score=int(data['difficulty_score']) if data.get('difficulty_score') is not None else 0,
             difficulty=str(data.get('difficulty', 'intermediate') or 'intermediate').strip(),
+            size_minor_arcmin=(float(data['size_minor_arcmin']) if data.get('size_minor_arcmin') is not None else None),
+            position_angle_deg=(
+                float(data['position_angle_deg']) if data.get('position_angle_deg') is not None else None
+            ),
         )

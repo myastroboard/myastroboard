@@ -11,8 +11,18 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Lighter and faster server: one process with request threads on small hosts (about 200 MB less memory),
   two from 2 CPUs and 4 GB, and pages stay quick during SkyTonight calculations
   ([docs/1.INSTALLATION.md](docs/1.INSTALLATION.md#workers-and-threads)).
+- New smart telescope presets: Seestar S50 Pro and S30 Plus, Vaonis Vespera 3, Vespera Pro 2 and Atlas
+  ([docs/EQUIPMENT.md](docs/EQUIPMENT.md#bundles-smart-telescopes)).
+- Framing simulator: galaxies are outlined by their catalogue ellipse and orientation, and zoom buttons
+  sharpen the sky image around small fields ([docs/SKYTONIGHT.md](docs/SKYTONIGHT.md#framing-simulator)).
 
 ### Fixes
+
+- Smart telescopes added from the Equipment tab now get their built-in camera and a combination, so the
+  framing simulator can show their field; Seestar frames are drawn in portrait, as the device records
+  ([docs/EQUIPMENT.md](docs/EQUIPMENT.md#bundles-smart-telescopes)).
+- The framing simulator lists the combinations it cannot show with what each one lacks, and a link to
+  edit them ([docs/SKYTONIGHT.md](docs/SKYTONIGHT.md#framing-simulator)).
 
 - Astro weather no longer falls back to its reduced forecast for some locations: it stopped requesting
   unused upper-air variables, one of which made Open-Meteo answer with an error.

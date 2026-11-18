@@ -196,7 +196,7 @@ optical specs (aperture/focal length), not sensor data.
   "...": "... normal telescope fields ...",
   "auto_combination": true,
   "bundle": [
-    { "kind": "camera", "label": "Seestar S50 built-in camera (Sony IMX462)", "sensor_width_mm": 5.6, "...": "..." },
+    { "kind": "camera", "label": "Seestar S50 built-in camera (Sony IMX462)", "sensor_width_mm": 3.15, "...": "..." },
     { "kind": "mount", "label": "Seestar S50 built-in AZ mount/tripod", "mount_type": "Alt-Azimuth", "...": "..." },
     { "kind": "filter", "label": "Seestar S50 Solar Filter", "filter_type": "Solar", "...": "..." }
   ]
@@ -209,13 +209,26 @@ optical specs (aperture/focal length), not sensor data.
 - Set **`weight_kg: 0`** on every bundle entry - the parent telescope's own `weight_kg` already represents
   the whole fused unit's mass; giving bundle items their own non-zero weight would multiply-count it in a
   combination card's total payload calculation.
-- `auto_combination: true` on the parent tells the **guided setup wizard** (`static/js/first_run.js`) to
-  create every bundle item alongside the telescope and link them all into one auto-created combination -
-  this is what makes "every time the wizard creates equipment, a combination is created" true even for a
-  single-preset pick. When a bundling preset is selected, the wizard's separate camera picker is hidden
-  (a combination can only have one imaging camera, and the bundle already supplies it).
-- Bundle items are never independently selectable elsewhere (no separate preset dropdown entry) - they only
-  ever get created as part of their parent telescope's wizard flow.
+- `auto_combination: true` on the parent makes picking that preset create every bundle item alongside
+  the telescope and link them all into one combination (`static/js/equipment_bundles.js`):
+  - in the **guided setup wizard** (`static/js/first_run.js`), always - the wizard's separate camera
+    picker is hidden (a combination can only have one imaging camera, and the bundle already supplies it);
+  - in the **Equipment tab**'s "New Telescope" form, through an option shown under the preset picker,
+    ticked by default. Without the built-in camera, the framing simulator and the field of view of the
+    combination cannot be computed.
+- The bundle **cameras** are also offered in the Equipment tab's "New Camera" preset picker, so a smart
+  telescope saved without its camera (before bundles existed, or with the option unticked) can be
+  completed: add the camera, then select it in the combination. Mounts and filters of a bundle are not
+  offered separately.
+- **Orientation**: give a bundle camera's `sensor_width_mm` / `sensor_height_mm` and `resolution_w` /
+  `resolution_h` in the orientation the device delivers its images, since the framing simulator draws the
+  width across. Seestar units record in portrait (S50: 1080 x 1920), so their short side is the width;
+  Dwarf, Vespera and Atlas record in landscape.
+- **Built-in mount capacity**: makers publish no payload for a built-in mount. The bundle mount's
+  `payload_capacity_kg` is sized so the unit's own weight sits at the recommended load (75% of the
+  capacity), so the combination does not report a payload warning for the device itself.
+- A sensor size the maker does not publish is derived as resolution x pixel size (Seestar S50 Pro:
+  2160 x 3840 px at 2.9 um = 6.26 x 11.14 mm; Seestar S30 Plus: 1440 x 2560 px at 2.9 um = 4.18 x 7.42 mm).
 
 ---
 

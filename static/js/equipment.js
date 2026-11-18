@@ -1229,14 +1229,57 @@ async function showTelescopeModal(id = null) {
     openModal('#modal_lg_close', { backdrop: 'static' });
 
     _wirePresetSelect('telescope', presets, _applyTelescopePreset);
+    const bundleCheckbox = _addTelescopeBundleOption(presets);
 
     document.getElementById('telescopeForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        await saveTelescope(telescope?.id || '');
+        const presetId = document.getElementById('telescope-preset-select')?.value;
+        const preset = presets.find(p => p.id === presetId);
+        const bundlePreset = !telescope && bundleCheckbox?.checked && isBundlingPreset(preset) ? preset : null;
+        await saveTelescope(telescope?.id || '', bundlePreset);
     });
 }
 
-async function saveTelescope(id) {
+/**
+ * Add, under the telescope preset picker, the option to also create a smart telescope's
+ * built-in camera, mount and filters with a combination linking them. Shown only while a
+ * bundling preset is selected. Returns the checkbox, or null when there is no preset picker.
+ * @param {Object[]} presets - telescope presets offered in the picker
+ * @returns {?HTMLInputElement}
+ */
+function _addTelescopeBundleOption(presets) {
+    const select = document.getElementById('telescope-preset-select');
+    if (!select) return null;
+
+    const wrap = document.createElement('div');
+    wrap.className = 'col-md-12';
+    wrap.style.display = 'none';
+    const check = document.createElement('div');
+    check.className = 'form-check';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.className = 'form-check-input';
+    input.id = 'telescope-create-bundle';
+    input.checked = true;
+    const label = document.createElement('label');
+    label.className = 'form-check-label';
+    label.htmlFor = input.id;
+    label.textContent = i18n.t('equipment.preset_bundle_create');
+    DOMUtils.append(check, input, label);
+    const help = document.createElement('small');
+    help.className = 'form-text text-muted';
+    help.textContent = i18n.t('equipment.preset_bundle_help');
+    DOMUtils.append(wrap, check, help);
+    select.parentElement.after(wrap);
+
+    select.addEventListener('change', () => {
+        const preset = (presets || []).find(p => p.id === select.value);
+        wrap.style.display = isBundlingPreset(preset) ? '' : 'none';
+    });
+    return input;
+}
+
+async function saveTelescope(id, bundlePreset = null) {
     const form = document.getElementById('telescopeForm');
     const formData = new FormData(form);
     const data = Object.fromEntries(formData);
@@ -1247,7 +1290,7 @@ async function saveTelescope(id) {
         const url = id ? appUrl(`/api/equipment/telescopes/${id}`) : appUrl('/api/equipment/telescopes');
         const method = id ? 'PUT' : 'POST';
 
-        await fetchJSON(url, {
+        const result = await fetchJSON(url, {
             method,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
@@ -1255,6 +1298,23 @@ async function saveTelescope(id) {
 
         document.activeElement?.blur();
         closeModal('#modal_lg_close');
+
+        const telescopeId = result?.data?.id;
+        if (bundlePreset && telescopeId) {
+            let bundled = false;
+            try {
+                bundled = !!(await createBundleCombination(bundlePreset, telescopeId, data.name));
+            } catch (bundleError) {
+                console.error('Error creating the smart telescope bundle:', bundleError);
+            }
+            await loadAllEquipment();
+            showMessage(
+                bundled ? 'success' : 'warning',
+                i18n.t(bundled ? 'equipment.telescope_bundle_created' : 'equipment.telescope_bundle_failed')
+            );
+            return;
+        }
+
         await loadEquipmentType('telescopes');
         await loadEquipmentType('combinations');
         renderTelescopesTab();
@@ -1272,7 +1332,10 @@ async function saveTelescope(id) {
 async function showCameraModal(id = null) {
     const camera = id ? equipmentData.cameras.find(c => c.id === id) : null;
     const title = camera ? i18n.t('equipment.edit_camera') : i18n.t('equipment.new_camera');
-    const presets = camera ? [] : (await _loadEquipmentPresets())?.cameras || [];
+    // The built-in cameras of smart telescopes are offered too, so a smart telescope saved
+    // without its camera (before bundles existed, or with the bundle option unticked) can be completed.
+    const allPresets = camera ? {} : await _loadEquipmentPresets();
+    const presets = camera ? [] : [...(allPresets?.cameras || []), ...bundleCameraPresets(allPresets?.telescopes)];
 
     const modalContent = `
         <form id="cameraForm" class="form row g-3">
@@ -1844,6 +1907,22 @@ async function showCombinationModal(id = null) {
         e.preventDefault();
         await saveCombination(combination?.id || '');
     });
+}
+
+/**
+ * Open the editor of one of the user's own combinations from outside the Equipment tab (the
+ * framing simulator links an incomplete combination here). Loads the equipment first when the
+ * tab has not been visited yet. Returns false when the combination is not the user's own.
+ * @param {string} id
+ * @returns {Promise<boolean>}
+ */
+async function editCombinationById(id) {
+    if (!equipmentData.combinations.some(c => c.id === id)) {
+        await loadAllEquipment();
+    }
+    if (!equipmentData.combinations.some(c => c.id === id)) return false;
+    await showCombinationModal(id);
+    return true;
 }
 
 async function saveCombination(id) {

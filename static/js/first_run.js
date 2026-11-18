@@ -615,17 +615,9 @@ const _WIZARD_TELESCOPE_TYPE_MAP = {
     cassegrain: 'Cassegrain',
     dobsonian: 'Dobsonian',
 };
-// Preset payloads may include more specific color-camera types (e.g. DSLR/mirrorless),
-// but the manual wizard camera form intentionally normalizes to canonical sensor options:
-// CMOS Color, CMOS Mono, CCD Color, CCD Mono.
-const _WIZARD_CAMERA_SENSOR_TYPE_MAP = {
-    cmos_color: 'CMOS Color',
-    dslr_color: 'CMOS Color',
-    mirrorless_color: 'CMOS Color',
-    cmos_mono: 'CMOS Mono',
-    ccd_color: 'CCD Color',
-    ccd_mono: 'CCD Mono',
-};
+// Camera presets are mapped by mapCameraPresetToPayload() (equipment_bundles.js), which
+// normalizes the more specific color-camera types (DSLR, mirrorless) to the canonical
+// sensor options: CMOS Color, CMOS Mono, CCD Color, CCD Mono.
 
 async function _wizardLoadEquipmentData() {
     // Independent requests - fired together instead of sequentially, but each keeps its own
@@ -755,7 +747,7 @@ function _buildEquipmentStep(container) {
     const telescopeSelect = document.getElementById('wizard-telescope-preset');
     const _updateCameraBlockVisibility = () => {
         const preset = (_wizard.presets?.telescopes || []).find((p) => p.id === telescopeSelect?.value);
-        const isBundling = preset?.auto_combination !== false && !!(preset?.bundle && preset.bundle.length > 0);
+        const isBundling = isBundlingPreset(preset);
         cameraBlock.style.display = isBundling ? 'none' : '';
         bundledNote.style.display = isBundling ? '' : 'none';
     };
@@ -939,22 +931,6 @@ function _mapTelescopePresetToPayload(preset) {
     };
 }
 
-function _mapCameraPresetToPayload(preset) {
-    return {
-        name: preset.label,
-        manufacturer: preset.manufacturer || '',
-        sensor_width_mm: preset.sensor_width_mm,
-        sensor_height_mm: preset.sensor_height_mm,
-        resolution_width_px: preset.resolution_w,
-        resolution_height_px: preset.resolution_h,
-        pixel_size_um: preset.pixel_size_um,
-        sensor_type: _WIZARD_CAMERA_SENSOR_TYPE_MAP[preset.type] || 'CMOS Color',
-        weight_kg: preset.weight_kg || 0,
-        cooling_supported: preset.cooling_supported || false,
-        min_temperature_c: preset.min_temperature_c ?? null,
-    };
-}
-
 // Per-kind config driving _saveEquipmentOfKind() - keeps the telescope/camera save
 // flow as a single code path instead of two near-identical copies.
 const _WIZARD_EQUIPMENT_KIND_CONFIG = {
@@ -974,7 +950,7 @@ const _WIZARD_EQUIPMENT_KIND_CONFIG = {
         endpoint: appUrl('/api/equipment/cameras'),
         selectId: 'wizard-camera-preset',
         presetsKey: 'cameras',
-        mapPreset: _mapCameraPresetToPayload,
+        mapPreset: mapCameraPresetToPayload,
         buildManualPayload: (name) => ({
             name,
             manufacturer: '',
@@ -1019,80 +995,11 @@ async function _saveEquipmentOfKind(kind) {
     return null;
 }
 
-const _WIZARD_BUNDLE_ENDPOINT_BY_KIND = {
-    camera: appUrl('/api/equipment/cameras'),
-    mount: appUrl('/api/equipment/mounts'),
-    filter: appUrl('/api/equipment/filters'),
-    accessory: appUrl('/api/equipment/accessories'),
-};
-
-/** Map a bundle sub-item (same field shape as a standalone preset of that kind, see
- * docs/EQUIPMENT.md#presets) to its create payload. */
-function _mapBundleItemToPayload(kind, item) {
-    if (kind === 'camera') return _mapCameraPresetToPayload(item);
-    if (kind === 'mount') {
-        return {
-            name: item.label,
-            manufacturer: item.manufacturer || '',
-            mount_type: item.mount_type || 'Alt-Azimuth',
-            payload_capacity_kg: item.payload_capacity_kg || 0,
-            guiding_supported: item.guiding_supported || false,
-        };
-    }
-    if (kind === 'filter') {
-        return {
-            name: item.label,
-            manufacturer: item.manufacturer || '',
-            filter_type: item.filter_type || 'Other',
-            central_wavelength_nm: item.central_wavelength_nm ?? null,
-            bandwidth_nm: item.bandwidth_nm ?? null,
-            intended_use: item.intended_use || '',
-        };
-    }
-    if (kind === 'accessory') {
-        return {
-            name: item.label,
-            manufacturer: item.manufacturer || '',
-            accessory_type: item.accessory_type || '',
-            weight_kg: item.weight_kg || 0,
-        };
-    }
-    return null;
-}
-
-/** Create every item in a bundling telescope preset's `bundle` array (e.g. a Seestar's built-in
- * camera + mount + solar filter). Returns the created ids grouped by combination field, so the
- * caller can link them all into one auto-created combination. Best-effort: one failed item logs
- * and is skipped rather than aborting the rest of the bundle. */
-async function _createBundleItems(bundle) {
-    const created = { camera_id: null, mount_id: null, filter_ids: [] };
-    for (const item of bundle || []) {
-        const endpoint = _WIZARD_BUNDLE_ENDPOINT_BY_KIND[item.kind];
-        const payload = _mapBundleItemToPayload(item.kind, item);
-        if (!endpoint || !payload) continue;
-        try {
-            const result = await fetchJSON(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
-            const id = result?.data?.id;
-            if (!id) continue;
-            if (item.kind === 'camera') created.camera_id = id;
-            else if (item.kind === 'mount') created.mount_id = id;
-            else if (item.kind === 'filter') created.filter_ids.push(id);
-        } catch (err) {
-            console.error(`Wizard bundle item (${item.kind}) create error:`, err);
-        }
-    }
-    return created;
-}
-
 async function _saveEquipmentStep() {
     const expSelect = document.getElementById('wizard-experience-level');
     const telescopeSelect = document.getElementById('wizard-telescope-preset');
     const telescopePreset = (_wizard.presets?.telescopes || []).find((p) => p.id === telescopeSelect?.value);
-    const isBundling = telescopePreset?.auto_combination !== false && !!(telescopePreset?.bundle && telescopePreset.bundle.length > 0);
+    const isBundling = isBundlingPreset(telescopePreset);
 
     try {
         const telescopeId = await _saveEquipmentOfKind('telescope');
@@ -1100,11 +1007,13 @@ async function _saveEquipmentStep() {
         let cameraId = null;
         let mountId = null;
         let filterIds = [];
+        let accessoryIds = [];
         if (isBundling) {
-            const created = await _createBundleItems(telescopePreset.bundle);
+            const created = await createBundleItems(telescopePreset.bundle);
             cameraId = created.camera_id;
             mountId = created.mount_id;
             filterIds = created.filter_ids;
+            accessoryIds = created.accessory_ids;
         } else {
             cameraId = await _saveEquipmentOfKind('camera');
         }
@@ -1128,6 +1037,7 @@ async function _saveEquipmentStep() {
                         camera_id: cameraId || null,
                         mount_id: mountId || null,
                         filter_ids: filterIds,
+                        accessory_ids: accessoryIds,
                     }),
                 });
             } catch (err) {

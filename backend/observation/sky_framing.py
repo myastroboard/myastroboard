@@ -64,8 +64,9 @@ def resolve_target(identifier: str) -> dict[str, Any]:
 
     The result always carries ``supported`` (bool) and ``name``. When supported it also has
     ``target_id``, ``object_type``, ``ra_deg``, ``dec_deg``, ``size_arcmin`` (None when
-    unknown) and ``image_key``. When not, it carries ``reason``: ``'moving_target'`` for a
-    solar-system body or comet, ``'not_found'`` otherwise.
+    unknown), the outline of an elongated object (``size_minor_arcmin`` and
+    ``position_angle_deg``, None when unknown) and ``image_key``. When not, it carries
+    ``reason``: ``'moving_target'`` for a solar-system body or comet, ``'not_found'`` otherwise.
     """
     match = skytonight_targets.find_target(identifier)
     if match is not None:
@@ -85,6 +86,8 @@ def resolve_target(identifier: str) -> dict[str, Any]:
             'ra_deg': ra_deg,
             'dec_deg': dec_deg,
             'size_arcmin': size,
+            'size_minor_arcmin': match.size_minor_arcmin if size else None,
+            'position_angle_deg': match.position_angle_deg if size else None,
             'image_key': image_key(ra_deg, dec_deg),
         }
 
@@ -112,6 +115,8 @@ def resolve_target(identifier: str) -> dict[str, Any]:
         'ra_deg': ra_deg,
         'dec_deg': dec_deg,
         'size_arcmin': None,
+        'size_minor_arcmin': None,
+        'position_angle_deg': None,
         'image_key': image_key(ra_deg, dec_deg),
     }
 

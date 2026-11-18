@@ -93,3 +93,31 @@ class TestSkyTonightTargetFromDict:
         }
         target = SkyTonightTarget.from_dict(data)
         assert target.aliases == []
+
+
+class TestSkyTonightTargetOutline:
+    def test_to_dict_leaves_out_an_unknown_outline(self):
+        """Targets without an outline write no null keys into the dataset file."""
+        d = SkyTonightTarget(target_id='t', category='deep_sky', object_type='Galaxy', preferred_name='X').to_dict()
+        assert 'size_minor_arcmin' not in d
+        assert 'position_angle_deg' not in d
+
+    def test_outline_survives_a_round_trip(self):
+        """The minor axis and position angle are written and read back."""
+        original = SkyTonightTarget(
+            target_id='t',
+            category='deep_sky',
+            object_type='Galaxy',
+            preferred_name='M81',
+            size_arcmin=21.63,
+            size_minor_arcmin=11.25,
+            position_angle_deg=157.0,
+        )
+        restored = SkyTonightTarget.from_dict(original.to_dict())
+        assert (restored.size_minor_arcmin, restored.position_angle_deg) == (11.25, 157.0)
+
+    def test_from_dict_without_outline_keys(self):
+        """A dataset written before outlines existed reads back with an unknown outline."""
+        restored = SkyTonightTarget.from_dict({'target_id': 't', 'size_arcmin': 5.0})
+        assert restored.size_minor_arcmin is None
+        assert restored.position_angle_deg is None

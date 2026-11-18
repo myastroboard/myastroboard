@@ -14,13 +14,15 @@
  * way, so changing the background field of view never moves anything on the sky.
  */
 
-/* global DOMUtils, i18n, fetchJSON, API_BASE, appUrl, openModal */
+/* global DOMUtils, i18n, fetchJSON, API_BASE, appUrl, openModal, editCombinationById */
 
 const FRAMING_MODAL_ID = 'modal_xl_close';
 const FRAMING_MAX_SELECTED = 3;
-// The background is this many times wider than the widest selected frame, so there is
-// room to rotate and move it.
-const FRAMING_BACKGROUND_MARGIN = 2.2;
+// By default the background is this many times wider than the widest selected frame, so
+// there is room to rotate and move it. The zoom buttons go down to FRAMING_ZOOM_MIN_MARGIN,
+// where the rotated frame still fits, for a sharper view of the target.
+const FRAMING_BACKGROUND_MARGIN = 1.6;
+const FRAMING_ZOOM_MIN_MARGIN = 1.05;
 const FRAMING_EXPORT_FOOTER_PX = 96;
 const FRAMING_FALLBACK_COLORS = ['#ffd43b', '#4dabf7', '#ff8787'];
 
@@ -138,6 +140,45 @@ function _frPickBackgroundFov(ladder, selectedFrames, sizeArcmin) {
     }
     const step = ladder.find((fov) => fov >= needed);
     return step !== undefined ? step : ladder[ladder.length - 1];
+}
+
+/**
+ * Background fields of view the zoom buttons can step through: from the smallest step
+ * where the widest selected frame (or the target, with no frame) still fits, to the
+ * widest of the ladder.
+ * @param {number[]} ladder - allowed fields of view, ascending, degrees
+ * @param {Object[]} selectedFrames
+ * @param {number|null} sizeArcmin - target apparent size
+ * @returns {number[]} ascending, never empty
+ */
+function _frZoomSteps(ladder, selectedFrames, sizeArcmin) {
+    let needed;
+    if (selectedFrames.length) {
+        needed = Math.max(...selectedFrames.map(_frDiagonalDeg)) * FRAMING_ZOOM_MIN_MARGIN;
+    } else {
+        needed = sizeArcmin ? (sizeArcmin / 60) * 1.2 : 0;
+    }
+    const steps = ladder.filter((fov) => fov >= needed);
+    return steps.length ? steps : [ladder[ladder.length - 1]];
+}
+
+/**
+ * Outline of the target on the canvas (north up, east left).
+ * @param {Object} target - payload target, with size_arcmin set
+ * @returns {{majorArcmin: number, minorArcmin: number, rotationRad: number}} the ellipse
+ *   axes and the canvas rotation of its major axis (a circle when the outline is unknown)
+ */
+function _frTargetOutline(target) {
+    const major = target.size_arcmin;
+    const minor = target.size_minor_arcmin;
+    const angle = target.position_angle_deg;
+    if (!minor || minor <= 0 || minor > major || angle === null || angle === undefined) {
+        return { majorArcmin: major, minorArcmin: major, rotationRad: 0 };
+    }
+    // The position angle runs from north through east. On the canvas north is up (-y) and
+    // east is left (-x), so the major axis points along (-sin PA, -cos PA).
+    const pa = _frRad(angle);
+    return { majorArcmin: major, minorArcmin: minor, rotationRad: Math.atan2(-Math.cos(pa), -Math.sin(pa)) };
 }
 
 /**
@@ -259,6 +300,68 @@ async function openFraming(identifier, options = {}) {
     if (closed) teardown();
 }
 
+/**
+ * Text saying what an unframeable combination is missing.
+ * @param {string} reason - see equipment/framing.py REASON_*
+ * @returns {string}
+ */
+function _frUnframeableReason(reason) {
+    switch (reason) {
+        case 'no_camera':
+            return _frT(
+                'framing.unframeable_no_camera',
+                'no camera. A visual setup has no field to frame; for a smart telescope, add its built-in camera (offered in the camera presets) to this combination.'
+            );
+        case 'camera_incomplete':
+            return _frT('framing.unframeable_camera_incomplete', 'the camera has no sensor size or pixel size.');
+        default:
+            return _frT(
+                'framing.unframeable_no_focal_length',
+                "no focal length: set the telescope's, or the lens focal length for a camera-only combination."
+            );
+    }
+}
+
+/**
+ * List of the combinations left out of the simulator, with what each one lacks and, for the
+ * user's own, a link to its editor.
+ * @param {Object[]} items - the payload's `unframeable` entries
+ * @returns {HTMLElement}
+ */
+function _frBuildUnframeable(items) {
+    const box = document.createElement('div');
+    box.className = 'mb-3';
+    const title = document.createElement('p');
+    title.className = 'small text-muted mb-1';
+    title.textContent = _frT('framing.unframeable_title', 'Not shown:');
+    box.appendChild(title);
+
+    const list = document.createElement('ul');
+    list.className = 'list-unstyled small mb-0';
+    items.forEach((item) => {
+        const row = document.createElement('li');
+        row.className = 'mb-1';
+        const name = document.createElement('strong');
+        name.textContent = item.combination_name;
+        DOMUtils.append(row, name, ` - ${_frUnframeableReason(item.reason)}`);
+        if (item.is_own && typeof editCombinationById === 'function') {
+            const edit = document.createElement('button');
+            edit.type = 'button';
+            edit.className = 'btn btn-link btn-sm p-0 ms-1 align-baseline';
+            edit.textContent = _frT('framing.unframeable_edit', 'Edit this combination');
+            edit.addEventListener('click', async () => {
+                edit.disabled = true;
+                const opened = await editCombinationById(item.combination_id);
+                if (!opened) edit.disabled = false;
+            });
+            row.appendChild(edit);
+        }
+        list.appendChild(row);
+    });
+    box.appendChild(list);
+    return box;
+}
+
 function _frAlert(level, text) {
     const alert = document.createElement('div');
     alert.className = `alert alert-${level} mb-0`;
@@ -282,6 +385,7 @@ function _frBuildSimulator(data, containerEl, preferredId) {
         offsetXi: 0, // towards east, tangent units
         offsetEta: 0, // towards north, tangent units
         backgroundFov: null,
+        zoomFov: null, // background field chosen with the zoom buttons; null follows the frames
         image: null,
         imageToken: 0,
         imageFailed: false,
@@ -345,6 +449,23 @@ function _frBuildSimulator(data, containerEl, preferredId) {
     const stageStatus = document.createElement('div');
     stageStatus.className = 'framing-stage-status';
     stage.appendChild(stageStatus);
+
+    const zoomGroup = document.createElement('div');
+    zoomGroup.className = 'btn-group btn-group-sm framing-zoom';
+    const zoomOutBtn = document.createElement('button');
+    zoomOutBtn.type = 'button';
+    zoomOutBtn.className = 'btn';
+    zoomOutBtn.setAttribute('aria-label', _frT('framing.zoom_out', 'Zoom out'));
+    zoomOutBtn.title = zoomOutBtn.getAttribute('aria-label');
+    zoomOutBtn.appendChild(DOMUtils.createIcon('bi bi-zoom-out'));
+    const zoomInBtn = document.createElement('button');
+    zoomInBtn.type = 'button';
+    zoomInBtn.className = 'btn';
+    zoomInBtn.setAttribute('aria-label', _frT('framing.zoom_in', 'Zoom in'));
+    zoomInBtn.title = zoomInBtn.getAttribute('aria-label');
+    zoomInBtn.appendChild(DOMUtils.createIcon('bi bi-zoom-in'));
+    DOMUtils.append(zoomGroup, zoomOutBtn, zoomInBtn);
+    stage.appendChild(zoomGroup);
     stageCol.appendChild(stage);
 
     const caption = document.createElement('p');
@@ -359,6 +480,9 @@ function _frBuildSimulator(data, containerEl, preferredId) {
     const combosList = document.createElement('div');
     combosList.className = 'framing-combos mb-3';
     sideCol.appendChild(combosList);
+    if ((data.unframeable || []).length) {
+        sideCol.appendChild(_frBuildUnframeable(data.unframeable));
+    }
 
     const swatches = [];
     for (let index = 0; index < FRAMING_MAX_SELECTED; index += 1) {
@@ -373,7 +497,7 @@ function _frBuildSimulator(data, containerEl, preferredId) {
         const message = data.has_combinations
             ? _frT(
                 'framing.no_frameable_combinations',
-                'None of your equipment combinations has both a camera sensor and a focal length. Complete one in the Equipment tab to see your field here.'
+                'None of your equipment combinations can be framed yet: each one needs a camera sensor and a focal length. See below what is missing.'
             )
             : _frT(
                 'framing.no_combinations',
@@ -493,14 +617,24 @@ function _frBuildSimulator(data, containerEl, preferredId) {
         ctx.fillRect(0, 0, size, size);
         if (state.image) ctx.drawImage(state.image, 0, 0, size, size);
 
-        // Target extent (dashed circle) and position (cross).
+        // Target extent (dashed outline) and position (cross). An elongated object with a
+        // known minor axis and position angle is drawn as its ellipse, otherwise a circle of
+        // its largest dimension.
         ctx.lineWidth = 2;
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
         if (data.target.size_arcmin) {
-            const radius = Math.tan(_frRad(data.target.size_arcmin / 120)) * scale;
+            const outline = _frTargetOutline(data.target);
             ctx.setLineDash([10, 8]);
             ctx.beginPath();
-            ctx.arc(half, half, radius, 0, 2 * Math.PI);
+            ctx.ellipse(
+                half,
+                half,
+                Math.tan(_frRad(outline.majorArcmin / 120)) * scale,
+                Math.tan(_frRad(outline.minorArcmin / 120)) * scale,
+                outline.rotationRad,
+                0,
+                2 * Math.PI
+            );
             ctx.stroke();
             ctx.setLineDash([]);
         }
@@ -622,8 +756,16 @@ function _frBuildSimulator(data, containerEl, preferredId) {
             verdicts.appendChild(card);
         });
 
-        // Background: reload only when the needed field of view changes.
-        const fov = _frPickBackgroundFov(data.image.fovs_deg, selected, data.target.size_arcmin);
+        // Background: the zoom choice while it still fits the frames, else the automatic
+        // field. Reload only when the field of view changes.
+        const zoomSteps = _frZoomSteps(data.image.fovs_deg, selected, data.target.size_arcmin);
+        if (state.zoomFov !== null && !zoomSteps.includes(state.zoomFov)) state.zoomFov = null;
+        const fov =
+            state.zoomFov !== null
+                ? state.zoomFov
+                : _frPickBackgroundFov(data.image.fovs_deg, selected, data.target.size_arcmin);
+        zoomInBtn.disabled = !zoomSteps.some((step) => step < fov);
+        zoomOutBtn.disabled = !zoomSteps.some((step) => step > fov);
         const widest = selected.length ? Math.max(...selected.map(_frDiagonalDeg)) : 0;
         const captionParts = [
             _frT('framing.orientation', 'North up, east left'),
@@ -686,6 +828,25 @@ function _frBuildSimulator(data, containerEl, preferredId) {
     canvas.addEventListener('pointerup', onPointerUp);
     canvas.addEventListener('pointercancel', onPointerUp);
     canvas.addEventListener('keydown', onKeyDown);
+
+    // Zoom: step through the background fields of view. The frame keeps its place on the
+    // sky; an offset now outside the image is brought back to its edge.
+    function zoomTo(direction) {
+        const steps = _frZoomSteps(data.image.fovs_deg, selectedFrames(), data.target.size_arcmin);
+        const current = state.backgroundFov;
+        const next =
+            direction < 0
+                ? [...steps].reverse().find((fov) => fov < current)
+                : steps.find((fov) => fov > current);
+        if (next === undefined) return;
+        state.zoomFov = next;
+        const tanHalf = Math.tan(_frRad(next / 2));
+        state.offsetXi = Math.max(-tanHalf, Math.min(tanHalf, state.offsetXi));
+        state.offsetEta = Math.max(-tanHalf, Math.min(tanHalf, state.offsetEta));
+        refresh();
+    }
+    zoomInBtn.addEventListener('click', () => zoomTo(-1));
+    zoomOutBtn.addEventListener('click', () => zoomTo(1));
 
     recentreBtn.addEventListener('click', () => {
         state.offsetXi = 0;

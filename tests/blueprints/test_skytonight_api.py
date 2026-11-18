@@ -3257,6 +3257,8 @@ _FRAMING_TARGET = {
     'ra_deg': 10.684708,
     'dec_deg': 41.26875,
     'size_arcmin': 177.8,
+    'size_minor_arcmin': 69.66,
+    'position_angle_deg': 35.0,
     'image_key': '10.684708_41.268750',
 }
 
@@ -3333,6 +3335,8 @@ def test_framing_returns_target_image_ladder_and_frames(client_admin, monkeypatc
         'ra_deg': 10.684708,
         'dec_deg': 41.26875,
         'size_arcmin': 177.8,
+        'size_minor_arcmin': 69.66,
+        'position_angle_deg': 35.0,
     }
     assert payload['image']['key'] == '10.684708_41.268750'
     assert payload['image']['fovs_deg'] == list(skytonight_api_module.sky_framing.FOV_LADDER_DEG)
@@ -3342,6 +3346,9 @@ def test_framing_returns_target_image_ladder_and_frames(client_admin, monkeypatc
     assert [frame['combination_id'] for frame in payload['frames']] == ['combo-1']
     assert payload['frames'][0]['verdict'] == 'too_large'
     assert payload['default_combination_id'] == 'combo-1'
+    assert payload['unframeable'] == [
+        {'combination_id': 'combo-2', 'combination_name': 'Visual', 'reason': 'no_camera', 'is_own': True}
+    ]
 
 
 def test_framing_without_combinations_still_returns_the_target(client_admin, monkeypatch):
@@ -3353,6 +3360,7 @@ def test_framing_without_combinations_still_returns_the_target(client_admin, mon
     assert payload['supported'] is True
     assert payload['has_combinations'] is False
     assert payload['frames'] == []
+    assert payload['unframeable'] == []
     assert payload['default_combination_id'] is None
 
 

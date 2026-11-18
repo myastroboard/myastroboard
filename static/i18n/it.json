@@ -2299,7 +2299,11 @@
     "form_guide_camera": "Camera di guida",
     "form_lens_focal_length": "Lunghezza focale dell'obiettivo (mm)",
     "form_lens_focal_ratio": "Rapporto focale dell'obiettivo (f/)",
-    "form_lens_focal_help": "Utilizzato solo quando non è selezionato alcun telescopio (es. fotocamera + obiettivo su un inseguitore stellare)."
+    "form_lens_focal_help": "Utilizzato solo quando non è selezionato alcun telescopio (es. fotocamera + obiettivo su un inseguitore stellare).",
+    "preset_bundle_create": "Aggiungi anche la fotocamera e la montatura integrate, con una combinazione pronta all'uso",
+    "preset_bundle_help": "Uno smart telescope ha la fotocamera integrata: senza di essa non si possono calcolare né il simulatore di inquadratura né il campo visivo.",
+    "telescope_bundle_created": "Telescopio creato con la sua attrezzatura integrata e una combinazione pronta all'uso",
+    "telescope_bundle_failed": "Telescopio creato, ma non è stato possibile aggiungere la sua attrezzatura integrata. Aggiungi la sua fotocamera dai preset delle fotocamere."
   },
   "weather": {
     "observation_conditions": "Condizioni di osservazione",
@@ -2742,7 +2746,7 @@
     "loading_image": "Caricamento dell'immagine del cielo...",
     "image_unavailable": "L'immagine del cielo non è disponibile al momento. Il riquadro resta in scala.",
     "no_combinations": "Aggiungi una combinazione di attrezzatura con una camera nella scheda Attrezzatura per vedere qui il tuo campo.",
-    "no_frameable_combinations": "Nessuna delle tue combinazioni di attrezzatura ha sia un sensore sia una lunghezza focale. Completane una nella scheda Attrezzatura per vedere qui il tuo campo.",
+    "no_frameable_combinations": "Nessuna delle tue combinazioni di attrezzatura può ancora essere inquadrata: ognuna richiede un sensore della fotocamera e una lunghezza focale. Vedi sotto cosa manca.",
     "combinations_label": "Combinazioni di attrezzatura",
     "max_selected": "Si possono confrontare fino a {max} combinazioni.",
     "rotation_label": "Rotazione del sensore: {deg}°",
@@ -2761,7 +2765,14 @@
     "verdict_tight": "Inquadratura stretta: il bersaglio occupa il {percent}% del lato corto del campo, con poco margine.",
     "verdict_too_large": "Più grande del campo ({percent}% del lato corto). Un mosaico di circa {columns} x {rows} pannelli lo coprirebbe (stima basata sulla dimensione maggiore del bersaglio).",
     "verdict_small": "Piccolo nel campo ({percent}% del lato corto): circa {pixels} px di larghezza sul sensore.",
-    "verdict_unknown": "Il catalogo non indica una dimensione per questo bersaglio."
+    "verdict_unknown": "Il catalogo non indica una dimensione per questo bersaglio.",
+    "unframeable_title": "Non mostrate:",
+    "unframeable_no_camera": "nessuna fotocamera. Un setup visuale non ha un campo da inquadrare; per uno smart telescope, aggiungi la sua fotocamera integrata (proposta nei preset delle fotocamere) a questa combinazione.",
+    "unframeable_camera_incomplete": "la fotocamera non ha la dimensione del sensore o la dimensione dei pixel.",
+    "unframeable_no_focal_length": "nessuna lunghezza focale: indica quella del telescopio, o quella dell'obiettivo per una combinazione con sola fotocamera.",
+    "unframeable_edit": "Modifica questa combinazione",
+    "zoom_in": "Ingrandisci",
+    "zoom_out": "Riduci"
   },
   "share": {
     "title": "Condividi",

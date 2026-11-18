@@ -2299,7 +2299,11 @@
     "form_guide_camera": "Caméra de guidage",
     "form_lens_focal_length": "Focale de l'objectif (mm)",
     "form_lens_focal_ratio": "Rapport focal de l'objectif (f/)",
-    "form_lens_focal_help": "Utilisé uniquement si aucun télescope n'est sélectionné (ex. : appareil photo + objectif sur une monture de suivi)."
+    "form_lens_focal_help": "Utilisé uniquement si aucun télescope n'est sélectionné (ex. : appareil photo + objectif sur une monture de suivi).",
+    "preset_bundle_create": "Ajouter aussi sa caméra et sa monture intégrées, avec une combinaison prête à l'emploi",
+    "preset_bundle_help": "Un smart telescope a sa caméra intégrée : sans elle, ni le simulateur de cadrage ni le champ ne peuvent être calculés.",
+    "telescope_bundle_created": "Télescope créé avec son matériel intégré et une combinaison prête à l'emploi",
+    "telescope_bundle_failed": "Télescope créé, mais son matériel intégré n'a pas pu être ajouté. Ajoutez sa caméra depuis les presets de caméras."
   },
   "weather": {
     "observation_conditions": "Conditions d'observation",
@@ -2742,7 +2746,7 @@
     "loading_image": "Chargement de l'image du ciel...",
     "image_unavailable": "L'image du ciel est indisponible pour le moment. Le cadre reste à l'échelle.",
     "no_combinations": "Ajoutez une combinaison de matériel avec une caméra dans l'onglet Équipement pour voir votre champ ici.",
-    "no_frameable_combinations": "Aucune de vos combinaisons de matériel n'a à la fois un capteur de caméra et une focale. Complétez-en une dans l'onglet Équipement pour voir votre champ ici.",
+    "no_frameable_combinations": "Aucune de vos combinaisons de matériel ne peut encore être cadrée : il faut un capteur de caméra et une focale. Voyez ci-dessous ce qui manque.",
     "combinations_label": "Combinaisons de matériel",
     "max_selected": "Jusqu'à {max} combinaisons peuvent être comparées.",
     "rotation_label": "Rotation du capteur : {deg}°",
@@ -2761,7 +2765,14 @@
     "verdict_tight": "Cadrage serré : la cible occupe {percent} % du petit côté du champ, avec peu de marge.",
     "verdict_too_large": "Plus grande que le champ ({percent} % de son petit côté). Une mosaïque d'environ {columns} x {rows} tuiles la couvrirait (estimation d'après la plus grande dimension de la cible).",
     "verdict_small": "Petite dans le champ ({percent} % de son petit côté) : environ {pixels} px de large sur le capteur.",
-    "verdict_unknown": "Le catalogue ne donne pas de taille pour cette cible."
+    "verdict_unknown": "Le catalogue ne donne pas de taille pour cette cible.",
+    "unframeable_title": "Non affichées :",
+    "unframeable_no_camera": "pas de caméra. Un setup visuel n'a pas de champ à cadrer ; pour un smart telescope, ajoutez sa caméra intégrée (proposée dans les presets de caméras) à cette combinaison.",
+    "unframeable_camera_incomplete": "la caméra n'a pas de taille de capteur ou de taille de pixel.",
+    "unframeable_no_focal_length": "pas de focale : renseignez celle du télescope, ou celle de l'objectif pour une combinaison caméra seule.",
+    "unframeable_edit": "Modifier cette combinaison",
+    "zoom_in": "Zoom avant",
+    "zoom_out": "Zoom arrière"
   },
   "share": {
     "title": "Partager",

@@ -2299,7 +2299,11 @@
     "form_guide_camera": "Guide Camera",
     "form_lens_focal_length": "Lens Focal Length (mm)",
     "form_lens_focal_ratio": "Lens Focal Ratio (f/)",
-    "form_lens_focal_help": "Only used when no telescope is selected (e.g. a camera + lens on a star tracker)."
+    "form_lens_focal_help": "Only used when no telescope is selected (e.g. a camera + lens on a star tracker).",
+    "preset_bundle_create": "Also add its built-in camera and mount, with a ready-to-use combination",
+    "preset_bundle_help": "A smart telescope has its camera built in: without it, the framing simulator and the field of view cannot be computed.",
+    "telescope_bundle_created": "Telescope created with its built-in equipment and a ready-to-use combination",
+    "telescope_bundle_failed": "Telescope created, but its built-in equipment could not be added. Add its camera from the camera presets."
   },
   "weather": {
     "observation_conditions": "Observation Conditions",
@@ -2742,7 +2746,7 @@
     "loading_image": "Loading the sky image...",
     "image_unavailable": "The sky image is unavailable for now. The frame is still to scale.",
     "no_combinations": "Add an equipment combination with a camera in the Equipment tab to see your field here.",
-    "no_frameable_combinations": "None of your equipment combinations has both a camera sensor and a focal length. Complete one in the Equipment tab to see your field here.",
+    "no_frameable_combinations": "None of your equipment combinations can be framed yet: each one needs a camera sensor and a focal length. See below what is missing.",
     "combinations_label": "Equipment combinations",
     "max_selected": "Up to {max} combinations can be compared.",
     "rotation_label": "Sensor rotation: {deg}°",
@@ -2761,7 +2765,14 @@
     "verdict_tight": "Tight fit: the target fills {percent}% of the field's short side, with little margin.",
     "verdict_too_large": "Larger than the field ({percent}% of its short side). A mosaic of about {columns} x {rows} panels would cover it (estimated from the target's longest dimension).",
     "verdict_small": "Small in the field ({percent}% of its short side): about {pixels} px across on the sensor.",
-    "verdict_unknown": "The catalogue gives no size for this target."
+    "verdict_unknown": "The catalogue gives no size for this target.",
+    "unframeable_title": "Not shown:",
+    "unframeable_no_camera": "no camera. A visual setup has no field to frame; for a smart telescope, add its built-in camera (offered in the camera presets) to this combination.",
+    "unframeable_camera_incomplete": "the camera has no sensor size or pixel size.",
+    "unframeable_no_focal_length": "no focal length: set the telescope's, or the lens focal length for a camera-only combination.",
+    "unframeable_edit": "Edit this combination",
+    "zoom_in": "Zoom in",
+    "zoom_out": "Zoom out"
   },
   "share": {
     "title": "Share",

@@ -2299,7 +2299,11 @@
     "form_guide_camera": "Cámara de guiado",
     "form_lens_focal_length": "Distancia focal del objetivo (mm)",
     "form_lens_focal_ratio": "Relación focal del objetivo (f/)",
-    "form_lens_focal_help": "Solo se usa cuando no se selecciona ningún telescopio (p. ej., cámara + objetivo sobre un seguidor estelar)."
+    "form_lens_focal_help": "Solo se usa cuando no se selecciona ningún telescopio (p. ej., cámara + objetivo sobre un seguidor estelar).",
+    "preset_bundle_create": "Añadir también su cámara y su montura integradas, con una combinación lista para usar",
+    "preset_bundle_help": "Un telescopio inteligente lleva la cámara integrada: sin ella no se pueden calcular ni el simulador de encuadre ni el campo de visión.",
+    "telescope_bundle_created": "Telescopio creado con su equipo integrado y una combinación lista para usar",
+    "telescope_bundle_failed": "Telescopio creado, pero no se pudo añadir su equipo integrado. Añade su cámara desde los presets de cámaras."
   },
   "weather": {
     "observation_conditions": "Condiciones de observación",
@@ -2742,7 +2746,7 @@
     "loading_image": "Cargando la imagen del cielo...",
     "image_unavailable": "La imagen del cielo no está disponible por ahora. El marco sigue estando a escala.",
     "no_combinations": "Añade una combinación de equipo con una cámara en la pestaña Equipo para ver tu campo aquí.",
-    "no_frameable_combinations": "Ninguna de tus combinaciones de equipo tiene a la vez un sensor de cámara y una distancia focal. Completa una en la pestaña Equipo para ver tu campo aquí.",
+    "no_frameable_combinations": "Ninguna de tus combinaciones de equipo se puede encuadrar todavía: cada una necesita un sensor de cámara y una distancia focal. Mira abajo lo que falta.",
     "combinations_label": "Combinaciones de equipo",
     "max_selected": "Se pueden comparar hasta {max} combinaciones.",
     "rotation_label": "Rotación del sensor: {deg}°",
@@ -2761,7 +2765,14 @@
     "verdict_tight": "Encuadre ajustado: el objetivo ocupa el {percent}% del lado corto del campo, con poco margen.",
     "verdict_too_large": "Más grande que el campo ({percent}% de su lado corto). Un mosaico de unos {columns} x {rows} paneles lo cubriría (estimación a partir de la dimensión mayor del objetivo).",
     "verdict_small": "Pequeño en el campo ({percent}% de su lado corto): unos {pixels} px de ancho en el sensor.",
-    "verdict_unknown": "El catálogo no indica el tamaño de este objetivo."
+    "verdict_unknown": "El catálogo no indica el tamaño de este objetivo.",
+    "unframeable_title": "No mostradas:",
+    "unframeable_no_camera": "sin cámara. Un equipo visual no tiene campo que encuadrar; para un telescopio inteligente, añade su cámara integrada (disponible en los presets de cámaras) a esta combinación.",
+    "unframeable_camera_incomplete": "la cámara no tiene tamaño de sensor o tamaño de píxel.",
+    "unframeable_no_focal_length": "sin distancia focal: indica la del telescopio, o la del objetivo para una combinación solo con cámara.",
+    "unframeable_edit": "Editar esta combinación",
+    "zoom_in": "Acercar",
+    "zoom_out": "Alejar"
   },
   "share": {
     "title": "Compartir",

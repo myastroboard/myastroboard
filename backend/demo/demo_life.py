@@ -73,10 +73,11 @@ DEMO_SETUPS = (
         'camera': {
             'name': 'Seestar S50 sensor (IMX462)',
             'manufacturer': 'ZWO',
-            'sensor_width_mm': 5.6,
-            'sensor_height_mm': 3.2,
-            'resolution_width_px': 1920,
-            'resolution_height_px': 1080,
+            # Portrait, as the Seestar delivers its images (see docs/EQUIPMENT.md, bundles).
+            'sensor_width_mm': 3.2,
+            'sensor_height_mm': 5.6,
+            'resolution_width_px': 1080,
+            'resolution_height_px': 1920,
             'pixel_size_um': 2.9,
             'sensor_type': 'color',
         },
