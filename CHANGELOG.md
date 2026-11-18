@@ -23,7 +23,8 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   ([docs/EQUIPMENT.md](docs/EQUIPMENT.md#bundles-smart-telescopes)).
 - The framing simulator lists the combinations it cannot show with what each one lacks, and a link to
   edit them ([docs/SKYTONIGHT.md](docs/SKYTONIGHT.md#framing-simulator)).
-
+- Aurora forecast on phones: each time slot's header wraps instead of overflowing, and the Kp value fits
+  in narrow columns.
 - Astro weather no longer falls back to its reduced forecast for some locations: it stopped requesting
   unused upper-air variables, one of which made Open-Meteo answer with an error.
 - The weather forecast decodes again on humid nights: a fractional fog percentage made the fast decoder
