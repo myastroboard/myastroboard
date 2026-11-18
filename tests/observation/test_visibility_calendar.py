@@ -316,7 +316,7 @@ def test_result_is_cached_and_lru_evicts(monkeypatch):
     second = visibility_calendar.get_visibility_calendar('NGC 224', _PARIS, _YEAR)
     assert first is second  # served from the LRU, not recomputed
 
-    monkeypatch.setattr(visibility_calendar, '_MAX_CACHE_ENTRIES', 2)
+    monkeypatch.setattr(visibility_calendar._calendar_cache, 'limit', 2)
     visibility_calendar.get_visibility_calendar('NGC 224', _PARIS, _YEAR + 1)
     visibility_calendar.get_visibility_calendar('NGC 224', _PARIS, _YEAR + 2)
     assert ('ngc 224', 'loc-paris', _YEAR) not in visibility_calendar._calendar_cache
@@ -408,7 +408,7 @@ class TestDarkHoursByMonth:
         assert all(row['moon_illumination_pct'] is None for row in rows)
 
     def test_dark_hours_cache_evicts_the_oldest_entry(self, monkeypatch):
-        monkeypatch.setattr(visibility_calendar, '_MAX_CACHE_ENTRIES', 1)
+        monkeypatch.setattr(visibility_calendar._dark_hours_cache, 'limit', 1)
         visibility_calendar.clear_batch_caches()
         visibility_calendar.dark_hours_by_month(
             {'id': 'loc-a', 'latitude': 48.0, 'longitude': 2.0, 'timezone': 'Europe/Paris'}, 2026
@@ -531,7 +531,7 @@ class TestNextVisibilityBatch:
     def test_context_cache_evicts_the_oldest_entry(self, monkeypatch):
         from datetime import date as _date
 
-        monkeypatch.setattr(visibility_calendar, '_MAX_CONTEXT_ENTRIES', 1)
+        monkeypatch.setattr(visibility_calendar._context_cache, 'limit', 1)
         visibility_calendar.clear_batch_caches()
         location_id = self._location()['id']
         visibility_calendar._cached_night_context(location_id, 48.0, 2.0, 'Europe/Paris', _date(2026, 1, 1))
@@ -588,3 +588,37 @@ def test_calendar_cache_misses_after_horizon_or_constraint_change(monkeypatch):
     visibility_calendar.get_visibility_calendar('M31', location, 2026)
 
     assert len(calls) == 3
+
+
+def test_night_context_for_reads_the_preset_and_reuses_the_night(monkeypatch):
+    """The challenges ask per preset: its coordinates feed the night, computed once per date."""
+    from datetime import date as _date
+
+    calls = []
+
+    def fake_build(lat_deg, lon_deg, timezone_name, night_date):
+        calls.append((lat_deg, lon_deg, timezone_name, night_date))
+        return {'date': night_date.isoformat()}
+
+    monkeypatch.setattr(visibility_calendar, 'build_night_context', fake_build)
+    location = {'id': 'home', 'latitude': 45.5, 'longitude': 6.25, 'timezone': 'Europe/Paris'}
+
+    first = visibility_calendar.night_context_for(location, _date(2026, 9, 15))
+    second = visibility_calendar.night_context_for(location, _date(2026, 9, 15))
+
+    assert first == second == {'date': '2026-09-15'}
+    assert calls == [(45.5, 6.25, 'Europe/Paris', _date(2026, 9, 15))]
+
+
+def test_observing_constraints_follow_the_skytonight_settings(monkeypatch):
+    """The altitude band is the one the SkyTonight calculator uses, airmass limit included."""
+    assert visibility_calendar.observing_constraints() == (30.0, 90.0)
+
+    monkeypatch.setattr(
+        visibility_calendar,
+        'load_config',
+        lambda: {'skytonight': {'constraints': {'altitude_constraint_min': 10, 'airmass_constraint': 2.0}}},
+    )
+    alt_min, alt_max = visibility_calendar.observing_constraints()
+    assert alt_min == pytest.approx(30.0)
+    assert alt_max == 80.0

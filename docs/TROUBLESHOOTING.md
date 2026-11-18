@@ -18,8 +18,10 @@ limits and file system of the data directory: it answers most resource questions
 
 ### Requests fail at random, or the offline page appears, during the first SkyTonight run
 
-**Cause**: not enough memory. A worker is killed during the SkyTonight calculation; the browser
-then sees failed requests, sometimes for actions that went through on the server.
+**Cause**: not enough memory. The worker is killed during the SkyTonight calculation and restarts
+within seconds; meanwhile the browser sees failed requests, sometimes for actions that went through
+on the server. The log of the container shows `Worker (pid:...) was sent SIGKILL! Perhaps out of
+memory?`.
 
 **Fix**: give the container at least 1 GB, 2 GB when other services share the host. App settings ->
 Metrics warns below 1 GB. See [system requirements](1.INSTALLATION.md#system-requirements).

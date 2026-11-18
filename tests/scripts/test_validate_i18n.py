@@ -233,3 +233,19 @@ def test_html_parsers_extract_language_codes():
     }
     assert validate_i18n.parse_html_supported_langs("var supported = ['fr', \"de\"];") == {'fr', 'de'}
     assert validate_i18n.parse_html_selector_langs('<option selected value="it">') == {'it'}
+
+
+@pytest.mark.unit
+def test_a_bare_value_has_no_keys_or_leaves():
+    """A value that is neither an object nor a list holds no translation key."""
+    assert validate_i18n.flatten_keys('text') == set()
+    assert validate_i18n.get_leaf_types(3) == {}
+
+
+@pytest.mark.unit
+def test_empty_reference_and_translation_pass(tree, capsys):
+    """An empty reference has no leaf types to compare, and an empty translation matches it."""
+    (tree / 'static' / 'i18n' / 'en.json').write_text('{}', encoding='utf-8')
+    _write_fr(tree, '{}')
+    assert validate_i18n.main() == 0
+    assert 'i18n validation OK' in capsys.readouterr().out

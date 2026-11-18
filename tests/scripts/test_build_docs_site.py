@@ -167,6 +167,28 @@ def test_install_katex_extracts_only_the_needed_files(tmp_path, monkeypatch):
 
 
 @pytest.mark.unit
+def test_install_katex_stops_on_a_file_it_cannot_read(tmp_path, monkeypatch):
+    """A needed file the archive cannot hand back stops the build instead of shipping without it."""
+    data = _katex_tgz({'package/dist/katex.min.js': b'js'})
+    archive = tmp_path / 'katex.tgz'
+    archive.write_bytes(data)
+    monkeypatch.setattr(build_docs_site, 'KATEX_INTEGRITY', _integrity(data))
+    monkeypatch.setattr(tarfile.TarFile, 'extractfile', lambda self, member: None)
+    with pytest.raises(SystemExit, match='cannot read package/dist/katex.min.js'):
+        build_docs_site.install_katex(tmp_path / 'katex', archive)
+
+
+@pytest.mark.unit
+def test_convert_images_needs_pillow(tmp_path, monkeypatch):
+    """Without Pillow the build stops with the command that installs it."""
+    import sys
+
+    monkeypatch.setitem(sys.modules, 'PIL', None)
+    with pytest.raises(SystemExit, match='Pillow is required'):
+        build_docs_site.convert_images(tmp_path)
+
+
+@pytest.mark.unit
 def test_convert_images_turns_screenshots_into_webp(tmp_path):
     """PNG and GIF screenshots become WebP (animated GIFs stay animated); the banner and other files stay."""
     from PIL import Image
@@ -326,6 +348,16 @@ def _fake_mdbook(pages):
         return subprocess.CompletedProcess(command, 0)
 
     return run, calls
+
+
+@pytest.mark.unit
+def test_prepare_works_on_a_first_build(fake_repo):
+    """With no build folder yet, there is nothing to clear and the site is assembled all the same."""
+    import shutil
+
+    shutil.rmtree(fake_repo['build'])
+    build_docs_site.prepare('local.tgz')
+    assert (fake_repo['build'] / 'docs' / 'README.md').exists()
 
 
 @pytest.mark.unit

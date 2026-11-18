@@ -5,6 +5,7 @@ token generation/verification, slot timing, picture shuffling, and rendering.
 
 import io
 import os
+import sys
 import tempfile
 import time
 
@@ -214,6 +215,42 @@ class TestRendering:
 
         assert len(astrodex_stream._FRAME_CACHE) <= max_entries
         assert not any(key[2] == bucket - 1 for key in astrodex_stream._FRAME_CACHE)
+
+    def test_concurrent_renders_past_the_cap_never_raise(self, monkeypatch):
+        """Many feeds rendered at once by request threads keep the cache consistent.
+
+        The eviction walks the cache; without the lock another thread's insert during that
+        walk raised "dictionary changed size during iteration".
+        """
+        import threading
+
+        astrodex_stream._FRAME_CACHE.clear()
+        monkeypatch.setattr(astrodex_stream, 'render_current_frame', lambda pictures, config, seed: b'frame')
+        monkeypatch.setattr(astrodex_stream, '_FRAME_CACHE_MAX_ENTRIES', 8)
+        errors = []
+        start = threading.Barrier(8)
+
+        def worker(seed):
+            start.wait()
+            try:
+                for i in range(500):
+                    assert astrodex_stream._render_cached(f'feed-{seed}-{i}', [], _cfg()) == b'frame'
+            except BaseException as error:  # pragma: no cover - only reached on a regression
+                errors.append(error)
+
+        threads = [threading.Thread(target=worker, args=(seed,)) for seed in range(8)]
+        previous = sys.getswitchinterval()
+        sys.setswitchinterval(1e-6)  # switch threads as often as possible to expose races
+        try:
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+        finally:
+            sys.setswitchinterval(previous)
+        assert errors == []
+        assert len(astrodex_stream._FRAME_CACHE) <= 8
+        astrodex_stream._FRAME_CACHE.clear()
 
     def test_shared_feed_includes_owner_username_in_the_banner_personal_does_not(self, temp_data_dir):
         """Not asserting on rendered pixels - just that the banner-line builder picks up

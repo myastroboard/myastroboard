@@ -226,6 +226,6 @@ def _warn_deprecated_env_vars() -> None:
     if deprecated:
         logger.warning(
             f"Deprecated environment variables detected and ignored: {', '.join(deprecated)}. "
-            "These settings are now managed through the admin UI (Parameters → Advanced). "
+            "These settings are now managed through the admin UI (App settings -> Configuration). "
             "Please remove them from your docker-compose file."
         )

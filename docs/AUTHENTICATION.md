@@ -106,8 +106,9 @@ from there.
 
 1. **Enable 2FA** -> `POST /api/auth/2fa/setup` generates a TOTP secret and persists it
    immediately with `totp_enabled: false`. It is **not** held in server memory or the Flask
-   session: the container runs `gunicorn -w 2` (two worker processes), so an in-memory pending
-   secret would randomly fail confirmation depending on which worker handled it.
+   session: the server can run several gunicorn worker processes
+   ([Workers and threads](1.INSTALLATION.md#workers-and-threads)), and an in-memory pending
+   secret would then randomly fail confirmation depending on which worker handled it.
 2. The setup modal shows:
    - A QR code (rendered client-side) - scan it **from a different device** than the one showing
      it.
@@ -285,7 +286,7 @@ These are managed in **App settings -> Configuration** in the admin UI, or via `
   `POST /api/auth/login` answers `429` with a `Retry-After` header until the window has passed. A
   successful sign-in resets that username's counter. Counting per IP + username means a stranger
   cannot lock a user out from the user's own address. The counters live in memory per worker process
-  (`gunicorn -w N` multiplies the ceiling by N) and reset on restart, so a reverse proxy with its own
+  (one or two, see [Workers and threads](1.INSTALLATION.md#workers-and-threads); N processes multiply the ceiling by N) and reset on restart, so a reverse proxy with its own
   rate limit remains a good complement for public-facing deployments. `POST /api/auth/login/verify-2fa`
   has its own, tighter 5-attempt, 5-minute limit (see [Two-factor authentication](#two-factor-authentication)).
 - There is no email-based password reset: an admin must reset passwords via the Users panel.

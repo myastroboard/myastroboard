@@ -8,7 +8,6 @@ import os
 import time
 import zipfile
 from datetime import UTC, datetime
-from urllib.parse import urlsplit
 
 from flask import Blueprint, current_app, jsonify, request, send_file, session
 
@@ -19,6 +18,7 @@ from utils.auth import admin_required
 from utils.constants import DATA_DIR, SKYTONIGHT_LOGS_DIR, SKYTONIGHT_SCHEDULER_STATUS_FILE
 from utils.file_lock import interprocess_lock
 from utils.image_privacy import strip_stored_pictures
+from utils.ingress import browser_keeps_secure_cookies
 from utils.logging_config import apply_log_retention, env_log_level, get_logger, refresh_log_levels
 from utils.metrics_collector import collect_metrics
 from utils.user_data import user_data_dirs
@@ -52,24 +52,6 @@ def get_app_settings_api():
             'console_log_level_env': env_log_level('CONSOLE_LOG_LEVEL'),
         }
     )
-
-
-_LOOPBACK_HOSTS = {'localhost', '127.0.0.1', '::1'}
-
-
-def _request_can_keep_secure_cookies() -> bool:
-    """True when the browser will accept a ``Secure`` cookie from this page.
-
-    That is HTTPS (as seen through ProxyFix when the proxy headers are trusted), or a loopback
-    address, which browsers treat as secure even over plain HTTP.
-    """
-    if request.is_secure:
-        return True
-    try:
-        host = urlsplit(f'//{request.host}').hostname or ''  # lower-cased, port and IPv6 brackets removed
-    except ValueError:  # a malformed Host header is not a secure context
-        return False
-    return host in _LOOPBACK_HOSTS or host.endswith('.localhost')
 
 
 @admin_bp.route('/api/admin/app-settings', methods=['POST'])
@@ -116,7 +98,7 @@ def update_app_settings_api():
     # drops every Secure cookie the server sends to that page, so signing in (and out) stops
     # working there. Only the switch from off to on is refused; a value already on is kept.
     secure_requested = bool(data.get('session_cookie_secure', old_settings.get('session_cookie_secure', False)))
-    if secure_requested and not old_settings.get('session_cookie_secure') and not _request_can_keep_secure_cookies():
+    if secure_requested and not old_settings.get('session_cookie_secure') and not browser_keeps_secure_cookies():
         logger.warning(
             f"Refused to turn on HTTPS-only session cookies from a plain-HTTP page ({request.host}), "
             f"requested by {session.get('username', '?')}"

@@ -137,5 +137,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 # Entrypoint root -> fix perms -> drop user
 ENTRYPOINT ["/entrypoint.sh"]
 
-# Default command (listen address: gunicorn.conf.py)
-CMD ["gunicorn", "-w", "2", "backend.app:app"]
+# Default command. gunicorn.conf.py sets the listen address and one worker process with
+# request threads; WEB_CONCURRENCY=2 asks for a second process (about 215 MB more memory).
+CMD ["gunicorn", "backend.app:app"]

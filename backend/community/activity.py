@@ -15,6 +15,7 @@ Who takes part:
 """
 
 import datetime
+import threading
 from collections import OrderedDict
 from collections.abc import Iterable
 from typing import Any
@@ -179,18 +180,23 @@ class TtlCache:
         self.ttl = ttl
         self.max_entries = max_entries
         self._entries: OrderedDict[Any, tuple[float, Any]] = OrderedDict()
+        # Shared by the request threads of the process.
+        self._lock = threading.Lock()
 
     def get(self, key: Any, now: float) -> Any:
-        hit = self._entries.get(key)
+        with self._lock:
+            hit = self._entries.get(key)
         if hit is None or now - hit[0] > self.ttl:
             return None
         return hit[1]
 
     def put(self, key: Any, value: Any, now: float) -> None:
-        self._entries[key] = (now, value)
-        self._entries.move_to_end(key)
-        while len(self._entries) > self.max_entries:
-            self._entries.popitem(last=False)
+        with self._lock:
+            self._entries[key] = (now, value)
+            self._entries.move_to_end(key)
+            while len(self._entries) > self.max_entries:
+                self._entries.popitem(last=False)
 
     def clear(self) -> None:
-        self._entries.clear()
+        with self._lock:
+            self._entries.clear()

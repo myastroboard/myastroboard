@@ -587,6 +587,40 @@ class TestFetchExtendedWeatherDataErrors:
         # Core fallback should return a result (or None if parse also fails)
         # Either outcome means  were hit
 
+    def test_full_request_asks_only_for_variables_that_are_read(self):
+        """The full request keeps the jet stream wind used by the seeing estimate and leaves out the
+        unused geopotential heights, one of which made Open-Meteo answer 500 for some locations."""
+        analyzer = self._build_analyzer_with_location()
+        mock_client = MagicMock()
+        mock_client.weather_api.return_value = [MagicMock()]
+
+        with patch("weather.weather_astro.create_weather_client", return_value=mock_client):
+            with patch.object(analyzer, "_parse_extended_data", return_value={"data": pd.DataFrame(), "location": {}}):
+                analyzer.fetch_extended_weather_data(24)
+
+        hourly = mock_client.weather_api.call_args.kwargs["params"]["hourly"]
+        assert "wind_speed_500hPa" in hourly
+        assert not any(name.startswith("geopotential_height") for name in hourly)
+
+    def test_fallback_warning_gives_the_reason_without_the_request_url(self, caplog):
+        """The retry warning says why the full request failed, but drops the request URL and the
+        coordinates it carries."""
+        analyzer = self._build_analyzer_with_location()
+        mock_client = MagicMock()
+        mock_client.weather_api.side_effect = [
+            Exception("500 Server Error: Internal Server Error for url: https://example.test/?latitude=48.0"),
+            [MagicMock()],
+        ]
+
+        with patch("weather.weather_astro.create_weather_client", return_value=mock_client):
+            with patch.object(analyzer, "_parse_extended_data", return_value={"data": pd.DataFrame(), "location": {}}):
+                with caplog.at_level("WARNING"):
+                    analyzer.fetch_extended_weather_data(24)
+
+        warning = next(r.getMessage() for r in caplog.records if "retrying with core variables" in r.getMessage())
+        assert "500 Server Error: Internal Server Error" in warning
+        assert "latitude" not in warning
+
     def test_both_requests_fail_returns_none(self):
         """both full and core requests fail → None."""
         analyzer = self._build_analyzer_with_location()

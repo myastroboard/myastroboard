@@ -266,6 +266,85 @@ class TestSessionCookie:
         assert cookies and f'Path={PREFIX}' in cookies[0]
 
 
+class TestSecureCookie:
+    """The HTTPS-only session cookie is flagged Secure only where the browser can keep it."""
+
+    @pytest.mark.parametrize(
+        'address, keeps',
+        [
+            ('https://demo.example.org', True),
+            ('http://localhost:5000', True),
+            ('http://LOCALHOST', True),
+            ('http://127.0.0.1:5000', True),
+            ('http://[::1]:5000', True),
+            ('http://myastroboard.localhost:5000', True),
+            ('http://192.168.1.10:5050', False),
+            ('http://demo.example.org', False),
+            ('http://[fe80::1]:5000', False),
+        ],
+    )
+    def test_rule_follows_what_browsers_accept(self, flask_app, address, keeps):
+        """Browsers keep a Secure cookie over HTTPS and on loopback addresses only."""
+        with flask_app.test_request_context('/', base_url=address):
+            assert ingress.browser_keeps_secure_cookies() is keeps
+
+    def test_rule_treats_a_malformed_host_as_insecure(self, flask_app, monkeypatch):
+        """A Host header that is not a valid address is never a secure context: Werkzeug already
+        empties it, and a host urlsplit still cannot parse is refused too."""
+        with flask_app.test_request_context('/', environ_overrides={'HTTP_HOST': '[::1'}):
+            assert ingress.browser_keeps_secure_cookies() is False
+
+        def _unparsable(url):
+            raise ValueError('Invalid IPv6 URL')
+
+        monkeypatch.setattr(ingress, 'urlsplit', _unparsable)
+        with flask_app.test_request_context('/', base_url='http://localhost:5000'):
+            assert ingress.browser_keeps_secure_cookies() is False
+
+    @pytest.fixture
+    def secure_setting_on(self, flask_app, monkeypatch):
+        monkeypatch.setitem(flask_app.config, 'SESSION_COOKIE_SECURE', True)
+
+    @staticmethod
+    def _sign_in(client, base_url):
+        from utils.auth import user_manager
+
+        username = 'secure_cookie_user'
+        if not user_manager.get_user_by_username(username):
+            user_manager.create_user(username, 'password123', 'user')
+        resp = client.post('/api/auth/login', json={'username': username, 'password': 'password123'}, base_url=base_url)
+        assert resp.status_code == 200
+        cookies = [h for h in resp.headers.getlist('Set-Cookie') if h.startswith('session=')]
+        assert cookies
+        return cookies[0]
+
+    def test_https_page_gets_a_secure_cookie(self, flask_app, secure_setting_on):
+        """Over HTTPS the setting applies: the cookie never travels over plain HTTP afterwards."""
+        with flask_app.test_client() as client:
+            cookie = self._sign_in(client, 'https://demo.example.org')
+        assert '; Secure' in cookie
+
+    def test_plain_http_lan_page_gets_a_cookie_the_browser_keeps(self, flask_app, secure_setting_on):
+        """Over http://<lan address> a Secure cookie would be dropped and the page would reload
+        forever: the cookie goes without the flag, and the session works."""
+        with flask_app.test_client() as client:
+            cookie = self._sign_in(client, 'http://192.168.1.10:5050')
+            status = client.get('/api/auth/status', base_url='http://192.168.1.10:5050').get_json()
+        assert '; Secure' not in cookie
+        assert status['authenticated'] is True
+
+    def test_setting_off_never_flags_the_cookie(self, flask_app, monkeypatch):
+        """With the setting off the cookie is never Secure, even over HTTPS (Flask's default)."""
+        monkeypatch.setitem(flask_app.config, 'SESSION_COOKIE_SECURE', False)
+        with flask_app.test_client() as client:
+            cookie = self._sign_in(client, 'https://demo.example.org')
+        assert '; Secure' not in cookie
+
+    def test_outside_a_request_the_setting_is_returned_as_is(self, flask_app, secure_setting_on):
+        """No request to look at (a session saved by hand): the setting itself."""
+        assert flask_app.session_interface.get_cookie_secure(flask_app) is True
+
+
 class TestClientIpReachesTheApp:
     def test_failed_login_is_counted_against_the_real_client(self, ingress_client):
         """One ingress user's failed logins must not lock out every other ingress user."""

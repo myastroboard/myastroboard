@@ -245,6 +245,7 @@ def test_load_calculation_results_merges_split_files(monkeypatch):
         return default or {}
 
     monkeypatch.setattr(calc, 'load_json_file', _fake_load)
+    monkeypatch.setattr(calc, 'load_shared_json', _fake_load)
 
     combined = load_calculation_results()
 
@@ -256,6 +257,7 @@ def test_load_calculation_results_merges_split_files(monkeypatch):
 
 def test_load_calculation_results_handles_missing_files(monkeypatch):
     monkeypatch.setattr(calc, 'load_json_file', lambda path, default=None: default or {})
+    monkeypatch.setattr(calc, 'load_shared_json', lambda path, default=None: default or {})
 
     combined = load_calculation_results()
 
@@ -276,6 +278,7 @@ def test_load_calculation_results_falls_back_to_data_file_metadata(monkeypatch):
         return default or {}
 
     monkeypatch.setattr(calc, 'load_json_file', _fake_load)
+    monkeypatch.setattr(calc, 'load_shared_json', _fake_load)
 
     combined = load_calculation_results()
 

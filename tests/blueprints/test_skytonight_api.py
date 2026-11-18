@@ -137,7 +137,7 @@ def test_dso_annotation_uses_display_name_for_astrodex_matching(monkeypatch):
     monkeypatch.setattr(skytonight_api_module, 'has_dso_results', lambda *_a, **_k: True)
     monkeypatch.setattr(
         skytonight_api_module,
-        'load_json_file',
+        'load_shared_json',
         lambda *_args, **_kwargs: {
             'metadata': {},
             'deep_sky': [
@@ -553,6 +553,7 @@ class TestBuildBodiesSectionPayloadWithCalcResults:
         data = {'bodies': calc['bodies'], 'metadata': {}}
         monkeypatch.setattr(skytonight_api_module, 'has_bodies_results', lambda *_a, **_k: True)
         monkeypatch.setattr(skytonight_api_module, 'load_json_file', lambda *a, **k: data)
+        monkeypatch.setattr(skytonight_api_module, 'load_shared_json', lambda *a, **k: data)
         monkeypatch.setattr(
             skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'}
         )
@@ -577,6 +578,7 @@ class TestBuildCometsSectionPayloadWithCalcResults:
         data = {'comets': calc['comets'], 'metadata': {}}
         monkeypatch.setattr(skytonight_api_module, 'has_comets_results', lambda *_a, **_k: True)
         monkeypatch.setattr(skytonight_api_module, 'load_json_file', lambda *a, **k: data)
+        monkeypatch.setattr(skytonight_api_module, 'load_shared_json', lambda *a, **k: data)
         monkeypatch.setattr(
             skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'}
         )
@@ -598,6 +600,7 @@ class TestBuildCometsSectionPayloadWithCalcResults:
         data = {'comets': [comet], 'metadata': {}}
         monkeypatch.setattr(skytonight_api_module, 'has_comets_results', lambda *_a, **_k: True)
         monkeypatch.setattr(skytonight_api_module, 'load_json_file', lambda *a, **k: data)
+        monkeypatch.setattr(skytonight_api_module, 'load_shared_json', lambda *a, **k: data)
         monkeypatch.setattr(
             skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'}
         )
@@ -619,6 +622,7 @@ class TestBuildDsoSectionPayloadWithCalcResults:
         data = {'deep_sky': calc['deep_sky'], 'metadata': {}}
         monkeypatch.setattr(skytonight_api_module, 'has_dso_results', lambda *_a, **_k: True)
         monkeypatch.setattr(skytonight_api_module, 'load_json_file', lambda *a, **k: data)
+        monkeypatch.setattr(skytonight_api_module, 'load_shared_json', lambda *a, **k: data)
         monkeypatch.setattr(
             skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'}
         )
@@ -639,6 +643,7 @@ class TestBuildDsoSectionPayloadWithCalcResults:
         data = {'deep_sky': calc['deep_sky'], 'metadata': {}}
         monkeypatch.setattr(skytonight_api_module, 'has_dso_results', lambda *_a, **_k: True)
         monkeypatch.setattr(skytonight_api_module, 'load_json_file', lambda *a, **k: data)
+        monkeypatch.setattr(skytonight_api_module, 'load_shared_json', lambda *a, **k: data)
         monkeypatch.setattr(
             skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'}
         )
@@ -2285,6 +2290,7 @@ class TestCalcPathMissingBranches:
             'metadata': {},
         }
         monkeypatch.setattr(skytonight_api_module, 'load_json_file', lambda *a, **k: dso_data)
+        monkeypatch.setattr(skytonight_api_module, 'load_shared_json', lambda *a, **k: dso_data)
         # Request Messier → NGC 1 doesn't have it → skipped
         result = skytonight_api_module._build_dso_section_payload('Messier', 'uid-1', 'user1')
         assert result['report'] == []
@@ -2514,6 +2520,7 @@ class TestRemainingRouteGaps:
             lambda: {'skytonight': {'constraints': {'altitude_constraint_min': 30, 'horizon_profile': []}}},
         )
         monkeypatch.setattr(skytonight_api_module, 'load_json_file', lambda path, default=None: dso_data)
+        monkeypatch.setattr(skytonight_api_module, 'load_shared_json', lambda path, default=None: dso_data)
 
         response = client_admin.get('/api/skytonight/skymap')
         assert response.status_code == 200
@@ -2568,6 +2575,7 @@ class TestSkytonightRecommendationsEndpoint:
 
     def _mock_common(self, monkeypatch, experience_level='advanced'):
         monkeypatch.setattr(skytonight_api_module, 'load_json_file', lambda *a, **k: self._dso_results())
+        monkeypatch.setattr(skytonight_api_module, 'load_shared_json', lambda *a, **k: self._dso_results())
         monkeypatch.setattr(skytonight_api_module.beginner_catalog, 'load_beginner_catalog', lambda: [])
         monkeypatch.setattr(skytonight_api_module.astrodex, 'is_item_in_astrodex', lambda *a, **k: False)
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'is_target_in_current_plan', lambda *a, **k: False)
@@ -2620,6 +2628,7 @@ class TestSkytonightRecommendationsEndpoint:
 
     def test_estimated_hours_uses_beginner_catalog_match_when_available(self, client_admin, monkeypatch):
         monkeypatch.setattr(skytonight_api_module, 'load_json_file', lambda *a, **k: self._dso_results())
+        monkeypatch.setattr(skytonight_api_module, 'load_shared_json', lambda *a, **k: self._dso_results())
         monkeypatch.setattr(
             skytonight_api_module.beginner_catalog,
             'load_beginner_catalog',
@@ -2661,6 +2670,7 @@ class TestSkytonightRecommendationsEndpoint:
             ]
         }
         monkeypatch.setattr(skytonight_api_module, 'load_json_file', lambda *a, **k: dso_results)
+        monkeypatch.setattr(skytonight_api_module, 'load_shared_json', lambda *a, **k: dso_results)
         monkeypatch.setattr(skytonight_api_module.beginner_catalog, 'load_beginner_catalog', lambda: [])
         monkeypatch.setattr(skytonight_api_module.astrodex, 'is_item_in_astrodex', lambda *a, **k: False)
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'is_target_in_current_plan', lambda *a, **k: False)
@@ -2826,11 +2836,9 @@ def _dso_calc_items():
 
 def _patch_dso_calc(monkeypatch, items=None):
     monkeypatch.setattr(skytonight_api_module, 'has_dso_results', lambda *_a, **_k: True)
-    monkeypatch.setattr(
-        skytonight_api_module,
-        'load_json_file',
-        lambda *_a, **_k: {'metadata': {}, 'deep_sky': items if items is not None else _dso_calc_items()},
-    )
+    dso_results = {'metadata': {}, 'deep_sky': items if items is not None else _dso_calc_items()}
+    monkeypatch.setattr(skytonight_api_module, 'load_json_file', lambda *_a, **_k: dso_results)
+    monkeypatch.setattr(skytonight_api_module, 'load_shared_json', lambda *_a, **_k: dso_results)
     monkeypatch.setattr(skytonight_api_module, '_annotate_skytonight_item', lambda *a, **k: None)
     monkeypatch.setattr(skytonight_api_module.astrodex, 'load_user_astrodex', lambda *_a, **_k: {'items': []})
     monkeypatch.setattr(skytonight_api_module, '_preload_all_current_plan_entries', lambda *_a, **_k: [])
@@ -3505,6 +3513,7 @@ class TestReportSizeCap:
         data = {'deep_sky': _many_calc_rows(1001), 'metadata': {}}
         monkeypatch.setattr(skytonight_api_module, 'has_dso_results', lambda *_a, **_k: True)
         monkeypatch.setattr(skytonight_api_module, 'load_json_file', lambda *a, **k: data)
+        monkeypatch.setattr(skytonight_api_module, 'load_shared_json', lambda *a, **k: data)
 
         result = skytonight_api_module._build_dso_section_payload(None, 'uid-1', 'user1')
 

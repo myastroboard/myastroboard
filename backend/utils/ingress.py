@@ -18,8 +18,9 @@ import os
 import re
 from collections.abc import Callable, Iterable
 from typing import Any
+from urllib.parse import urlsplit
 
-from flask import request
+from flask import has_request_context, request
 from flask.sessions import SecureCookieSessionInterface
 
 from utils import app_settings
@@ -147,11 +148,42 @@ def is_ingress_request() -> bool:
     return bool(request.environ.get('myastroboard.ingress'))
 
 
+_LOOPBACK_HOSTS = {'localhost', '127.0.0.1', '::1'}
+
+
+def browser_keeps_secure_cookies() -> bool:
+    """True when the browser will accept a ``Secure`` cookie from the current request.
+
+    That is HTTPS (as seen through ProxyFix when the proxy headers are trusted), or a loopback
+    address, which browsers treat as secure even over plain HTTP.
+    """
+    if request.is_secure:
+        return True
+    try:
+        host = urlsplit(f'//{request.host}').hostname or ''  # lower-cased, port and IPv6 brackets removed
+    except ValueError:  # a malformed Host header is not a secure context
+        return False
+    return host in _LOOPBACK_HOSTS or host.endswith('.localhost')
+
+
 class IngressAwareSessionInterface(SecureCookieSessionInterface):
     """Session cookie scoped to the ingress prefix, with its own name, under ingress.
 
     Direct-port requests keep Flask's defaults, so existing sessions survive the upgrade.
     """
+
+    def get_cookie_secure(self, app) -> bool:
+        """The HTTPS-only setting, on the pages where the browser can keep such a cookie.
+
+        A browser drops a ``Secure`` cookie sent from a plain-HTTP page, so the setting would
+        only lock the user out there (an instance reached over HTTPS through its public name
+        and over http://<lan address> at home): the page reloads forever, never signed in.
+        The cookie sent over HTTPS keeps the flag, and never travels over plain HTTP.
+        """
+        secure = super().get_cookie_secure(app)
+        if secure and has_request_context():
+            return browser_keeps_secure_cookies()
+        return secure
 
     def get_cookie_name(self, app) -> str:
         if is_ingress_request():

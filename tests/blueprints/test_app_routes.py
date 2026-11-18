@@ -506,6 +506,17 @@ class TestConfigEndpoints:
         assert saved['custom_section'] == {'kept': True}
         assert saved['astrodex'] == {'private': True, 'map_private': False}
 
+    def test_post_config_saves_only_the_community_switch(self, client_admin, monkeypatch):
+        """The Community block is reduced to its on/off switch: other keys are not stored."""
+        saved = {}
+        monkeypatch.setattr(_locations_mod, 'load_config', lambda: {'locations': [], 'skytonight': {'constraints': {}}})
+        monkeypatch.setattr(_locations_mod, 'save_config', lambda cfg: saved.update(cfg) or True)
+
+        resp = client_admin.post('/api/config', json={'community': {'enabled': False, 'injected': 'x'}})
+
+        assert resp.status_code == 200
+        assert saved['community'] == {'enabled': False}
+
     def test_post_config_legacy_location_with_no_matching_preset_id(self, client_admin, monkeypatch):
         """Defensive arc: if the install default's id (from get_install_default_location)
         somehow isn't present in old_config['locations'], the compat loop runs to
@@ -583,47 +594,11 @@ class TestAdminEndpoints:
         """The route applies SESSION_COOKIE_SECURE live: put this process's value back afterwards."""
         monkeypatch.setitem(_app_mod.app.config, 'SESSION_COOKIE_SECURE', _app_mod.app.config['SESSION_COOKIE_SECURE'])
 
-    @pytest.mark.parametrize(
-        'address, keeps',
-        [
-            ('https://demo.example.org', True),
-            ('http://localhost:5000', True),
-            ('http://LOCALHOST', True),
-            ('http://127.0.0.1:5000', True),
-            ('http://[::1]:5000', True),
-            ('http://myastroboard.localhost:5000', True),
-            ('http://192.168.1.10:5050', False),
-            ('http://demo.example.org', False),
-            ('http://[fe80::1]:5000', False),
-        ],
-    )
-    def test_secure_cookie_rule_follows_what_browsers_accept(self, address, keeps):
-        """Browsers keep a Secure cookie over HTTPS and on loopback addresses only."""
-        from blueprints import admin as admin_bp_module
-
-        with _app_mod.app.test_request_context('/', base_url=address):
-            assert admin_bp_module._request_can_keep_secure_cookies() is keeps
-
-    def test_secure_cookie_rule_treats_a_malformed_host_as_insecure(self, monkeypatch):
-        """A Host header that is not a valid address is never a secure context: Werkzeug already
-        empties it, and a host urlsplit still cannot parse is refused too."""
-        from blueprints import admin as admin_bp_module
-
-        with _app_mod.app.test_request_context('/', environ_overrides={'HTTP_HOST': '[::1'}):
-            assert admin_bp_module._request_can_keep_secure_cookies() is False
-
-        def _unparsable(url):
-            raise ValueError('Invalid IPv6 URL')
-
-        monkeypatch.setattr(admin_bp_module, 'urlsplit', _unparsable)
-        with _app_mod.app.test_request_context('/', base_url='http://localhost:5000'):
-            assert admin_bp_module._request_can_keep_secure_cookies() is False
-
     def test_https_only_cookie_is_refused_from_a_plain_http_page(self, client_admin, keep_cookie_config, monkeypatch):
         """Turning it on from http://<lan address> would lock the admin out: refused, setting stays off."""
         from blueprints import admin as admin_bp_module
 
-        monkeypatch.setattr(admin_bp_module, '_request_can_keep_secure_cookies', lambda: False)
+        monkeypatch.setattr(admin_bp_module, 'browser_keeps_secure_cookies', lambda: False)
 
         resp = client_admin.post('/api/admin/app-settings', json={'session_cookie_secure': True})
 
@@ -636,7 +611,7 @@ class TestAdminEndpoints:
         """From an HTTPS (or loopback) page the setting turns on and applies at once."""
         from blueprints import admin as admin_bp_module
 
-        monkeypatch.setattr(admin_bp_module, '_request_can_keep_secure_cookies', lambda: True)
+        monkeypatch.setattr(admin_bp_module, 'browser_keeps_secure_cookies', lambda: True)
 
         resp = client_admin.post('/api/admin/app-settings', json={'session_cookie_secure': True})
 
@@ -649,9 +624,9 @@ class TestAdminEndpoints:
         """Only the switch from off to on is checked: an instance already on still saves its other settings."""
         from blueprints import admin as admin_bp_module
 
-        monkeypatch.setattr(admin_bp_module, '_request_can_keep_secure_cookies', lambda: True)
+        monkeypatch.setattr(admin_bp_module, 'browser_keeps_secure_cookies', lambda: True)
         client_admin.post('/api/admin/app-settings', json={'session_cookie_secure': True})
-        monkeypatch.setattr(admin_bp_module, '_request_can_keep_secure_cookies', lambda: False)
+        monkeypatch.setattr(admin_bp_module, 'browser_keeps_secure_cookies', lambda: False)
 
         resp = client_admin.post(
             '/api/admin/app-settings', json={'session_cookie_secure': True, 'log_retention_days': 30}
@@ -7338,7 +7313,6 @@ class TestConfigPostAdditionalBranches:
     def test_config_with_astrodex_present_skips_default(self, client_admin, monkeypatch):
         """'astrodex' IS in submitted config → if-body skipped."""
         monkeypatch.setattr(_locations_mod, 'save_config', lambda *a, **kw: None)
-        monkeypatch.setattr(_app_mod.cache_store, 'reset_all_caches', lambda: None)
         resp = client_admin.post(
             '/api/config',
             json={
@@ -7356,7 +7330,6 @@ class TestConfigPostAdditionalBranches:
         }  # non-dict skytonight
         monkeypatch.setattr(_locations_mod, 'load_config', lambda: old_cfg)
         monkeypatch.setattr(_locations_mod, 'save_config', lambda *a, **kw: None)
-        monkeypatch.setattr(_app_mod.cache_store, 'reset_all_caches', lambda: None)
         resp = client_admin.post(
             '/api/config',
             json={
@@ -7371,7 +7344,6 @@ class TestConfigPostAdditionalBranches:
         monkeypatch.setattr(_locations_mod, 'load_config', lambda: old_cfg)
         saved = {}
         monkeypatch.setattr(_locations_mod, 'save_config', lambda cfg: saved.update({'cfg': cfg}))
-        monkeypatch.setattr(_app_mod.cache_store, 'reset_all_caches', lambda: None)
         resp = client_admin.post(
             '/api/config',
             json={

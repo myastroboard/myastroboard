@@ -673,6 +673,42 @@ class TestGeneratePlanPdf:
         # Multiple pages should produce a reasonably large buffer.
         assert len(result.getvalue()) > 5000
 
+    def test_generate_plan_pdf_does_not_use_pyplot(self, monkeypatch):
+        """The PDF is drawn on standalone figures: pyplot's global figure registry is not
+        thread-safe, and request threads can export plans at the same time."""
+        import matplotlib.pyplot as plt
+
+        def forbidden(*_args, **_kwargs):
+            raise AssertionError('pyplot used')
+
+        monkeypatch.setattr(plt, 'figure', forbidden)
+        monkeypatch.setattr(plt, 'close', forbidden)
+        result = generate_plan_pdf({"plan": None}, {"fill_percent": 0.0}, _DummyI18n())
+        assert result.getvalue().startswith(b"%PDF")
+
+    def test_generate_plan_pdf_from_several_threads_at_once(self):
+        """Concurrent exports each produce a complete PDF."""
+        import threading
+
+        results, errors = [], []
+        start = threading.Barrier(4)
+
+        def worker():
+            start.wait()
+            try:
+                results.append(generate_plan_pdf({"plan": None}, {"fill_percent": 0.0}, _DummyI18n()).getvalue())
+            except BaseException as error:  # pragma: no cover - only reached on a regression
+                errors.append(error)
+
+        threads = [threading.Thread(target=worker) for _ in range(4)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        assert errors == []
+        assert len(results) == 4
+        assert all(pdf.startswith(b"%PDF") and pdf.rstrip().endswith(b"%%EOF") for pdf in results)
+
     def test_generate_plan_pdf_draws_meridian_flip_markers(self, tmp_path, monkeypatch):
         import matplotlib
 

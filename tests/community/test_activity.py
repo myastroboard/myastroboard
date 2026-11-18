@@ -4,6 +4,7 @@ No ranking anywhere: the feed is ordered by day, the totals are a union.
 """
 
 import datetime
+import sys
 import types
 
 from community import activity, members
@@ -79,6 +80,13 @@ class TestFeed:
         assert [d['date'] for d in windowed] == ['2026-11-10']
         assert len(activity.build_feed([member], TODAY, pictures_shared=True, limit=1)) == 1
 
+    def test_pictures_outside_the_window_stay_out(self):
+        """A picture older than the window does not open a day of its own in the feed."""
+        member = _member('m', {'2026-11-10': ['M 1']}, pictures=[('M 1', '2026-11-10'), ('M 2', '2025-01-01')])
+        feed = activity.build_feed([member], TODAY, pictures_shared=True, days=30)
+        assert [d['date'] for d in feed] == ['2026-11-10']
+        assert feed[0]['pictures'] == [{'filename': 'M 1.jpg', 'item_name': 'M 1'}]
+
     def test_long_days_are_capped_but_counted(self):
         names = [f'M {index}' for index in range(1, 11)]
         member = _member('m', {'2026-11-10': names})
@@ -142,6 +150,36 @@ class TestTtlCache:
         assert cache.get('b', now=1) is None
         cache.clear()
         assert cache.get('d', now=1) is None
+
+    def test_concurrent_puts_and_gets_never_raise(self):
+        """Request threads share one cache: eviction must not race with a put's move_to_end."""
+        import threading
+
+        cache = activity.TtlCache(ttl=60, max_entries=2)
+        errors = []
+        start = threading.Barrier(8)
+
+        def worker(seed):
+            start.wait()
+            try:
+                for i in range(3000):
+                    key = (seed + i) % 6
+                    cache.put(key, i, now=0)
+                    cache.get(key, now=1)
+            except BaseException as error:  # pragma: no cover - only reached on a regression
+                errors.append(error)
+
+        threads = [threading.Thread(target=worker, args=(seed,)) for seed in range(8)]
+        previous = sys.getswitchinterval()
+        sys.setswitchinterval(1e-6)  # switch threads as often as possible to expose races
+        try:
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+        finally:
+            sys.setswitchinterval(previous)
+        assert errors == []
 
 
 def test_natural_order_handles_letters_after_numbers():

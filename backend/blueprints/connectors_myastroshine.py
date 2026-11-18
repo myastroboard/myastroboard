@@ -150,7 +150,7 @@ def mint_handoff_api():
             return (
                 jsonify(
                     {
-                        'error': 'Set Parameters -> Advanced -> External base URL first',
+                        'error': 'Set App settings -> Configuration -> Reverse proxy -> External base URL first',
                         'code': 'external_base_url_required',
                     }
                 ),

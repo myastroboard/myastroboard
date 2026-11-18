@@ -164,17 +164,14 @@ class TestUserModel:
         u = auth.User(username='admin', password_hash='h', role=auth.ROLE_ADMIN)
         assert u.is_admin() is True
         assert u.is_user() is False
-        assert u.is_read_only() is False
 
     def test_is_user_true(self):
         u = auth.User(username='alice', password_hash='h', role=auth.ROLE_USER)
         assert u.is_user() is True
         assert u.is_admin() is False
-        assert u.is_read_only() is False
 
-    def test_is_read_only_true(self):
+    def test_read_only_role_is_neither_user_nor_admin(self):
         u = auth.User(username='viewer', password_hash='h', role=auth.ROLE_READ_ONLY)
-        assert u.is_read_only() is True
         assert u.is_user() is False
         assert u.is_admin() is False
 
@@ -193,6 +190,28 @@ class TestUserModel:
             role=auth.ROLE_ADMIN,
         )
         assert u.is_using_default_password() is False
+
+    def test_is_using_default_password_hashes_once_per_password_hash(self, monkeypatch):
+        """The scrypt check runs once per stored hash, then again only after a password change."""
+        calls = []
+        real_check = auth.check_password_hash
+
+        def counting_check(password_hash, password):
+            calls.append(password_hash)
+            return real_check(password_hash, password)
+
+        monkeypatch.setattr(auth, 'check_password_hash', counting_check)
+        monkeypatch.setattr(auth, '_default_password_check', None)
+        u = auth.User(
+            username=auth.DEFAULT_ADMIN_USERNAME,
+            password_hash=generate_password_hash(auth.DEFAULT_ADMIN_PASSWORD),
+            role=auth.ROLE_ADMIN,
+        )
+        assert [u.is_using_default_password() for _ in range(3)] == [True, True, True]
+        assert len(calls) == 1
+        u.password_hash = generate_password_hash('changed!')
+        assert u.is_using_default_password() is False
+        assert len(calls) == 2
 
     def test_is_using_default_password_false_non_admin(self):
         u = auth.User(
@@ -666,6 +685,20 @@ class TestUserManagerPreferences:
         with pytest.raises(ValueError, match='User not found'):
             isolated_user_manager.update_user_preferences('no-such-id', {'time_format': '24h'})
 
+    @pytest.mark.parametrize(
+        'call',
+        [
+            lambda manager: manager.update_user_profile('no-such-id', {'display_name': 'Vega'}),
+            lambda manager: manager.set_user_avatar('no-such-id', 'avatar.webp'),
+            lambda manager: manager.reset_user_profile('no-such-id'),
+        ],
+        ids=['update_profile', 'set_avatar', 'reset_profile'],
+    )
+    def test_profile_changes_refuse_an_unknown_user(self, isolated_user_manager, call):
+        """A profile change for an account that no longer exists raises instead of writing."""
+        with pytest.raises(ValueError, match='User not found'):
+            call(isolated_user_manager)
+
     def test_update_user_preferences_not_a_dict(self, isolated_user_manager):
         manager = isolated_user_manager
         user = manager.create_user('alice', 'pass', auth.ROLE_USER)
@@ -1077,18 +1110,6 @@ class TestAuthDecorators:
             user = auth.get_current_user()
             assert user is not None
             assert user.username == auth.DEFAULT_ADMIN_USERNAME
-
-    def test_is_user_admin_true(self, flask_app):
-        with flask_app.test_request_context('/'):
-            from flask import session
-
-            session['username'] = auth.DEFAULT_ADMIN_USERNAME
-            assert auth.is_user_admin() is True
-
-    def test_is_user_admin_false_no_session(self, flask_app):
-        with flask_app.test_request_context('/'):
-            # is_user_admin returns None (falsy) when no session; `and` short-circuits
-            assert not auth.is_user_admin()
 
 
 # ===========================================================================

@@ -389,7 +389,7 @@ def _load_location_signatures():
 def _save_location_signatures():
     """Persist location signatures to disk (atomically, so other workers never read a partial file)"""
     global _location_signatures_mtime_ns
-    tmp_path = f"{_LOCATION_CACHE_FILE}.{os.getpid()}.tmp"
+    tmp_path = f"{_LOCATION_CACHE_FILE}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp"
     try:
         _ensure_data_dir()
         with open(tmp_path, 'w') as f:
@@ -508,41 +508,6 @@ def pop_legacy_location_signature():
         if legacy is not None:
             _save_location_signatures()
     return legacy
-
-
-def reset_all_caches():
-    """Reset all astronomical caches (every location slot + refreshable globals).
-
-    Global cache entries are mutated IN PLACE (never rebound): other modules
-    and _GLOBAL_SHARED_CACHES hold references to these dicts, and rebinding
-    would silently detach them from all future syncs/reads.
-    """
-    for name in _location_caches:
-        for location_id in list(_location_caches[name]):
-            _location_caches[name][location_id] = {"timestamp": 0, "data": None}
-
-    for entry in (
-        _spaceflight_launches_cache,
-        _spaceflight_astronauts_cache,
-        _spaceflight_events_cache,
-        _allsky_health_cache,
-    ):
-        entry["timestamp"] = 0
-        entry["data"] = None
-
-    with _cache_file_write_lock():
-        shared = _read_shared_cache()
-        for key in list(shared):
-            if not isinstance(key, str) or key.startswith("_"):
-                continue
-            base_name = key.split(":", 1)[0]
-            if base_name in LOCATION_SCOPED_CACHE_TTLS or base_name in (
-                "spaceflight_launches",
-                "spaceflight_astronauts",
-                "spaceflight_events",
-            ):
-                shared[key] = {"timestamp": 0, "data": None}
-        _write_shared_cache(shared)
 
 
 def is_cache_valid(cache_entry, ttl_seconds):

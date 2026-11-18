@@ -1417,3 +1417,110 @@ def test_backoff_file_lock_uses_an_exclusive_flock_on_posix(fake_fcntl, monkeypa
         assert [op for _fd, op in fake.calls] == [fake.LOCK_EX]
 
     assert [op for _fd, op in fake.calls] == [fake.LOCK_EX, fake.LOCK_UN]
+
+
+class TestConcurrentImageDownload:
+    """Two request threads fetching the same image at once (gthread workers share a pid)."""
+
+    def test_both_downloads_succeed_and_leave_a_whole_file(self, tmp_path, monkeypatch):
+        """Each download writes its own temporary file before the atomic replace.
+
+        With a temporary name built from the process id alone, both threads wrote into the
+        same file: the bytes interleaved, and the second os.replace found the file gone, which
+        failed the request and put hips2fits in backoff for every user.
+        """
+        import threading
+
+        monkeypatch.setattr(oi, '_is_backed_off', lambda service: False)
+        monkeypatch.setattr(oi, '_clear_backoff', lambda service: None)
+        backoffs = []
+        monkeypatch.setattr(oi, '_trigger_backoff', backoffs.append)
+        start = threading.Barrier(2)
+
+        class SlowResponse:
+            def raise_for_status(self):
+                return None
+
+            def iter_content(self, chunk_size):
+                start.wait()  # both threads are now writing at the same time
+                for _ in range(50):
+                    yield b'x' * 100
+
+        monkeypatch.setattr(oi.requests, 'get', lambda url, timeout, stream: SlowResponse())
+        # Windows tolerates the shared temporary file that Linux rejects, so also check the names.
+        real_replace = os.replace
+        sources = []
+
+        def recording_replace(src, dst):
+            sources.append(src)
+            real_replace(src, dst)
+
+        monkeypatch.setattr(oi.os, 'replace', recording_replace)
+        target = tmp_path / 'img' / 'm31.jpg'
+        results = []
+        threads = [
+            threading.Thread(target=lambda: results.append(oi.download_hips2fits_image('u', str(target), 'M 31')))
+            for _ in range(2)
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        assert len(set(sources)) == 2
+        assert results == [True, True]
+        assert backoffs == []
+        assert target.read_bytes() == b'x' * 5000
+        assert [p.name for p in target.parent.iterdir()] == ['m31.jpg']  # no temporary file left
+
+    def test_a_rename_refused_onto_an_image_already_in_place_counts_as_done(self, tmp_path, monkeypatch):
+        """Windows refuses a rename onto a file another thread is replacing: the image is there
+        all the same, so the download succeeds, its copy is dropped and nothing is backed off."""
+        monkeypatch.setattr(oi, '_is_backed_off', lambda service: False)
+        monkeypatch.setattr(oi, '_clear_backoff', lambda service: None)
+        backoffs = []
+        monkeypatch.setattr(oi, '_trigger_backoff', backoffs.append)
+
+        class Response:
+            def raise_for_status(self):
+                return None
+
+            def iter_content(self, chunk_size):
+                yield b'new'
+
+        monkeypatch.setattr(oi.requests, 'get', lambda url, timeout, stream: Response())
+        target = tmp_path / 'm31.jpg'
+        target.write_bytes(b'placed by the other thread')
+
+        def refused(src, dst):
+            raise PermissionError(5, 'Access is denied')
+
+        monkeypatch.setattr(oi.os, 'replace', refused)
+
+        assert oi.download_hips2fits_image('u', str(target), 'M 31') is True
+        assert backoffs == []
+        assert [p.name for p in tmp_path.iterdir()] == ['m31.jpg']
+        assert target.read_bytes() == b'placed by the other thread'
+
+    def test_a_refused_rename_with_no_image_in_place_still_fails(self, tmp_path, monkeypatch):
+        """Without an image in place, a failed rename is a failed download, as before."""
+        monkeypatch.setattr(oi, '_is_backed_off', lambda service: False)
+        backoffs = []
+        monkeypatch.setattr(oi, '_trigger_backoff', backoffs.append)
+
+        class Response:
+            def raise_for_status(self):
+                return None
+
+            def iter_content(self, chunk_size):
+                yield b'new'
+
+        monkeypatch.setattr(oi.requests, 'get', lambda url, timeout, stream: Response())
+
+        def refused(src, dst):
+            raise PermissionError(5, 'Access is denied')
+
+        monkeypatch.setattr(oi.os, 'replace', refused)
+
+        assert oi.download_hips2fits_image('u', str(tmp_path / 'm31.jpg'), 'M 31') is False
+        assert backoffs == ['hips2fits']

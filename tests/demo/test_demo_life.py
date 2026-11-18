@@ -830,3 +830,24 @@ def test_history_pruning_keeps_records_without_a_date(demo_env, monkeypatch):
 
     assert astrodex.get_astrodex_item(user.user_id, item['id']) is not None
     assert session['id'] in {entry['id'] for entry in observation_sessions.get_user_sessions(user.user_id)}
+
+
+def test_seed_picture_needs_the_setup_of_the_seeded_item(monkeypatch):
+    """A seeded item whose equipment combination is gone gets no picture."""
+    monkeypatch.setattr(demo_life.skytonight_targets, 'find_target', _fake_find_target)
+    item = {'name': 'M31', 'created_at': '2026-11-01T20:00:00'}
+
+    assert demo_life._seed_picture(item, {}, date(2026, 11, 17)) is None
+
+
+def test_seed_picture_with_an_unreadable_creation_date_is_dated_from_today(monkeypatch):
+    """A creation date that does not parse falls back to today for the picture date."""
+    monkeypatch.setattr(demo_life.skytonight_targets, 'find_target', _fake_find_target)
+    today = date(2026, 11, 17)
+    item = {'name': 'M31', 'created_at': 'not a date'}
+
+    picture = demo_life._seed_picture(item, {'smart': {'id': 'combo-smart'}}, today)
+
+    assert picture is not None
+    assert picture['when'] == demo_life._seed_date(today, 0)
+    assert picture['combination'] == {'id': 'combo-smart'}

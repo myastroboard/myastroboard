@@ -67,20 +67,6 @@ def get_alias_entry(catalogue: str, object_name: str) -> dict:
     return lookup.get(key, {}) if isinstance(lookup, dict) else {}
 
 
-def get_aliases_map(catalogue: str, object_name: str) -> dict[str, str]:
-    """Get aliases map for a catalogue/object pair."""
-    entry = get_alias_entry(catalogue, object_name)
-    aliases = entry.get('aliases', {}) if isinstance(entry, dict) else {}
-    return aliases if isinstance(aliases, dict) else {}
-
-
-def get_group_id(catalogue: str, object_name: str) -> str:
-    """Get stable aliases group id for a catalogue/object pair."""
-    entry = get_alias_entry(catalogue, object_name)
-    group_id = entry.get('group_id', '') if isinstance(entry, dict) else ''
-    return str(group_id or '')
-
-
 def merge_item_with_alias_entry(item: dict) -> dict:
     """Attach runtime aliases metadata from current aliases table."""
     if not isinstance(item, dict):

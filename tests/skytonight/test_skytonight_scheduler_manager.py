@@ -137,6 +137,34 @@ class TestGetOrCreateScheduler:
         assert result is None
 
 
+class TestGetSchedulerForApi:
+    """get_skytonight_scheduler_for_api, the takeover path used by request handlers."""
+
+    def test_hands_the_real_app_not_the_request_proxy(self):
+        """A scheduler created from a request must keep the Flask app itself.
+
+        Its background thread runs outside any request; a LocalProxy stored there fails every
+        cycle with "Working outside of application context" (seen after the worker owning the
+        scheduler was OOM-killed and another worker took the lock over).
+        """
+        from flask import Flask
+
+        from skytonight import skytonight_scheduler_manager as manager
+
+        app = Flask(__name__)
+        received = []
+        with app.app_context():
+            with patch.object(
+                manager, 'get_or_create_skytonight_scheduler', side_effect=lambda a: received.append(a) or 'sched'
+            ):
+                assert manager.get_skytonight_scheduler_for_api() == 'sched'
+        assert received == [app]
+        assert type(received[0]) is Flask
+        # Usable once the request is over, as the scheduler thread does.
+        with received[0].app_context():
+            pass
+
+
 class TestGetRemoteSchedulerStatus:
     """Tests for get_remote_skytonight_scheduler_status."""
 
@@ -342,6 +370,34 @@ class TestRunSkytonigtRefresh:
 
         assert result["dataset_generated"] is True
         assert result["calculation"] == mock_calc_result
+
+    def test_shared_results_are_released_before_the_dataset_build(self):
+        """The old dataset and parsed results are dropped before the build, and again after it.
+
+        The build is the memory peak of a run; holding the previous copies through it is what
+        got the process killed on a 512 MB host.
+        """
+        from skytonight import skytonight_scheduler_manager as manager
+
+        events = []
+        with (
+            patch.object(manager, 'ensure_skytonight_directories'),
+            patch.object(manager, 'load_config', return_value={}),
+            patch.object(manager, 'invalidate_targets_dataset_cache', side_effect=lambda: events.append('dataset')),
+            patch.object(manager.json_file_cache, 'clear', side_effect=lambda: events.append('results')),
+            patch.object(
+                manager,
+                'build_and_save_default_dataset',
+                side_effect=lambda **_k: events.append('build') or {'metadata': {}},
+            ),
+            patch.object(manager, 'run_calculations', side_effect=lambda **_k: events.append('calc') or {}),
+            patch.object(manager, '_append_skytonight_calculation_log'),
+        ):
+            manager._run_skytonight_refresh()
+
+        assert events[:3] == ['dataset', 'results', 'build']
+        assert events[3:5] == ['dataset', 'results']
+        assert 'calc' in events[5:]
 
     def test_refresh_dataset_failure_raises(self):
         """If build_and_save_default_dataset raises, _run_skytonight_refresh re-raises."""

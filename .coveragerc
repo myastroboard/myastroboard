@@ -11,3 +11,7 @@ omit =
     tests/*
     */tests/*
     */__init__.py
+# A script's command-line entry point: its main() is tested, the guard itself only runs
+# when the file is executed directly.
+exclude_also =
+    if __name__ == .__main__.:

@@ -90,6 +90,16 @@ def test_main_copies_to_a_fresh_target(static_tree, tmp_path, monkeypatch, capsy
 
 
 @pytest.mark.unit
+def test_main_creates_a_target_that_does_not_exist_yet(static_tree, tmp_path, monkeypatch, capsys):
+    """A target folder that does not exist yet is created from the source."""
+    target = tmp_path / 'new-build'
+    monkeypatch.setattr('sys.argv', ['minify_static.py', str(static_tree), str(target)])
+    assert minify_static.main() == 0
+    assert (target / 'js' / 'app.js').read_text(encoding='utf-8') == 'function add(a,b){return a+b;}\n'
+    assert 'processed=2, changed=2' in capsys.readouterr().out
+
+
+@pytest.mark.unit
 def test_main_minifies_in_place_by_default(static_tree, monkeypatch, capsys):
     """Without a target, the source folder itself is minified."""
     monkeypatch.setattr('sys.argv', ['minify_static.py', str(static_tree)])

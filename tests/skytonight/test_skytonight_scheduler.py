@@ -339,6 +339,50 @@ class TestResolveScheduleEdgeCases:
         assert schedule.mode == 'fallback-6h'
 
 
+class TestTwilightReportsCache:
+    """resolve_schedule reuses the day's sun reports instead of recomputing them per request."""
+
+    def _config(self):
+        return {
+            'location': {'latitude': 48.8, 'longitude': 2.3, 'timezone': 'Europe/Paris'},
+            'skytonight': {'enabled': True},
+        }
+
+    def _fake_sun_service(self, built):
+        class FakeSunService:
+            def __init__(self, **kwargs):
+                built.append(kwargs)
+
+            def get_today_report(self):
+                return NS(nautical_dawn=None, nautical_dusk=None)
+
+            def get_tomorrow_report(self):
+                return NS(nautical_dawn=None, nautical_dusk=None)
+
+        return FakeSunService
+
+    def test_reports_are_computed_once_per_site_and_day(self, monkeypatch):
+        """Status polls in the same day hit the cache; a new day computes the reports again."""
+        import datetime as _dt
+
+        from skytonight import skytonight_scheduler as module
+
+        built = []
+        monkeypatch.setattr(module, 'SunService', self._fake_sun_service(built))
+        monkeypatch.setattr(module, '_twilight_reports_cache', module.LruCache(8))
+        today = [_dt.date(2026, 4, 17)]
+        monkeypatch.setattr(module, 'date', NS(today=lambda: today[0]))
+        now = datetime(2026, 4, 17, 12, 0, tzinfo=ZoneInfo('Europe/Paris'))
+
+        for _ in range(3):
+            resolve_schedule(self._config(), now=now)
+        assert len(built) == 1
+
+        today[0] = _dt.date(2026, 4, 18)
+        resolve_schedule(self._config(), now=now)
+        assert len(built) == 2
+
+
 class TestSchedulerHelperMethods:
     """Cover SkyTonightScheduler._write_status, get_status, trigger_now branches."""
 

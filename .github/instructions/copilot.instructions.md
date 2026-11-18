@@ -222,6 +222,29 @@ night, events <-> skytonight, skytonight <-> weather) and are being unwound one 
   feature packages must not import blueprints.
 - Full contributor-facing version: [docs/EXTENDING.md](../../docs/EXTENDING.md).
 
+#### Concurrency (MANDATORY)
+
+The image runs **one or two gunicorn worker processes with request threads** (`gunicorn.conf.py`,
+`gthread`; two only with 2 CPUs and 4 GB), next to the background threads (cache scheduler,
+SkyTonight, push, MQTT). Several requests run at once in the same process, so:
+
+- A module-level cache that requests write is either a `utils.lru_cache.LruCache` or guarded by a
+  `threading.Lock`. A bare `OrderedDict` LRU (`get` then `move_to_end`) raises `KeyError` when
+  another thread evicts in between; walking a dict other threads insert into raises
+  `RuntimeError`. Copy first (`dict(shared)`) when a snapshot is enough.
+- A temporary file name must be unique per call, not just per process: add
+  `uuid.uuid4().hex[:8]` next to `os.getpid()` before `os.replace`.
+- No `matplotlib.pyplot` in request code: draw on `matplotlib.figure.Figure` objects (pyplot's
+  figure registry is global state).
+- Large read-mostly files (SkyTonight results) go through `utils.json_file_cache.load_shared_json`
+  and are never modified by the caller; build new rows from them.
+- Keep the cross-process mechanisms (file locks, shared status files): larger hosts run two
+  processes, and `WEB_CONCURRENCY` sets any count.
+- A long loop in a background calculation calls `utils.request_activity.yield_to_requests()`
+  between units of work, so the requests being served run first.
+- A concurrency fix ships with a test that runs the code from several threads at once
+  (`threading.Barrier`, `sys.setswitchinterval(1e-6)` to expose the race).
+
 ## Key Design Patterns
 
 ### 1. Configuration Management
@@ -1319,7 +1342,7 @@ The background cache is **selective-refresh**: the scheduler polls every 25 min 
 2. **Register** in `cache/cache_updater.py` -> `fully_initialize_caches()` `cache_jobs` list with `(name, shared_key, partial(fn, config=config), ttl, cache_entry_ref)`
 3. **Accept `config=None`** in the update function and guard with `if config is None: config = load_config()`
 4. **Add validity check** in `cache_store.is_astronomical_cache_ready()` and `get_cache_init_status()` using the job's own TTL constant
-5. **Add to `reset_all_caches()`** and `_write_all_astronomical_caches_to_shared()` in `cache/cache_store.py`
+5. **A location-dependent cache goes in `LOCATION_SCOPED_CACHE_TTLS`** (`cache/cache_store.py`): one slot per preset, reset by `reset_caches_for_location()` and dropped by `drop_location_caches()`
 6. **Document TTL rationale** in `docs/CACHE_SYSTEM.md` TTL table
 
 ### Cache Metrics

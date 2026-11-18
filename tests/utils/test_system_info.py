@@ -86,6 +86,12 @@ class TestFileSystemType:
         """Without /proc/mounts the type is unknown."""
         assert system_info.file_system_type('/app/data', str(tmp_path / 'missing')) is None
 
+    def test_truncated_lines_are_skipped(self, tmp_path):
+        """A line without a type field is ignored, the others still count."""
+        mounts = tmp_path / 'mounts'
+        _write(mounts, 'broken /srv/mab-test-data\noverlay / overlay rw 0 0\n')
+        assert system_info.file_system_type('/srv/mab-test-data', str(mounts)) == 'overlay'
+
 
 class TestGunicornWorkerCount:
     def test_short_flag(self):
@@ -96,11 +102,41 @@ class TestGunicornWorkerCount:
         """`--workers=3` is read too."""
         assert system_info.gunicorn_worker_count(['gunicorn', '--workers=3', 'app']) == '3'
 
+    def test_count_chosen_by_the_config_file(self, monkeypatch):
+        """gunicorn.conf.py picks the count and exports it; an explicit flag still wins."""
+        monkeypatch.delenv('GUNICORN_CMD_ARGS', raising=False)
+        monkeypatch.setenv('MAB_GUNICORN_WORKERS', '2')
+        assert system_info.gunicorn_worker_count(['gunicorn', 'app']) == '2'
+        assert system_info.gunicorn_worker_count(['gunicorn', '-w', '3', 'app']) == '3'
+
+    def test_gunicorn_cmd_args_are_read(self, monkeypatch):
+        """GUNICORN_CMD_ARGS overrides the config file, so the summary follows it."""
+        monkeypatch.setenv('MAB_GUNICORN_WORKERS', '1')
+        monkeypatch.setenv('MAB_GUNICORN_THREADS', '8')
+        monkeypatch.setenv('GUNICORN_CMD_ARGS', '--workers 2 --threads=4')
+        assert system_info.gunicorn_worker_count(['gunicorn', 'app']) == '2'
+        assert system_info.gunicorn_thread_count(['gunicorn', 'app']) == '4'
+
+    def test_thread_count(self, monkeypatch):
+        """Threads come from the config file's export; None outside gunicorn."""
+        monkeypatch.delenv('GUNICORN_CMD_ARGS', raising=False)
+        monkeypatch.setenv('MAB_GUNICORN_THREADS', '8')
+        assert system_info.gunicorn_thread_count(['gunicorn', 'app']) == '8'
+        assert system_info.gunicorn_thread_count(['python', 'backend/app.py']) is None
+
     def test_default_comes_from_web_concurrency(self, monkeypatch):
-        """Without a flag gunicorn uses WEB_CONCURRENCY, else 1."""
+        """Without a flag or a config choice gunicorn uses WEB_CONCURRENCY, else 1."""
+        monkeypatch.delenv('GUNICORN_CMD_ARGS', raising=False)
+        monkeypatch.delenv('MAB_GUNICORN_WORKERS', raising=False)
         monkeypatch.setenv('WEB_CONCURRENCY', '4')
         assert system_info.gunicorn_worker_count(['gunicorn', 'app']) == '4'
         monkeypatch.delenv('WEB_CONCURRENCY')
+        assert system_info.gunicorn_worker_count(['gunicorn', 'app']) == '1'
+
+    def test_unparsable_gunicorn_cmd_args_are_ignored(self, monkeypatch):
+        """An unbalanced quote in GUNICORN_CMD_ARGS does not break the summary: the variable is skipped."""
+        monkeypatch.setenv('GUNICORN_CMD_ARGS', '--workers "2')
+        monkeypatch.setenv('MAB_GUNICORN_WORKERS', '1')
         assert system_info.gunicorn_worker_count(['gunicorn', 'app']) == '1'
 
     def test_not_under_gunicorn(self):
@@ -120,6 +156,7 @@ def _summary(**overrides):
         'memory_limit': None,
         'swap_total': 0,
         'workers': '2',
+        'threads': '8',
         'data_fs': 'ext4',
         'data_free': 10240 * 1024 * 1024,
     }
@@ -132,7 +169,14 @@ class TestFormatHostSummary:
         """The line names version, architecture, CPUs, memory, workers and data file system."""
         line = system_info.format_host_summary(_summary(), '1.8.2')
         assert line.startswith('Host: MyAstroBoard 1.8.2')
-        for fragment in ('aarch64', 'container: Docker', '4 CPUs', '4096 MB RAM', 'gunicorn workers: 2', 'ext4'):
+        for fragment in (
+            'aarch64',
+            'container: Docker',
+            '4 CPUs',
+            '4096 MB RAM',
+            'gunicorn workers: 2 x 8 threads',
+            'ext4',
+        ):
             assert fragment in line
 
     def test_container_limits_are_shown(self):
@@ -221,6 +265,21 @@ class TestLogHostSummary:
         assert summary['swap_total'] == 0 and summary['data_free'] == 99
         assert summary['cpu_limit'] == 0.5 and summary['container'] == 'Docker'
         assert summary['cpus']
+
+    def test_unreadable_data_dir_has_no_free_space_figure(self, tmp_path, monkeypatch):
+        """When the free space of the data directory cannot be read, it is reported unknown."""
+
+        def unreadable(path):
+            raise OSError('no such device')
+
+        from types import SimpleNamespace
+
+        psutil = system_info.psutil
+        monkeypatch.setattr(psutil, 'virtual_memory', lambda: SimpleNamespace(total=2048), raising=False)
+        monkeypatch.setattr(psutil, 'swap_memory', lambda: SimpleNamespace(total=0), raising=False)
+        monkeypatch.setattr(psutil, 'disk_usage', unreadable, raising=False)
+
+        assert system_info.collect_host_summary(str(tmp_path))['data_free'] is None
 
 
 class TestResourceStatus:

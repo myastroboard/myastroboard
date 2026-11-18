@@ -107,13 +107,19 @@ TEMPLATE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'te
 
 app = Flask(__name__, template_folder=TEMPLATE_DIR, static_folder=STATIC_DIR)
 
+# Count the requests in flight so background calculations pause for them (one process serves
+# everything; see utils/request_activity.py).
+from utils.request_activity import RequestActivityMiddleware
+
+app.wsgi_app = RequestActivityMiddleware(app.wsgi_app)  # type: ignore[method-assign]
+
 # Load persistent app settings (replaces SECRET_KEY / TRUST_PROXY_HEADERS /
 # SESSION_COOKIE_SECURE / VAPID_CONTACT_EMAIL environment variables).
 from utils import app_settings as _app_settings
 
 _startup_settings = _app_settings.get_app_settings()
 
-# Time-based log retention (Parameters -> Advanced -> Privacy), read live from app settings
+# Time-based log retention (App settings -> Configuration -> Privacy), read live from app settings
 from utils.logging_config import refresh_log_levels, set_log_level_provider, set_log_retention_provider
 
 set_log_retention_provider(_app_settings.get_log_retention_days)
@@ -121,7 +127,7 @@ set_log_retention_provider(_app_settings.get_log_retention_days)
 # Log file / console levels (Parameters -> Logs), unless LOG_LEVEL / CONSOLE_LOG_LEVEL are set
 set_log_level_provider(_app_settings.get_log_levels)
 
-# Configure reverse proxy support — configurable via Parameters → Advanced → Reverse proxy
+# Configure reverse proxy support - configurable via App settings -> Configuration -> Reverse proxy
 if _startup_settings['trust_proxy_headers']:  # pragma: no cover
     app.wsgi_app = ProxyFix(
         app.wsgi_app,
@@ -345,7 +351,10 @@ def index():
 def login_page():
     """Render login page - redirect to dashboard if already authenticated"""
     if _session_user():
-        return redirect(url_for('index'))
+        # Public demo: a visitor already browsing as the demo account still reaches the real
+        # sign-in form with ?signin (the maintainer's own account, see docs/DEMO_MODE.md)
+        if not (demo_mode.is_demo_session() and 'signin' in request.args):
+            return redirect(url_for('index'))
     # Public demo: /login leads into the demo, unless ?signin asks for the real sign-in form
     # (the maintainer's own account, see docs/DEMO_MODE.md)
     if demo_mode.is_demo_mode() and 'signin' not in request.args:
@@ -432,7 +441,7 @@ _ROBOTS_TXT_PRIVATE = "User-agent: *\nDisallow: /\n"
 @app.route('/robots.txt')
 def robots_txt():
     """Serve robots.txt - only allows crawling /login when an admin has
-    opted in via Parameters -> Advanced -> Privacy (search_engine_indexing).
+    opted in via App settings -> Configuration -> Privacy & search engines (search_engine_indexing).
     Private (Disallow: /) by default so self-hosted instances are not
     crawlable out of the box."""
     indexable = bool(_app_settings.get_app_settings().get('search_engine_indexing', False))
@@ -617,7 +626,7 @@ if demo_mode.is_demo_mode():  # pragma: no cover - startup notice only
         logger.warning(
             "DEMO_MODE: reverse proxy headers are not trusted - behind a tunnel or proxy every visitor "
             "then shares the proxy's IP (sign-in throttling, trusted networks). "
-            "Turn on Parameters -> Advanced -> Reverse proxy."
+            "Turn on App settings -> Configuration -> Reverse proxy."
         )
 
 

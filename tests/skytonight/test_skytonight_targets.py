@@ -89,23 +89,6 @@ def test_get_lookup_entry_falls_back_to_alias_match(tmp_path):
     assert entry['group_id'] == 'DSO-0001'
 
 
-def test_merge_item_with_target_entry_adds_alias_payload(monkeypatch):
-    monkeypatch.setattr(
-        skytonight_targets,
-        'get_lookup_entry',
-        lambda catalogue, object_name, force_reload=False: {
-            'group_id': 'DSO-0001',
-            'aliases': {'Messier': 'M 31', 'OpenNGC': 'NGC 224'},
-        },
-    )
-
-    item = {'catalogue': 'Messier', 'name': 'M 31'}
-    merged = skytonight_targets.merge_item_with_target_entry(item)
-
-    assert merged['catalogue_group_id'] == 'DSO-0001'
-    assert merged['catalogue_aliases']['OpenNGC'] == 'NGC 224'
-
-
 def test_choose_preferred_catalogue_name_empty_dict():
     name = skytonight_targets.choose_preferred_catalogue_name({})
     assert name == ''
@@ -169,52 +152,6 @@ def test_save_targets_dataset_returns_false_when_save_fails(tmp_path, monkeypatc
     monkeypatch.setattr(skytonight_targets, "save_json_file", lambda *_a, **_k: False)
     result = skytonight_targets.save_targets_dataset([], dataset_file=str(tmp_path / "out.json"))
     assert result is False
-
-
-def test_get_aliases_map_returns_dict(tmp_path):
-    dataset_file = tmp_path / 'targets.json'
-    skytonight_targets.save_targets_dataset(_sample_targets(), dataset_file=str(dataset_file))
-    aliases = skytonight_targets.get_aliases_map('Messier', 'M 31', dataset_file=str(dataset_file))
-    assert isinstance(aliases, dict)
-
-
-def test_get_group_id_returns_string(tmp_path):
-    dataset_file = tmp_path / 'targets.json'
-    skytonight_targets.save_targets_dataset(_sample_targets(), dataset_file=str(dataset_file))
-    gid = skytonight_targets.get_group_id('Messier', 'M 31', dataset_file=str(dataset_file))
-    assert isinstance(gid, str)
-    assert gid == 'DSO-0001'
-
-
-def test_merge_item_with_target_entry_non_dict():
-    result = skytonight_targets.merge_item_with_target_entry("not a dict")
-    assert result == "not a dict"
-
-
-def test_merge_item_with_target_entry_no_catalogue():
-    item = {'name': 'M 31'}
-    result = skytonight_targets.merge_item_with_target_entry(item)
-    assert 'catalogue_aliases' not in result
-    assert 'catalogue_group_id' not in result
-
-
-def test_merge_item_with_target_entry_no_entry(monkeypatch):
-    monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', lambda *_a, **_k: {})
-    item = {'catalogue': 'Messier', 'name': 'M 999'}
-    result = skytonight_targets.merge_item_with_target_entry(item)
-    assert 'catalogue_aliases' not in result
-
-
-def test_merge_item_empty_aliases(monkeypatch):
-    monkeypatch.setattr(
-        skytonight_targets,
-        'get_lookup_entry',
-        lambda *_a, **_k: {'group_id': '', 'aliases': {}},
-    )
-    item = {'catalogue': 'Messier', 'name': 'M 31'}
-    result = skytonight_targets.merge_item_with_target_entry(item)
-    assert 'catalogue_aliases' not in result
-    assert 'catalogue_group_id' not in result
 
 
 def test_build_lookup_no_preferred_name():
@@ -381,3 +318,43 @@ def test_find_target_tolerates_a_dataset_that_is_not_a_dict(monkeypatch):
     monkeypatch.setattr(skytonight_targets, 'load_targets_dataset', lambda: None)
 
     assert skytonight_targets.find_target('M 31') is None
+
+
+def test_simultaneous_first_loads_parse_the_dataset_once(tmp_path, monkeypatch):
+    """Threads asking for the dataset together share one load instead of each parsing a copy.
+
+    The dataset is the largest object in the process: duplicate loads after a rebuild were a
+    memory spike on small hosts.
+    """
+    import threading
+
+    dataset_file = tmp_path / 'targets.json'
+    dataset_file.write_text(json.dumps({'metadata': {}, 'targets': [t.to_dict() for t in _sample_targets()]}))
+    real_load = skytonight_targets.load_json_file
+    loads = []
+
+    def slow_load(path, default=None):
+        loads.append(path)
+        time.sleep(0.2)  # long enough for every thread to arrive while the first one loads
+        return real_load(path, default=default)
+
+    monkeypatch.setattr(skytonight_targets, 'load_json_file', slow_load)
+    skytonight_targets.invalidate_targets_dataset_cache()
+    results = []
+    start = threading.Barrier(6)
+
+    def worker():
+        start.wait()
+        results.append(skytonight_targets.load_targets_dataset(dataset_file=str(dataset_file)))
+
+    threads = [threading.Thread(target=worker) for _ in range(6)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    skytonight_targets.invalidate_targets_dataset_cache()
+
+    assert len(loads) == 1
+    assert len(results) == 6
+    assert all(result is results[0] for result in results)
+    assert len(results[0]['targets']) == 1

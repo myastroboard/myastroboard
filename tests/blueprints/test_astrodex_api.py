@@ -412,6 +412,19 @@ def test_get_astrodex_image_medium_and_unknown_sizes(client, monkeypatch):
         assert unknown_data == buffer.getvalue()
 
 
+def test_preview_of_a_name_leaving_the_pictures_directory_is_refused(monkeypatch, tmp_path):
+    """A file name that resolves outside the Astrodex pictures directory gets no preview."""
+    images_dir = tmp_path / 'images'
+    images_dir.mkdir()
+    (tmp_path / 'outside.jpg').write_bytes(b'not served')
+    monkeypatch.setattr(astrodex, 'ASTRODEX_IMAGES_DIR', str(images_dir))
+    rendered = []
+    monkeypatch.setattr(astrodex_bp_module, 'thumbnail_bytes', lambda *args: rendered.append(args))
+
+    assert astrodex_bp_module._astrodex_image_preview('../outside.jpg', 320) is None
+    assert rendered == []
+
+
 def test_get_astrodex_image_thumb_falls_back_to_the_original_file(client, monkeypatch):
     """A file Pillow cannot read is served as is rather than failing."""
     filename = f'raw_{uuid.uuid4().hex[:8]}.jpg'

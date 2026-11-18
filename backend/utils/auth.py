@@ -53,6 +53,8 @@ TOTP_VALID_WINDOW = 1
 # Default admin credentials
 DEFAULT_ADMIN_USERNAME = 'admin'
 DEFAULT_ADMIN_PASSWORD = 'admin'
+# (password hash, whether it is the default password): see User.is_using_default_password.
+_default_password_check: tuple[str, bool] | None = None
 
 # User customization defaults and allowed values
 ALLOWED_STARTUP_MAIN_TABS = {
@@ -293,15 +295,19 @@ class User:
         """Check if user is a regular user"""
         return self.role == ROLE_USER
 
-    def is_read_only(self):
-        """Check if user is read-only"""
-        return self.role == ROLE_READ_ONLY
-
     def is_using_default_password(self):
         """Check if user is still using default password"""
-        if self.username == DEFAULT_ADMIN_USERNAME:
-            return check_password_hash(self.password_hash, DEFAULT_ADMIN_PASSWORD)
-        return False
+        global _default_password_check
+        if self.username != DEFAULT_ADMIN_USERNAME:
+            return False
+        # A scrypt check costs about 50 ms of CPU and every page load asks (auth status); the
+        # answer only changes with the hash, and a new password always gets a new salted hash.
+        cached = _default_password_check
+        if cached is not None and cached[0] == self.password_hash:
+            return cached[1]
+        result = check_password_hash(self.password_hash, DEFAULT_ADMIN_PASSWORD)
+        _default_password_check = (self.password_hash, result)
+        return result
 
 
 def _same_username(first, second):
@@ -1279,9 +1285,3 @@ def get_current_user():
     if 'username' in session:
         return user_manager.get_user(session['username'])
     return None
-
-
-def is_user_admin():
-    """Check if current user is admin"""
-    user = get_current_user()
-    return user and user.is_admin()

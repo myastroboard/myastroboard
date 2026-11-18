@@ -120,3 +120,13 @@ def test_cache_drops_the_oldest_previews_beyond_its_budget(tmp_path, monkeypatch
     cached_paths = {key[0] for key in image_thumbnails._cache}
     assert os.path.realpath(paths[-1]) in cached_paths
     assert os.path.realpath(paths[0]) not in cached_paths
+
+
+def test_a_preview_rendered_twice_at_once_is_counted_once():
+    """Two requests rendering the same preview together keep the first copy and its size only."""
+    key = ('/pictures/m31.jpg', 1, 2, 480)
+    image_thumbnails._remember(key, b'first')
+    image_thumbnails._remember(key, b'second, longer')
+
+    assert image_thumbnails._cache[key] == b'first'
+    assert image_thumbnails._cache_bytes == len(b'first')

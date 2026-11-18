@@ -21,6 +21,7 @@ from skytonight.skytonight_storage import (
     get_scheduler_status_file as get_skytonight_scheduler_status_file,
 )
 from skytonight.skytonight_targets import invalidate_targets_dataset_cache
+from utils import json_file_cache
 from utils.constants import MAX_LOCATIONS, SKYTONIGHT_CALCULATION_LOG_FILE
 from utils.logging_config import get_logger
 from utils.repo_config import load_config
@@ -77,6 +78,18 @@ def _trim_calculation_log(log_path: str, max_runs: int = 5) -> None:
 # ============================================================
 
 
+def _release_shared_results() -> None:
+    """Drop the in-memory targets dataset and the shared parsed results.
+
+    The dataset build peaks at about 120 MB on top of what the process already holds; the
+    previous dataset (about 50 MB) and a location's parsed DSO results (about 40 MB) are not
+    needed meanwhile, and keeping them pushed a 512 MB host out of memory. Requests made during
+    the run read the files again (one shared copy).
+    """
+    invalidate_targets_dataset_cache()
+    json_file_cache.clear()
+
+
 def _run_skytonight_refresh() -> dict[str, Any]:
     """Run the current SkyTonight refresh pipeline.
 
@@ -94,6 +107,7 @@ def _run_skytonight_refresh() -> dict[str, Any]:
     )
 
     # --- Phase 1: catalogue dataset ---
+    _release_shared_results()
     try:
         from skytonight.skytonight_calculator import _set_progress as _calc_set_progress
 
@@ -116,10 +130,9 @@ def _run_skytonight_refresh() -> dict[str, Any]:
         _append_skytonight_calculation_log('dataset_error', {'error': str(exc), 'comet_source_mode': comet_source_mode})
         raise
 
-    # Invalidate the in-memory dataset cache so run_calculations() loads the
-    # freshly built file instead of the previous run's stale objects.  This
-    # also releases the old ~13 000-target list from RAM.
-    invalidate_targets_dataset_cache()
+    # Again: run_calculations() must load the freshly built file, not a copy of the previous
+    # one that a request reloaded during the build.
+    _release_shared_results()
 
     # --- Phase 2: observability calculations, once per scheduler location ---
     from utils.repo_config import get_install_default_location, get_scheduler_locations
@@ -234,7 +247,10 @@ def get_skytonight_scheduler_for_api():
     """Get SkyTonight scheduler for API endpoints (call inside a request context)."""
     from flask import current_app
 
-    scheduler = get_or_create_skytonight_scheduler(current_app)
+    # The scheduler keeps the app for its background thread, where the request-bound proxy no
+    # longer resolves: hand it the real object. This path runs when the worker that owned the
+    # scheduler died (OOM kill) and another worker takes the lock over.
+    scheduler = get_or_create_skytonight_scheduler(current_app._get_current_object())  # type: ignore[attr-defined]
     if scheduler:
         return scheduler
 

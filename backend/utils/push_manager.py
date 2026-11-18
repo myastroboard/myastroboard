@@ -78,7 +78,7 @@ def load_or_generate_vapid_keys() -> dict:
             _VAPID_CONTACT_WARNING_EMITTED = True
             logger.warning(
                 "VAPID contact email is not configured. Push notifications may be rejected by push services. "
-                "Set it in Parameters → Advanced → Notifications."
+                "Set it in App settings -> Configuration -> Notifications."
             )
     _ = _VAPID_CONTACT_WARNING_EMITTED
 
