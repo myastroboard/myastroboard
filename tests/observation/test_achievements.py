@@ -477,3 +477,56 @@ class TestDefensiveInputs:
         member = achievements.catalogue_members('Messier')[0]
         assert member['object_class'] == 'nebula'
         assert member['dec_deg'] == pytest.approx(-5.39)
+
+
+class TestIncompleteRecords:
+    """Records missing a usable name, date or figure are tolerated, never counted wrongly."""
+
+    def test_unnamed_objects_undated_nights_and_unreadable_sky_figures(self):
+        sessions = [
+            make_session(
+                's1',
+                [make_night('n1', ''), make_night('n2', '2026-03-01', sqm='bright')],
+                [
+                    make_entry('---', 'n1', integration_minutes=30.0),
+                    make_entry('M 31', 'n1', integration_minutes=20.0, astrodex_item_id='item-1'),
+                    make_entry('M 31', 'n2', integration_minutes=40.0, astrodex_item_id='item-2'),
+                ],
+            ),
+            make_session('s2', [make_night('n3', '')], []),
+        ]
+        facts = facts_for(sessions, [{'id': 'item-9', 'name': '***'}])
+
+        # A name with nothing left once normalized is no object; the gallery item neither
+        assert list(facts['captures']) == ['dso-m31']
+        assert facts['astrodex_item_keys'] == {}
+        # The first Astrodex link found is kept
+        assert facts['captures']['dso-m31']['astrodex_item_id'] == 'item-1'
+        # An undated night counts its hours, but no day of activity or night fact
+        assert facts['integration'] == [('', 20.0, 'dso-m31'), ('2026-03-01', 40.0, 'dso-m31')]
+        assert facts['activity_dates'] == ['2026-03-01']
+        # A session without a dated night is left out; an SQM that is not a number is unknown
+        assert facts['sessions'] == [['2026-03-01']]
+        assert facts['nights'] == [
+            {'date': '2026-03-01', 'sqm': None, 'moon_illumination_percent': None, 'bortle': None}
+        ]
+
+    def test_catalogue_entries_without_an_identifier_are_not_members(self, monkeypatch):
+        targets = [
+            {
+                'target_id': 'dso-ngc7000',
+                'category': 'deep_sky',
+                'object_type': 'Emission Nebula',
+                'preferred_name': 'North America Nebula',
+                'catalogue_names': {'Messier': '', 'OpenNGC': 'NGC 7000'},
+                'coordinates': {'ra_hours': 20.98, 'dec_degrees': 44.33},
+            }
+        ]
+        monkeypatch.setattr(achievements.skytonight_targets, 'load_targets_dataset', lambda: {'targets': targets})
+        # Both keys are restored afterwards, so later tests never see these totals
+        monkeypatch.setitem(achievements._catalogue_totals_cache, 'marker', None)
+        monkeypatch.setitem(achievements._catalogue_totals_cache, 'totals', {})
+
+        assert achievements.catalogue_totals() == {'OpenNGC': 1}
+        assert achievements.catalogue_members('Messier') == []
+        assert [member['identifier'] for member in achievements.catalogue_members('OpenNGC')] == ['NGC 7000']

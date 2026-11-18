@@ -159,6 +159,21 @@ class TestMissingTonight:
         rows = challenges.missing_tonight('Messier', PARIS, datetime.date(2026, 11, 17), {'a'})
         assert [row['target_id'] for row in rows] == ['c', 'b']
 
+    def test_objects_not_up_tonight_are_left_out(self, monkeypatch):
+        """No observable hours (zero, or no figure at all) means not on tonight's list."""
+        members = [
+            member('a', 'M 1', 'galaxy', 8.0),
+            member('b', 'M 2', 'galaxy', 7.0),
+            member('c', 'M 3', 'galaxy', 6.0),
+        ]
+        rows = [{'observable_hours_next': 0.0}, {}, {'observable_hours_next': 1.5}]
+        monkeypatch.setattr(challenges.achievements, 'catalogue_members', lambda catalogue: members)
+        monkeypatch.setattr(challenges.visibility_calendar, 'next_visibility_batch', lambda *args, **kwargs: rows)
+
+        result = challenges.missing_tonight('Messier', PARIS, datetime.date(2026, 11, 17), set())
+
+        assert [row['target_id'] for row in result] == ['c']
+
 
 class TestDefensivePaths:
     def test_bounded_cache_drops_the_oldest(self):

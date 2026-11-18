@@ -204,3 +204,76 @@ class TestDefensiveInputs:
         payload = review([make_session('s1', [night], entries)], items)
         assert payload['best_night']['targets'] == ['M 31']
         assert payload['mosaic'] == []
+
+    def test_an_unreadable_rating_ranks_below_any_rated_picture(self):
+        """Among the pictures of the year, one whose rating is not a number is not preferred."""
+        items = [
+            {
+                'id': 'a1',
+                'name': 'M 31',
+                'pictures': [
+                    {'id': 'p1', 'filename': 'unrated.jpg', 'date': '2026-01-10', 'rating': 'great'},
+                    {'id': 'p2', 'filename': 'rated.jpg', 'date': '2026-01-11', 'rating': 2},
+                ],
+            }
+        ]
+        payload = review(_one_night(integration_minutes=60.0, astrodex_item_id='a1'), items)
+        assert payload['target_of_year']['picture']['filename'] == 'rated.jpg'
+
+    def test_undated_hours_add_no_year(self):
+        """Hours logged on a night without a date do not invent a year to review."""
+        sessions = [
+            make_session(
+                's1',
+                [make_night('n1', ''), make_night('n2', '2026-01-10')],
+                [
+                    make_entry('M 31', 'n1', integration_minutes=30.0),
+                    make_entry('M 45', 'n2', integration_minutes=30.0),
+                ],
+            )
+        ]
+        facts = collect_progress(sessions, [], resolve=fake_resolve)
+        assert available_years(facts) == [2026]
+
+    def test_a_catalogue_without_new_objects_this_year_is_left_out(self):
+        """Caldwell objects all captured in earlier years make no Caldwell row; Messier always has one."""
+
+        def resolve(name, catalogue):
+            if name == 'C 14':
+                return {
+                    'group_id': 'dso-c14',
+                    'object_type': 'Open Cluster',
+                    'category': 'deep_sky',
+                    'aliases': {'Caldwell': 'C 14'},
+                }
+            return fake_resolve(name, catalogue)
+
+        sessions = [
+            make_session('s0', [make_night('n0', '2025-10-01')], [make_entry('C 14', 'n0', integration_minutes=60.0)]),
+            make_session('s1', [make_night('n1', '2026-01-10')], [make_entry('M 31', 'n1', integration_minutes=60.0)]),
+        ]
+        facts = collect_progress(sessions, [], resolve=resolve)
+        payload = build_year_review(sessions, [], 2026, facts, TOTALS)
+        assert [row['catalogue'] for row in payload['catalogues']] == ['Messier']
+
+
+class TestFigureHelpers:
+    """The helpers tolerate figures the public builder never hands them today."""
+
+    def test_best_picture_without_a_year_is_the_cover(self):
+        from observation.year_review import _best_picture
+
+        item = {'pictures': [{'filename': 'a.jpg'}, {'filename': 'cover.jpg', 'is_main': True}]}
+        assert _best_picture(item, None)['filename'] == 'cover.jpg'
+
+    def test_favourite_class_ignores_unknown_keys(self):
+        from observation.year_review import _favourite_class
+
+        figures = {'keys': {'gone'}, 'minutes_by_key': {'gone': 30.0}}
+        assert _favourite_class({'captures': {}}, figures) is None
+
+    def test_no_target_of_the_year_without_positive_hours(self):
+        from observation.year_review import _target_of_year
+
+        figures = {'keys': {'dso-m31'}, 'minutes_by_key': {'dso-m31': 0.0}}
+        assert _target_of_year({'captures': {}}, figures, {}, 2026) is None

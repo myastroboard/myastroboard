@@ -69,6 +69,20 @@ def test_missing_file_returns_the_default_and_is_not_cached(tmp_path):
     assert json_file_cache.load_shared_json(str(path), default=default) == {'deep_sky': ['m31']}
 
 
+def test_file_removed_while_waiting_for_the_load_returns_the_default(tmp_path, monkeypatch):
+    """A file seen at first but gone once the load lock is held gives the default, uncached."""
+    path = tmp_path / 'dso_results.json'
+    _write(path, {'deep_sky': []})
+    real_signature = json_file_cache._signature
+    answers = [real_signature(str(path)), None]
+    monkeypatch.setattr(json_file_cache, '_signature', lambda _path: answers.pop(0))
+    loads = _count_loads(monkeypatch)
+
+    default = {'missing': True}
+    assert json_file_cache.load_shared_json(str(path), default=default) is default
+    assert loads == []
+
+
 def test_unreadable_file_returns_the_default_and_is_retried(tmp_path):
     """A corrupt file is not remembered as an empty result."""
     path = tmp_path / 'broken.json'

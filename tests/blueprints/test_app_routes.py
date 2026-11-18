@@ -506,6 +506,17 @@ class TestConfigEndpoints:
         assert saved['custom_section'] == {'kept': True}
         assert saved['astrodex'] == {'private': True, 'map_private': False}
 
+    def test_post_config_saves_only_the_community_switch(self, client_admin, monkeypatch):
+        """The Community block is reduced to its on/off switch: other keys are not stored."""
+        saved = {}
+        monkeypatch.setattr(_locations_mod, 'load_config', lambda: {'locations': [], 'skytonight': {'constraints': {}}})
+        monkeypatch.setattr(_locations_mod, 'save_config', lambda cfg: saved.update(cfg) or True)
+
+        resp = client_admin.post('/api/config', json={'community': {'enabled': False, 'injected': 'x'}})
+
+        assert resp.status_code == 200
+        assert saved['community'] == {'enabled': False}
+
     def test_post_config_legacy_location_with_no_matching_preset_id(self, client_admin, monkeypatch):
         """Defensive arc: if the install default's id (from get_install_default_location)
         somehow isn't present in old_config['locations'], the compat loop runs to

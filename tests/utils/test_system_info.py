@@ -86,6 +86,12 @@ class TestFileSystemType:
         """Without /proc/mounts the type is unknown."""
         assert system_info.file_system_type('/app/data', str(tmp_path / 'missing')) is None
 
+    def test_truncated_lines_are_skipped(self, tmp_path):
+        """A line without a type field is ignored, the others still count."""
+        mounts = tmp_path / 'mounts'
+        _write(mounts, 'broken /srv/mab-test-data\noverlay / overlay rw 0 0\n')
+        assert system_info.file_system_type('/srv/mab-test-data', str(mounts)) == 'overlay'
+
 
 class TestGunicornWorkerCount:
     def test_short_flag(self):
@@ -125,6 +131,12 @@ class TestGunicornWorkerCount:
         monkeypatch.setenv('WEB_CONCURRENCY', '4')
         assert system_info.gunicorn_worker_count(['gunicorn', 'app']) == '4'
         monkeypatch.delenv('WEB_CONCURRENCY')
+        assert system_info.gunicorn_worker_count(['gunicorn', 'app']) == '1'
+
+    def test_unparsable_gunicorn_cmd_args_are_ignored(self, monkeypatch):
+        """An unbalanced quote in GUNICORN_CMD_ARGS does not break the summary: the variable is skipped."""
+        monkeypatch.setenv('GUNICORN_CMD_ARGS', '--workers "2')
+        monkeypatch.setenv('MAB_GUNICORN_WORKERS', '1')
         assert system_info.gunicorn_worker_count(['gunicorn', 'app']) == '1'
 
     def test_not_under_gunicorn(self):
@@ -253,6 +265,21 @@ class TestLogHostSummary:
         assert summary['swap_total'] == 0 and summary['data_free'] == 99
         assert summary['cpu_limit'] == 0.5 and summary['container'] == 'Docker'
         assert summary['cpus']
+
+    def test_unreadable_data_dir_has_no_free_space_figure(self, tmp_path, monkeypatch):
+        """When the free space of the data directory cannot be read, it is reported unknown."""
+
+        def unreadable(path):
+            raise OSError('no such device')
+
+        from types import SimpleNamespace
+
+        psutil = system_info.psutil
+        monkeypatch.setattr(psutil, 'virtual_memory', lambda: SimpleNamespace(total=2048), raising=False)
+        monkeypatch.setattr(psutil, 'swap_memory', lambda: SimpleNamespace(total=0), raising=False)
+        monkeypatch.setattr(psutil, 'disk_usage', unreadable, raising=False)
+
+        assert system_info.collect_host_summary(str(tmp_path))['data_free'] is None
 
 
 class TestResourceStatus:

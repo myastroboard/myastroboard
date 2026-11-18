@@ -230,3 +230,22 @@ class TestStripStoredPictures:
         counts = image_privacy.strip_stored_pictures([str(root)])
         assert counts['cleaned'] == 0 and counts['failed'] == 2
         assert (root / 'u1_gps.jpg').read_bytes() == before
+
+    def test_a_cleaned_result_that_is_not_a_picture_is_refused(self, tmp_path, monkeypatch):
+        """The decode check itself rejects bytes that are no picture: the original stays."""
+        from utils import image_privacy
+
+        root = tmp_path
+        (root / 'u1_gps.jpg').write_bytes(_encode('JPEG', exif=_exif()))
+        before = (root / 'u1_gps.jpg').read_bytes()
+        monkeypatch.setattr(image_privacy, 'strip_image_metadata', lambda _data: b'truncated')
+        counts = image_privacy.strip_stored_pictures([str(root)])
+        assert counts == {'scanned': 1, 'cleaned': 0, 'unchanged': 0, 'failed': 1}
+        assert (root / 'u1_gps.jpg').read_bytes() == before
+
+    def test_a_directory_named_like_a_picture_is_skipped(self, tmp_path):
+        """Only regular files are scanned: a folder called 'x.jpg' is left alone."""
+        from utils.image_privacy import strip_stored_pictures
+
+        (tmp_path / 'u1_album.jpg').mkdir()
+        assert strip_stored_pictures([str(tmp_path)])['scanned'] == 0

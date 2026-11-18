@@ -80,6 +80,13 @@ class TestFeed:
         assert [d['date'] for d in windowed] == ['2026-11-10']
         assert len(activity.build_feed([member], TODAY, pictures_shared=True, limit=1)) == 1
 
+    def test_pictures_outside_the_window_stay_out(self):
+        """A picture older than the window does not open a day of its own in the feed."""
+        member = _member('m', {'2026-11-10': ['M 1']}, pictures=[('M 1', '2026-11-10'), ('M 2', '2025-01-01')])
+        feed = activity.build_feed([member], TODAY, pictures_shared=True, days=30)
+        assert [d['date'] for d in feed] == ['2026-11-10']
+        assert feed[0]['pictures'] == [{'filename': 'M 1.jpg', 'item_name': 'M 1'}]
+
     def test_long_days_are_capped_but_counted(self):
         names = [f'M {index}' for index in range(1, 11)]
         member = _member('m', {'2026-11-10': names})

@@ -688,6 +688,20 @@ class TestUserManagerPreferences:
         with pytest.raises(ValueError, match='User not found'):
             isolated_user_manager.update_user_preferences('no-such-id', {'time_format': '24h'})
 
+    @pytest.mark.parametrize(
+        'call',
+        [
+            lambda manager: manager.update_user_profile('no-such-id', {'display_name': 'Vega'}),
+            lambda manager: manager.set_user_avatar('no-such-id', 'avatar.webp'),
+            lambda manager: manager.reset_user_profile('no-such-id'),
+        ],
+        ids=['update_profile', 'set_avatar', 'reset_profile'],
+    )
+    def test_profile_changes_refuse_an_unknown_user(self, isolated_user_manager, call):
+        """A profile change for an account that no longer exists raises instead of writing."""
+        with pytest.raises(ValueError, match='User not found'):
+            call(isolated_user_manager)
+
     def test_update_user_preferences_not_a_dict(self, isolated_user_manager):
         manager = isolated_user_manager
         user = manager.create_user('alice', 'pass', auth.ROLE_USER)

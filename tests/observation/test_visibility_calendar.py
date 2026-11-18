@@ -588,3 +588,37 @@ def test_calendar_cache_misses_after_horizon_or_constraint_change(monkeypatch):
     visibility_calendar.get_visibility_calendar('M31', location, 2026)
 
     assert len(calls) == 3
+
+
+def test_night_context_for_reads_the_preset_and_reuses_the_night(monkeypatch):
+    """The challenges ask per preset: its coordinates feed the night, computed once per date."""
+    from datetime import date as _date
+
+    calls = []
+
+    def fake_build(lat_deg, lon_deg, timezone_name, night_date):
+        calls.append((lat_deg, lon_deg, timezone_name, night_date))
+        return {'date': night_date.isoformat()}
+
+    monkeypatch.setattr(visibility_calendar, 'build_night_context', fake_build)
+    location = {'id': 'home', 'latitude': 45.5, 'longitude': 6.25, 'timezone': 'Europe/Paris'}
+
+    first = visibility_calendar.night_context_for(location, _date(2026, 9, 15))
+    second = visibility_calendar.night_context_for(location, _date(2026, 9, 15))
+
+    assert first == second == {'date': '2026-09-15'}
+    assert calls == [(45.5, 6.25, 'Europe/Paris', _date(2026, 9, 15))]
+
+
+def test_observing_constraints_follow_the_skytonight_settings(monkeypatch):
+    """The altitude band is the one the SkyTonight calculator uses, airmass limit included."""
+    assert visibility_calendar.observing_constraints() == (30.0, 90.0)
+
+    monkeypatch.setattr(
+        visibility_calendar,
+        'load_config',
+        lambda: {'skytonight': {'constraints': {'altitude_constraint_min': 10, 'airmass_constraint': 2.0}}},
+    )
+    alt_min, alt_max = visibility_calendar.observing_constraints()
+    assert alt_min == pytest.approx(30.0)
+    assert alt_max == 80.0
