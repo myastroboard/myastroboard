@@ -16,6 +16,10 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - SkyTonight no longer stops calculating until the next restart after a worker was killed for lack of
   memory (every run then failed with "Working outside of application context").
+- Signing in at a local `http://` address works again with the HTTPS-only session cookie on: the page
+  no longer reloads forever ([docs/6.REVERSE_PROXY.md](docs/6.REVERSE_PROXY.md)).
+- Demo mode: `/login?signin` shows the sign-in form again in a browser already browsing the demo
+  ([docs/DEMO_MODE.md](docs/DEMO_MODE.md)).
 - My astro year: format, theme and signature are chosen once for the whole slideshow and apply to the
   preview, "This screen" and "All screens" alike ([docs/MY_PROGRESS.md](docs/MY_PROGRESS.md)).
 - Community, Astrodex, Catalogue Collection, Observation Log and montages: pictures load as small

@@ -78,6 +78,20 @@ def test_login_page_with_signin_shows_the_form(demo_client):
     assert response.status_code == 200
 
 
+def test_login_page_with_signin_shows_the_form_to_a_demo_visitor(demo_client):
+    """A browser already browsing the demo (session cookie kept) still reaches the real form."""
+    demo_client.get('/')  # signs the visitor in on the demo account
+    assert demo_client.get('/login?signin=1').status_code == 200
+    assert demo_client.get('/login').status_code == 302
+
+
+def test_login_page_with_signin_redirects_another_signed_in_account(client_admin, monkeypatch):
+    """Someone signed in on their own account has nothing to sign in to: back to the app."""
+    monkeypatch.setenv('DEMO_MODE', 'true')
+    response = client_admin.get('/login?signin=1')
+    assert response.status_code == 302
+
+
 def test_status_flag_is_false_for_another_account(client_admin, monkeypatch):
     """The maintainer signed in on the demo instance is not treated as a demo visitor."""
     monkeypatch.setenv('DEMO_MODE', 'true')

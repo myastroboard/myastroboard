@@ -583,42 +583,6 @@ class TestAdminEndpoints:
         """The route applies SESSION_COOKIE_SECURE live: put this process's value back afterwards."""
         monkeypatch.setitem(_app_mod.app.config, 'SESSION_COOKIE_SECURE', _app_mod.app.config['SESSION_COOKIE_SECURE'])
 
-    @pytest.mark.parametrize(
-        'address, keeps',
-        [
-            ('https://demo.example.org', True),
-            ('http://localhost:5000', True),
-            ('http://LOCALHOST', True),
-            ('http://127.0.0.1:5000', True),
-            ('http://[::1]:5000', True),
-            ('http://myastroboard.localhost:5000', True),
-            ('http://192.168.1.10:5050', False),
-            ('http://demo.example.org', False),
-            ('http://[fe80::1]:5000', False),
-        ],
-    )
-    def test_secure_cookie_rule_follows_what_browsers_accept(self, address, keeps):
-        """Browsers keep a Secure cookie over HTTPS and on loopback addresses only."""
-        from blueprints import admin as admin_bp_module
-
-        with _app_mod.app.test_request_context('/', base_url=address):
-            assert admin_bp_module._request_can_keep_secure_cookies() is keeps
-
-    def test_secure_cookie_rule_treats_a_malformed_host_as_insecure(self, monkeypatch):
-        """A Host header that is not a valid address is never a secure context: Werkzeug already
-        empties it, and a host urlsplit still cannot parse is refused too."""
-        from blueprints import admin as admin_bp_module
-
-        with _app_mod.app.test_request_context('/', environ_overrides={'HTTP_HOST': '[::1'}):
-            assert admin_bp_module._request_can_keep_secure_cookies() is False
-
-        def _unparsable(url):
-            raise ValueError('Invalid IPv6 URL')
-
-        monkeypatch.setattr(admin_bp_module, 'urlsplit', _unparsable)
-        with _app_mod.app.test_request_context('/', base_url='http://localhost:5000'):
-            assert admin_bp_module._request_can_keep_secure_cookies() is False
-
     def test_https_only_cookie_is_refused_from_a_plain_http_page(self, client_admin, keep_cookie_config, monkeypatch):
         """Turning it on from http://<lan address> would lock the admin out: refused, setting stays off."""
         from blueprints import admin as admin_bp_module

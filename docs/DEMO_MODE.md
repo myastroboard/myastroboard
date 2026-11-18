@@ -133,10 +133,9 @@ Open `http://<host>:5050` from your local network and:
    inside a trusted network, every visitor would count as local. The startup log warns when demo
    mode runs without trusted proxy headers.
 
-   Leave *HTTPS-only session cookie* **off** while you reach the instance at `http://<host>:5050`:
-   a browser drops a `Secure` cookie on a plain-HTTP page, so the admin, who signs in from the
-   local network only, could no longer sign in or out. Turn it on only once every address you use
-   is HTTPS, local one included; the setting refuses to turn on from a plain-HTTP page.
+   *HTTPS-only session cookie* can be turned on from the public HTTPS address: the cookie then
+   carries the `Secure` flag there, and the admin still signs in at `http://<host>:5050` (an HTTP
+   page gets the cookie without the flag; up to 1.9.0 the page reloaded forever instead).
 4. Leave *Search engine indexing* (*App settings -> Configuration -> Privacy & search engines*) as you want the demo to
    be found or not.
 
