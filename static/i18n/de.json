@@ -667,7 +667,7 @@
     "astrodex_private": "Privat Astrodex",
     "astrodex_private_info": "Aktivieren Sie diese Option, um für jeden Benutzer einen privaten Astrodex einzurichten",
     "astrodex_map_private": "Fotokarte privat",
-    "astrodex_map_private_info": "Standardmäßig deaktiviert zeigt die Fotokarte allen Nutzern die genauen GPS-Koordinaten der Fotos aller Nutzer an, die ihr Astrodex teilen. Aktivieren Sie diese Option, wenn Ihre genauen Standorte für andere Nutzer nicht sichtbar sein sollen, selbst wenn die Astrodex-Freigabe aktiviert ist.",
+    "astrodex_map_private_info": "Aktiviert (Standard bei Neuinstallationen) zeigt die Fotokarte jedem Nutzer nur seine eigenen Fotos. Deaktiviert zeigt sie allen die genauen GPS-Koordinaten der Fotos aller Nutzer.",
     "sky_quality": "Himmelsqualität (Lichtverschmutzung)",
     "sky_quality_info": "Die Bortle-Klasse beschreibt den Lichtverschmutzungsgrad Ihres Standorts. Sie finden sie auf lightpollutionmap.info (World Atlas-Ebene).",
     "sky_quality_bortle": "Bortle-Klasse:",

@@ -667,7 +667,7 @@
     "astrodex_private": "Private Astrodex",
     "astrodex_private_info": "Enable this option to set up a private Astrodex for each user",
     "astrodex_map_private": "Photo map private",
-    "astrodex_map_private_info": "When off (default), the Photo Map shows exact GPS locations of every shared user's photos to everyone. Turn this on if you don't want your precise photo locations visible to other users, even when Astrodex sharing is on.",
+    "astrodex_map_private_info": "When on (the default for new installs), each user's Photo Map shows only their own photos. When off, it shows everyone the exact GPS locations of every user's photos.",
     "sky_quality": "Sky Quality (Light Pollution)",
     "sky_quality_info": "Bortle class describes your site's light pollution level. Find it at lightpollutionmap.info (World Atlas layer).",
     "sky_quality_bortle": "Bortle Class:",
