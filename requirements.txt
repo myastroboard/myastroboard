@@ -6,7 +6,7 @@ Werkzeug===3.1.9
 gunicorn===27.0.1
 
 # Astronomy libraries (essential)
-astropy===8.0.2
+astropy===8.0.3
 astroplan===0.10.1
 astronomy-engine===2.1.19
 constellation-enum===0.1.0
