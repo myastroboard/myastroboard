@@ -8,6 +8,20 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Features
 
+- None.
+
+### Fixes
+
+- None.
+
+### Breaking changes
+
+- None.
+
+## 1.9.1 (2026-11-18)
+
+### Features
+
 - Lighter and faster server: one process with request threads on small hosts (about 200 MB less memory),
   two from 2 CPUs and 4 GB, and pages stay quick during SkyTonight calculations
   ([docs/1.INSTALLATION.md](docs/1.INSTALLATION.md#workers-and-threads)).
