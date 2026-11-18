@@ -303,9 +303,10 @@ subscription - the server-side scheduler owns delivery in that case (see Phase A
 2. Add default prefs to `_NOTIF_DEFAULTS.triggers` in `notifications.js`
 3. Add a row to `#notif-triggers-list` in `templates/index.html`
 4. Add `notifications.nX_title` and `notifications.nX_body` keys to all 6 i18n files
-5. Add `_check_nX()` function in the relevant feature module (called by the background poller)
+5. Add the browser-side check function in the feature's JS module (like `_checkAuroraN7()` in
+   `aurora.js`), used by the in-app poller when Web Push is off
 6. Add the poller call in `_runNotificationChecks()` in `notifications.js`
-7. Add the server-side check in `utils/push_scheduler.py`
+7. Add the server-side `_check_nX_...()` function in `utils/push_scheduler.py`
 8. Update the trigger table in this document
 
 ---

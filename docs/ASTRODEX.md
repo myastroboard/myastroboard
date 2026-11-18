@@ -93,7 +93,7 @@ Shows every geotagged picture (one with `latitude`/`longitude` set via a locatio
 
 This does **not** perform any EXIF GPS extraction - it only visualizes coordinates a user already entered manually. It is powered by a dedicated, lightweight endpoint:
 
-`GET /api/astrodex/map` returns a flat list of geotagged pictures across all visible users, gated by its own **`config['astrodex']['map_private']`** flag (Configuration -> Astrodex -> "Photo map private"; on by default for new installs, off for installs whose configuration predates the setting) - deliberately **independent** from the general `config['astrodex']['private']` sharing flag used by `/api/astrodex`. When `map_private` is off, every shared user's pictures appear on the map with their real coordinates, even though `/api/astrodex` itself always strips other users' exact coordinates for privacy in its own merged view. This app targets small trusted deployments (family/astro-club), so the map keeps its own, separately-labeled switch rather than being tied to the general sharing toggle; since real-world photo locations are often the observer's home, new installs start with it private.
+`GET /api/astrodex/map` returns a flat list of geotagged pictures across all visible users, gated by its own **`config['astrodex']['map_private']`** flag (**App settings -> Configuration** -> Astrodex -> "Photo map private"; on by default for new installs, off for installs whose configuration predates the setting) - deliberately **independent** from the general `config['astrodex']['private']` sharing flag used by `/api/astrodex`. When `map_private` is off, every shared user's pictures appear on the map with their real coordinates, even though `/api/astrodex` itself always strips other users' exact coordinates for privacy in its own merged view. This app targets small trusted deployments (family/astro-club), so the map keeps its own, separately-labeled switch rather than being tied to the general sharing toggle; since real-world photo locations are often the observer's home, new installs start with it private.
 
 ---
 
@@ -277,15 +277,79 @@ shared) plus an **"Other equipment"** option.
 - Images directory: `data/astrodex/images/`
 - Both are included in the **Backup / Restore** ZIP (see [CONFIGURATION.md](CONFIGURATION.md)).
 
+### Pictures on a NAS (optional, advanced)
+
+> **Optional, for advanced users.** Nothing here is needed to use MyAstroBoard: by default the
+> pictures stay in `data/astrodex/images/` next to everything else, and that is the right choice
+> for most installs. Only follow this if you are comfortable with Docker volumes, network shares
+> and Linux file permissions.
+
+You can keep the pictures on a NAS (or any network share) by mounting the share over the pictures
+folder in `docker-compose.yml`. Only the pictures move: the rest of `data/`, and the database in
+particular, **must stay on a local disk** (SQLite is slow and unsafe on NFS and SMB, see
+[DATABASE.md](DATABASE.md#network-shares)). Never point the whole `./data` volume at the share.
+
+If MyAstroBoard itself runs on the NAS (Docker on a Synology or QNAP, for example), the pictures are
+already on the NAS's own disks: leave the default setup as it is.
+
+**Option A - the host mounts the share.** Mount the share on the host first (in `/etc/fstab`, with
+the `_netdev` option so it waits for the network), then add a second volume line under the first one:
+
+```yaml
+    volumes:
+      - ./data:/app/data
+      - /mnt/nas/astro/astrodex:/app/data/astrodex/images
+```
+
+**Option B - Docker mounts the share (SMB/CIFS).** Docker connects to the share itself, and the
+container refuses to start when the NAS cannot be reached, instead of starting with an empty folder:
+
+```yaml
+services:
+  myastroboard:
+    # ...
+    volumes:
+      - ./data:/app/data
+      - astrodex_images:/app/data/astrodex/images
+
+volumes:
+  astrodex_images:
+    driver: local
+    driver_opts:
+      type: cifs
+      device: "//nas.local/astro/astrodex"
+      o: "credentials=/etc/myastroboard-nas.cred,uid=1000,gid=1000,vers=3.0"
+```
+
+`credentials=` points to a file on the host (`username=...` and `password=...` lines, readable by
+root only), so the password is not written in `docker-compose.yml`.
+
+Things to check:
+
+- **Permissions.** The application runs as user id 1000 inside the container, and must be able to
+  write to the share. On SMB, mount with `uid=1000,gid=1000` (as above). On NFS, give that user id
+  write access on the NAS side (with `root_squash`, the container cannot fix permissions itself).
+  At each start the container tries to give the whole `data/` tree, the share included, to that
+  user; on a share this may fail (harmless) or take a while with a large library.
+- **Share not mounted (option A).** If the host starts the container before the share is mounted,
+  Docker uses the empty local folder: existing pictures seem gone and new ones land on the local
+  disk. Make sure the mount is in place before the container starts, or use option B.
+- **Use a mount, not a symbolic link.** For security, the application refuses any picture whose real
+  path is outside `data/astrodex/images/`, so a symbolic link to the share makes every picture fail
+  to load.
+- **Backups.** The **Backup / Restore** ZIP still includes every picture, and is built in memory: with
+  a large library it becomes very large and needs a lot of memory. Back the pictures up with the
+  NAS's own tools instead.
+- **Other picture folders.** The same pattern works for observation log attachments
+  (`/app/data/observation_sessions/attachments`) and profile pictures (`/app/data/avatars`).
+
 ### Write safety
 
-`save_user_astrodex()` uses an atomic write pattern:
-1. Write to a temporary file (`.json.tmp`)
-2. Validate the temporary file's JSON
-3. `os.replace()` - atomic rename on POSIX filesystems
-4. Delete the backup on success; restore it on failure
-
-Per-user write locks (`threading.Lock` per `user_id`) prevent concurrent save race conditions across Gunicorn workers.
+`save_user_astrodex()` stamps `updated_at`, cleans the payload, runs `validate_astrodex_data()`, then
+writes the user's rows in one database transaction (`documents.put_document()`): nothing is stored
+when validation fails, and a failed write leaves the previous collection untouched. The database
+handles concurrent writes from several request threads and Gunicorn workers (see
+[DATABASE.md](DATABASE.md)).
 
 ---
 

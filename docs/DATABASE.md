@@ -118,8 +118,7 @@ local disk (the Home Assistant app always does).
 
 - Read-modify-write goes in one `db.engine.transaction()` (`BEGIN IMMEDIATE`): it
   serializes the gunicorn workers, so no file lock is needed. Nested calls join the outer
-  transaction. `documents.modify_document()` and `settings_store.modify_setting()` wrap the
-  common case.
+  transaction. `settings_store.modify_setting()` wraps the common case for settings.
 - Per-process caches compare a **store revision** (`get_revision()`), bumped in the same
   transaction as every write, to see other workers' changes - never a file mtime.
 - Deleting an account (`users_store.delete_user`) deletes all of its rows in the same
