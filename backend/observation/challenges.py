@@ -21,7 +21,6 @@ in-process caches keyed on the location's geometry: they change once a season at
 from __future__ import annotations
 
 import datetime
-from collections import OrderedDict
 from collections.abc import Collection, Sequence
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -34,6 +33,7 @@ from astropy.time import Time
 from astroweather.moon_calendar import phase_at
 from observation import achievements, visibility_calendar
 from utils.logging_config import get_logger
+from utils.lru_cache import LruCache
 
 logger = get_logger(__name__)
 
@@ -67,8 +67,8 @@ _MARATHON_GRID_END_HOUR = 10
 _MARATHON_MAX_ILLUMINATION = 15.0
 
 _MAX_CACHE_ENTRIES = 16
-_season_cache: OrderedDict[tuple[Any, ...], dict[str, list[dict[str, Any]]]] = OrderedDict()
-_marathon_cache: OrderedDict[tuple[Any, ...], dict[str, Any]] = OrderedDict()
+_season_cache = LruCache(_MAX_CACHE_ENTRIES)
+_marathon_cache = LruCache(_MAX_CACHE_ENTRIES)
 
 
 def clear_caches() -> None:
@@ -77,12 +77,8 @@ def clear_caches() -> None:
     _marathon_cache.clear()
 
 
-def _remember(cache: OrderedDict, key: Any, value: Any) -> Any:
-    cache[key] = value
-    cache.move_to_end(key)
-    while len(cache) > _MAX_CACHE_ENTRIES:
-        cache.popitem(last=False)
-    return value
+def _remember(cache: LruCache, key: Any, value: Any) -> Any:
+    return cache.put(key, value, _MAX_CACHE_ENTRIES)
 
 
 # ---------------------------------------------------------------------------
@@ -135,7 +131,6 @@ def _season_lists(location: dict[str, Any], season: dict[str, Any]) -> dict[str,
     cache_key = (visibility_calendar.location_cache_signature(location), season['index'], season['start_year'])
     cached = _season_cache.get(cache_key)
     if cached is not None:
-        _season_cache.move_to_end(cache_key)
         return cached
 
     alt_min, alt_max = visibility_calendar.observing_constraints()
@@ -388,8 +383,6 @@ def messier_marathon(
     plan = _marathon_cache.get(cache_key)
     if plan is None:
         plan = _remember(_marathon_cache, cache_key, _compute_marathon(location, year))
-    else:
-        _marathon_cache.move_to_end(cache_key)
 
     night = datetime.date.fromisoformat(plan['date'])
     highlight_from = datetime.date(year, *MARATHON_HIGHLIGHT_FROM)

@@ -1340,9 +1340,9 @@ def _pdf_footer(ax, label: str) -> None:
 
 def _pdf_new_page(title: str, subtitle: str = ''):
     """A blank A4 page with the shared header/footer bars already drawn."""
-    import matplotlib.pyplot as plt
+    from matplotlib.figure import Figure
 
-    fig = plt.figure(figsize=(_PDF_PAGE_W_IN, _PDF_PAGE_H_IN))
+    fig = Figure(figsize=(_PDF_PAGE_W_IN, _PDF_PAGE_H_IN))
     fig.patch.set_facecolor(_PDF_C_WHITE)
     _pdf_header(
         fig.add_axes((_PDF_MARGIN_L, _PDF_HEADER_TOP - _PDF_HEADER_H, _PDF_MARGIN_R - _PDF_MARGIN_L, _PDF_HEADER_H)),
@@ -1742,7 +1742,6 @@ def _render_session_section(pdf, session: dict, image_paths: dict[str, str], t) 
     instead gets one date/conditions sub-header per night, its own entries grouped
     underneath - the day-by-day breakdown a multi-night trip needs.
     """
-    import matplotlib.pyplot as plt
 
     entries = [entry for entry in session.get('entries', []) if isinstance(entry, dict)]
     nights = _sorted_nights(session)
@@ -1766,7 +1765,6 @@ def _render_session_section(pdf, session: dict, image_paths: dict[str, str], t) 
             va='top',
         )
         pdf.savefig(fig)
-        plt.close(fig)
         return
 
     targets_label = t('observation_log.export_pdf_targets_section') or 'Logged targets'
@@ -1776,7 +1774,6 @@ def _render_session_section(pdf, session: dict, image_paths: dict[str, str], t) 
         nonlocal fig, y_cursor
         if y_cursor - needed_h < _PDF_CONTENT_BOTTOM:
             pdf.savefig(fig)
-            plt.close(fig)
             fig = _pdf_new_page(title, continuation_subtitle)
             y_cursor = _PDF_CONTENT_TOP
 
@@ -1800,7 +1797,6 @@ def _render_session_section(pdf, session: dict, image_paths: dict[str, str], t) 
             y_cursor -= _PDF_ENTRY_ROW_H
 
         pdf.savefig(fig)
-        plt.close(fig)
         return
 
     entries_by_night: dict[str, list[dict]] = {night['id']: [] for night in nights}
@@ -1840,11 +1836,9 @@ def _render_session_section(pdf, session: dict, image_paths: dict[str, str], t) 
             y_cursor -= _PDF_ENTRY_ROW_H
 
     pdf.savefig(fig)
-    plt.close(fig)
 
 
 def _pdf_render_cover_page(pdf, sessions: list[dict], from_date: str | None, to_date: str | None, t) -> None:
-    import matplotlib.pyplot as plt
 
     title = t('observation_log.export_pdf_title') or 'Observation Log'
     fig = _pdf_new_page(title)
@@ -1922,11 +1916,9 @@ def _pdf_render_cover_page(pdf, sessions: list[dict], from_date: str | None, to_
         )
 
     pdf.savefig(fig)
-    plt.close(fig)
 
 
 def _pdf_render_summary_pages(pdf, sessions: list[dict], t) -> None:
-    import matplotlib.pyplot as plt
     from matplotlib.patches import Rectangle
 
     title = t('observation_log.export_pdf_title') or 'Observation Log'
@@ -2026,7 +2018,6 @@ def _pdf_render_summary_pages(pdf, sessions: list[dict], t) -> None:
             y -= _PDF_SUMMARY_ROW_H
 
         pdf.savefig(fig)
-        plt.close(fig)
 
 
 def generate_session_pdf(session: dict, image_paths: dict[str, str], i18n_manager) -> io.BytesIO:

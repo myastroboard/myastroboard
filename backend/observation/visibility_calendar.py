@@ -29,7 +29,6 @@ from __future__ import annotations
 import contextlib
 import json
 import math
-from collections import OrderedDict
 from collections.abc import Iterator, Sequence
 from datetime import UTC, date
 from typing import Any
@@ -45,6 +44,7 @@ from skytonight.skytonight_calculator import _horizon_floor_array
 from skytonight.skytonight_targets import normalize_object_name
 from utils import distant_epoch_precision_warnings_muted
 from utils.logging_config import get_logger
+from utils.lru_cache import LruCache
 from utils.repo_config import load_config
 
 logger = get_logger(__name__)
@@ -65,7 +65,7 @@ YEAR_OFFSET_MAX = 5
 _UNSUPPORTED_CATEGORIES = {'bodies', 'comets'}
 _UNSUPPORTED_OTYPE_TOKENS = ('planet', 'comet', 'asteroid', 'moon', 'minor')
 
-_calendar_cache: OrderedDict[tuple[Any, ...], dict[str, Any]] = OrderedDict()
+_calendar_cache = LruCache(_MAX_CACHE_ENTRIES)
 
 
 def clear_cache() -> None:
@@ -437,15 +437,9 @@ def get_visibility_calendar(identifier: str, location: dict[str, Any], year: int
     cache_key = (identifier.strip().lower(), _location_cache_signature(location), int(year), _resolve_constraints())
     cached = _calendar_cache.get(cache_key)
     if cached is not None:
-        _calendar_cache.move_to_end(cache_key)
         return cached
 
-    result = _compute_visibility_calendar(identifier, location, year)
-    _calendar_cache[cache_key] = result
-    _calendar_cache.move_to_end(cache_key)
-    while len(_calendar_cache) > _MAX_CACHE_ENTRIES:
-        _calendar_cache.popitem(last=False)
-    return result
+    return _calendar_cache.put(cache_key, _compute_visibility_calendar(identifier, location, year), _MAX_CACHE_ENTRIES)
 
 
 # ---------------------------------------------------------------------------
@@ -457,14 +451,14 @@ def get_visibility_calendar(identifier: str, location: dict[str, Any], year: int
 # which stays one click away behind the v1.4 modal.
 WISHLIST_MONTHS_AHEAD = 3
 
-_dark_hours_cache: OrderedDict[tuple[Any, ...], list[dict[str, Any]]] = OrderedDict()
+_dark_hours_cache = LruCache(_MAX_CACHE_ENTRIES)
 
 # Night contexts depend only on (site, date) - never on which targets are folded through
 # them - so the same handful serves every wishlist load for that day. Bounded, like the
 # calendar's own LRU: the key space is (locations x dates) and only recent dates are ever
 # asked for.
-_context_cache: OrderedDict[tuple[Any, ...], dict[str, Any]] = OrderedDict()
 _MAX_CONTEXT_ENTRIES = 32
+_context_cache = LruCache(_MAX_CONTEXT_ENTRIES)
 
 
 def clear_batch_caches() -> None:
@@ -484,15 +478,11 @@ def _cached_night_context(
     cache_key = (location_id, lat_deg, lon_deg, timezone_name, night_date.isoformat())
     cached = _context_cache.get(cache_key)
     if cached is not None:
-        _context_cache.move_to_end(cache_key)
         return cached
 
-    context = build_night_context(lat_deg, lon_deg, timezone_name, night_date)
-    _context_cache[cache_key] = context
-    _context_cache.move_to_end(cache_key)
-    while len(_context_cache) > _MAX_CONTEXT_ENTRIES:
-        _context_cache.popitem(last=False)
-    return context
+    return _context_cache.put(
+        cache_key, build_night_context(lat_deg, lon_deg, timezone_name, night_date), _MAX_CONTEXT_ENTRIES
+    )
 
 
 def night_context_for(location: dict[str, Any], night_date: date) -> dict[str, Any]:
@@ -524,15 +514,6 @@ def fixed_target_altaz(ra_deg: float, dec_deg: float, lat_deg: float, lst_hours:
 def horizon_floor(azimuths: np.ndarray, horizon_profile: list[dict[str, Any]]) -> np.ndarray:
     """The custom horizon's altitude at each azimuth, as SkyTonight applies it."""
     return _horizon_floor_array(azimuths.astype(np.float64), horizon_profile or [])
-
-
-def _remember(cache: OrderedDict, key: Any, value: Any) -> Any:
-    """Store *value* in a bounded LRU and return it."""
-    cache[key] = value
-    cache.move_to_end(key)
-    while len(cache) > _MAX_CACHE_ENTRIES:
-        cache.popitem(last=False)
-    return value
 
 
 def _iter_sample_nights(year: int, months: tuple[int, ...] = _MONTHS) -> Iterator[date]:
@@ -569,7 +550,6 @@ def dark_hours_by_month(location: dict[str, Any], year: int) -> list[dict[str, A
     cache_key = (_location_cache_signature(location), int(year))
     cached = _dark_hours_cache.get(cache_key)
     if cached is not None:
-        _dark_hours_cache.move_to_end(cache_key)
         return cached
 
     lat_deg, lon_deg, timezone_name, _horizon = _location_geometry(location)
@@ -602,7 +582,7 @@ def dark_hours_by_month(location: dict[str, Any], year: int) -> list[dict[str, A
             }
         )
 
-    return _remember(_dark_hours_cache, cache_key, rows)
+    return _dark_hours_cache.put(cache_key, rows, _MAX_CACHE_ENTRIES)
 
 
 def next_visibility_batch(

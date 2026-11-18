@@ -25,8 +25,8 @@ services:
       - DATA_DIR=/app/data
 
       # Security, reverse proxy, and push notification settings are managed
-      # through the admin UI: Parameters -> Advanced
-      # They are stored in data/app_settings.json and persist across container rebuilds.
+      # through the admin UI: App settings -> Configuration
+      # They are stored in the database (data/myastroboard.db) and persist across container rebuilds.
 
     restart: unless-stopped
 

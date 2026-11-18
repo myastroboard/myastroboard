@@ -162,7 +162,7 @@ class TestMissingTonight:
 
 class TestDefensivePaths:
     def test_bounded_cache_drops_the_oldest(self):
-        cache = challenges.OrderedDict()
+        cache = challenges.LruCache(challenges._MAX_CACHE_ENTRIES)
         for key in range(challenges._MAX_CACHE_ENTRIES + 3):
             challenges._remember(cache, key, key)
         assert len(cache) == challenges._MAX_CACHE_ENTRIES

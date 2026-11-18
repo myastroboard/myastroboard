@@ -389,7 +389,7 @@ def _load_location_signatures():
 def _save_location_signatures():
     """Persist location signatures to disk (atomically, so other workers never read a partial file)"""
     global _location_signatures_mtime_ns
-    tmp_path = f"{_LOCATION_CACHE_FILE}.{os.getpid()}.tmp"
+    tmp_path = f"{_LOCATION_CACHE_FILE}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp"
     try:
         _ensure_data_dir()
         with open(tmp_path, 'w') as f:

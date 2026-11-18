@@ -1407,6 +1407,7 @@ class TestBuildBodiesSectionPayload:
         }
         monkeypatch.setattr(_skytonight_api_mod, 'has_bodies_results', lambda *_a, **_k: True)
         monkeypatch.setattr(_skytonight_api_mod, 'load_json_file', lambda *a, **k: bodies_data)
+        monkeypatch.setattr(_skytonight_api_mod, 'load_shared_json', lambda *a, **k: bodies_data)
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'})
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'load_user_astrodex', lambda u: {'items': []})
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'list_user_plan_combination_ids', lambda uid: [])
@@ -1437,6 +1438,7 @@ class TestBuildBodiesSectionPayload:
         }
         monkeypatch.setattr(_skytonight_api_mod, 'has_bodies_results', lambda *_a, **_k: True)
         monkeypatch.setattr(_skytonight_api_mod, 'load_json_file', lambda *a, **k: bodies_data)
+        monkeypatch.setattr(_skytonight_api_mod, 'load_shared_json', lambda *a, **k: bodies_data)
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'})
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'load_user_astrodex', lambda u: {'items': []})
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'list_user_plan_combination_ids', lambda uid: [])
@@ -1529,6 +1531,7 @@ class TestBuildCometsSectionPayload:
         }
         monkeypatch.setattr(_skytonight_api_mod, 'has_comets_results', lambda *_a, **_k: True)
         monkeypatch.setattr(_skytonight_api_mod, 'load_json_file', lambda *a, **k: comets_data)
+        monkeypatch.setattr(_skytonight_api_mod, 'load_shared_json', lambda *a, **k: comets_data)
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'})
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'load_user_astrodex', lambda u: {'items': []})
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'list_user_plan_combination_ids', lambda uid: [])
@@ -1562,6 +1565,7 @@ class TestBuildCometsSectionPayload:
         }
         monkeypatch.setattr(_skytonight_api_mod, 'has_comets_results', lambda *_a, **_k: True)
         monkeypatch.setattr(_skytonight_api_mod, 'load_json_file', lambda *a, **k: comets_data)
+        monkeypatch.setattr(_skytonight_api_mod, 'load_shared_json', lambda *a, **k: comets_data)
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'})
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'load_user_astrodex', lambda u: {'items': []})
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'list_user_plan_combination_ids', lambda uid: [])
@@ -1668,6 +1672,7 @@ class TestBuildDsoSectionPayload:
         }
         monkeypatch.setattr(_skytonight_api_mod, 'has_dso_results', lambda *_a, **_k: True)
         monkeypatch.setattr(_skytonight_api_mod, 'load_json_file', lambda *a, **k: dso_data)
+        monkeypatch.setattr(_skytonight_api_mod, 'load_shared_json', lambda *a, **k: dso_data)
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'})
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'load_user_astrodex', lambda u: {'items': []})
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'list_user_plan_combination_ids', lambda uid: [])
@@ -1703,6 +1708,7 @@ class TestBuildDsoSectionPayload:
         }
         monkeypatch.setattr(_skytonight_api_mod, 'has_dso_results', lambda *_a, **_k: True)
         monkeypatch.setattr(_skytonight_api_mod, 'load_json_file', lambda *a, **k: dso_data)
+        monkeypatch.setattr(_skytonight_api_mod, 'load_shared_json', lambda *a, **k: dso_data)
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'})
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'load_user_astrodex', lambda u: {'items': []})
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'list_user_plan_combination_ids', lambda uid: [])
@@ -1733,6 +1739,7 @@ class TestBuildDsoSectionPayload:
         }
         monkeypatch.setattr(_skytonight_api_mod, 'has_dso_results', lambda *_a, **_k: True)
         monkeypatch.setattr(_skytonight_api_mod, 'load_json_file', lambda *a, **k: dso_data)
+        monkeypatch.setattr(_skytonight_api_mod, 'load_shared_json', lambda *a, **k: dso_data)
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'})
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'load_user_astrodex', lambda u: {'items': []})
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'list_user_plan_combination_ids', lambda uid: [])

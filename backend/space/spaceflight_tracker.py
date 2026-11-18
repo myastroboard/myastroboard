@@ -108,7 +108,7 @@ def _save_backoff_state() -> None:
     try:
         os.makedirs(DATA_DIR_CACHE, exist_ok=True)
         now_ts = time.time()
-        active = {k: v for k, v in _backoff_until.items() if v > now_ts}
+        active = {k: v for k, v in dict(_backoff_until).items() if v > now_ts}  # copy: request threads write it
         with open(_SPACEFLIGHT_BACKOFF_FILE, 'w', encoding='utf-8') as fh:
             json.dump(active, fh)
     except Exception as exc:

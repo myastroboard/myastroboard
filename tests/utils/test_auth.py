@@ -194,6 +194,28 @@ class TestUserModel:
         )
         assert u.is_using_default_password() is False
 
+    def test_is_using_default_password_hashes_once_per_password_hash(self, monkeypatch):
+        """The scrypt check runs once per stored hash, then again only after a password change."""
+        calls = []
+        real_check = auth.check_password_hash
+
+        def counting_check(password_hash, password):
+            calls.append(password_hash)
+            return real_check(password_hash, password)
+
+        monkeypatch.setattr(auth, 'check_password_hash', counting_check)
+        monkeypatch.setattr(auth, '_default_password_check', None)
+        u = auth.User(
+            username=auth.DEFAULT_ADMIN_USERNAME,
+            password_hash=generate_password_hash(auth.DEFAULT_ADMIN_PASSWORD),
+            role=auth.ROLE_ADMIN,
+        )
+        assert [u.is_using_default_password() for _ in range(3)] == [True, True, True]
+        assert len(calls) == 1
+        u.password_hash = generate_password_hash('changed!')
+        assert u.is_using_default_password() is False
+        assert len(calls) == 2
+
     def test_is_using_default_password_false_non_admin(self):
         u = auth.User(
             username='alice',

@@ -381,3 +381,43 @@ def test_find_target_tolerates_a_dataset_that_is_not_a_dict(monkeypatch):
     monkeypatch.setattr(skytonight_targets, 'load_targets_dataset', lambda: None)
 
     assert skytonight_targets.find_target('M 31') is None
+
+
+def test_simultaneous_first_loads_parse_the_dataset_once(tmp_path, monkeypatch):
+    """Threads asking for the dataset together share one load instead of each parsing a copy.
+
+    The dataset is the largest object in the process: duplicate loads after a rebuild were a
+    memory spike on small hosts.
+    """
+    import threading
+
+    dataset_file = tmp_path / 'targets.json'
+    dataset_file.write_text(json.dumps({'metadata': {}, 'targets': [t.to_dict() for t in _sample_targets()]}))
+    real_load = skytonight_targets.load_json_file
+    loads = []
+
+    def slow_load(path, default=None):
+        loads.append(path)
+        time.sleep(0.2)  # long enough for every thread to arrive while the first one loads
+        return real_load(path, default=default)
+
+    monkeypatch.setattr(skytonight_targets, 'load_json_file', slow_load)
+    skytonight_targets.invalidate_targets_dataset_cache()
+    results = []
+    start = threading.Barrier(6)
+
+    def worker():
+        start.wait()
+        results.append(skytonight_targets.load_targets_dataset(dataset_file=str(dataset_file)))
+
+    threads = [threading.Thread(target=worker) for _ in range(6)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    skytonight_targets.invalidate_targets_dataset_cache()
+
+    assert len(loads) == 1
+    assert len(results) == 6
+    assert all(result is results[0] for result in results)
+    assert len(results[0]['targets']) == 1

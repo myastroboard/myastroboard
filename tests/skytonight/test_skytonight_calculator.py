@@ -2263,7 +2263,10 @@ class TestLoadCalculationResults:
         dso = {'metadata': {}, 'deep_sky': [{'target_id': 'ngc1'}]}
         bodies = {'metadata': {}, 'bodies': [{'target_id': 'jupiter'}]}
         comets = {'metadata': {}, 'comets': []}
-        with patch('skytonight.skytonight_calculator.load_json_file', side_effect=[meta, dso, bodies, comets]):
+        with (
+            patch('skytonight.skytonight_calculator.load_json_file', side_effect=[meta, bodies, comets]),
+            patch('skytonight.skytonight_calculator.load_shared_json', return_value=dso),
+        ):
             result = load_calculation_results()
         assert result['metadata']['calculated_at'] == '2026-01-01'
         assert result['deep_sky'] == [{'target_id': 'ngc1'}]
@@ -2276,7 +2279,10 @@ class TestLoadCalculationResults:
         dso = {'metadata': {'from': 'dso'}, 'deep_sky': []}
         bodies = {'metadata': {}, 'bodies': []}
         comets = {'metadata': {}, 'comets': []}
-        with patch('skytonight.skytonight_calculator.load_json_file', side_effect=[meta, dso, bodies, comets]):
+        with (
+            patch('skytonight.skytonight_calculator.load_json_file', side_effect=[meta, bodies, comets]),
+            patch('skytonight.skytonight_calculator.load_shared_json', return_value=dso),
+        ):
             result = load_calculation_results()
         assert result['metadata'] == {'from': 'dso'}
 

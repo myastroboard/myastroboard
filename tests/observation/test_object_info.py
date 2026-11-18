@@ -1417,3 +1417,58 @@ def test_backoff_file_lock_uses_an_exclusive_flock_on_posix(fake_fcntl, monkeypa
         assert [op for _fd, op in fake.calls] == [fake.LOCK_EX]
 
     assert [op for _fd, op in fake.calls] == [fake.LOCK_EX, fake.LOCK_UN]
+
+
+class TestConcurrentImageDownload:
+    """Two request threads fetching the same image at once (gthread workers share a pid)."""
+
+    def test_both_downloads_succeed_and_leave_a_whole_file(self, tmp_path, monkeypatch):
+        """Each download writes its own temporary file before the atomic replace.
+
+        With a temporary name built from the process id alone, both threads wrote into the
+        same file: the bytes interleaved, and the second os.replace found the file gone, which
+        failed the request and put hips2fits in backoff for every user.
+        """
+        import threading
+
+        monkeypatch.setattr(oi, '_is_backed_off', lambda service: False)
+        monkeypatch.setattr(oi, '_clear_backoff', lambda service: None)
+        backoffs = []
+        monkeypatch.setattr(oi, '_trigger_backoff', backoffs.append)
+        start = threading.Barrier(2)
+
+        class SlowResponse:
+            def raise_for_status(self):
+                return None
+
+            def iter_content(self, chunk_size):
+                start.wait()  # both threads are now writing at the same time
+                for _ in range(50):
+                    yield b'x' * 100
+
+        monkeypatch.setattr(oi.requests, 'get', lambda url, timeout, stream: SlowResponse())
+        # Windows tolerates the shared temporary file that Linux rejects, so also check the names.
+        real_replace = os.replace
+        sources = []
+
+        def recording_replace(src, dst):
+            sources.append(src)
+            real_replace(src, dst)
+
+        monkeypatch.setattr(oi.os, 'replace', recording_replace)
+        target = tmp_path / 'img' / 'm31.jpg'
+        results = []
+        threads = [
+            threading.Thread(target=lambda: results.append(oi.download_hips2fits_image('u', str(target), 'M 31')))
+            for _ in range(2)
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        assert len(set(sources)) == 2
+        assert results == [True, True]
+        assert backoffs == []
+        assert target.read_bytes() == b'x' * 5000
+        assert [p.name for p in target.parent.iterdir()] == ['m31.jpg']  # no temporary file left

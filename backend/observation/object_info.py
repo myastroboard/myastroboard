@@ -13,6 +13,7 @@ import re
 import sys
 import time
 import urllib.parse
+import uuid
 from contextlib import contextmanager
 from typing import Any
 
@@ -202,7 +203,8 @@ def _save_backoff_state() -> None:
     try:
         os.makedirs(DATA_DIR_CACHE, exist_ok=True)
         now_ts = time.time()
-        active = {k: v for k, v in _backoff_until.items() if v > now_ts}
+        # dict() copies in one step; iterating the live dict races with other request threads.
+        active = {k: v for k, v in dict(_backoff_until).items() if v > now_ts}
         tmp_path = f'{_BACKOFF_FILE}.tmp-{os.getpid()}'
         with _backoff_file_lock():
             with open(tmp_path, 'w', encoding='utf-8') as fh:
@@ -661,7 +663,7 @@ def _render_from_hips_mirrors(
         try:
             data = hips_cutout.render_cutout(base_url, ra, dec, size_deg, size_px, timeout=_HIPS_TILE_TIMEOUT)
             os.makedirs(os.path.dirname(local_path), exist_ok=True)
-            tmp_path = f'{local_path}.tmp-{os.getpid()}'
+            tmp_path = f'{local_path}.tmp-{os.getpid()}-{uuid.uuid4().hex[:8]}'
             with open(tmp_path, 'wb') as f:
                 f.write(data)
             os.replace(tmp_path, local_path)
@@ -692,7 +694,7 @@ def download_hips2fits_image(
         os.makedirs(os.path.dirname(local_path), exist_ok=True)
         resp = requests.get(url, timeout=timeout, stream=True)
         resp.raise_for_status()
-        tmp_path = f'{local_path}.tmp-{os.getpid()}'
+        tmp_path = f'{local_path}.tmp-{os.getpid()}-{uuid.uuid4().hex[:8]}'
         with open(tmp_path, 'wb') as f:
             for chunk in resp.iter_content(chunk_size=8192):
                 f.write(chunk)

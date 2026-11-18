@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import threading
 import time
 from typing import Any
 
@@ -14,6 +15,9 @@ from utils.logging_config import get_logger
 logger = get_logger(__name__)
 
 _dataset_cache: dict[str, Any] = {}
+# One loader at a time: the dataset is the largest object in the process, and request threads
+# arriving together after a rebuild would otherwise each parse their own copy of it.
+_dataset_load_lock = threading.Lock()
 
 # How long a cached dataset is trusted before its file's mtime is checked again. One request
 # can resolve tens of thousands of names (Astrodex matching over a DSO report), and a stat()
@@ -137,14 +141,29 @@ def _coerce_targets(raw_targets: Any) -> list[SkyTonightTarget]:
 
 def load_targets_dataset(force_reload: bool = False, dataset_file: str | None = None) -> dict[str, Any]:
     """Load the persisted SkyTonight dataset and derive compatibility lookup tables."""
+    target_dataset_file = dataset_file or SKYTONIGHT_DATASET_FILE
+    cached = _dataset_cache
+    if (
+        not force_reload
+        and cached.get('dataset_file') == target_dataset_file
+        and cached.get('loaded')
+        and time.monotonic() - cached.get('checked_at', 0.0) < _DATASET_MTIME_CHECK_INTERVAL_S
+    ):
+        return cached
+    with _dataset_load_lock:
+        return _load_targets_dataset_locked(target_dataset_file, force_reload)
+
+
+def _load_targets_dataset_locked(target_dataset_file: str, force_reload: bool) -> dict[str, Any]:
+    """The slow path of load_targets_dataset: stat the file, reload it when it changed."""
     global _dataset_cache
 
-    target_dataset_file = dataset_file or SKYTONIGHT_DATASET_FILE
     cache_matches = (
         not force_reload and _dataset_cache.get('dataset_file') == target_dataset_file and _dataset_cache.get('loaded')
     )
     now = time.monotonic()
     if cache_matches and now - _dataset_cache.get('checked_at', 0.0) < _DATASET_MTIME_CHECK_INTERVAL_S:
+        # Another thread reloaded it while this one waited for the lock.
         return _dataset_cache
 
     # The scheduler rebuilds the file in its own worker and only clears its own

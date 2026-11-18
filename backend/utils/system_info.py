@@ -12,6 +12,7 @@ Nothing personal is logged: no host name, address, user name or coordinates.
 
 import os
 import platform
+import shlex
 import sys
 
 import psutil
@@ -91,17 +92,46 @@ def file_system_type(path, mounts_file='/proc/mounts'):
     return best_type
 
 
+def _gunicorn_option(args, short, long):
+    """The value of ``short`` / ``long`` (or ``long=value``) in *args*, or None."""
+    for index, arg in enumerate(args):
+        if arg in (short, long) and index + 1 < len(args):
+            return args[index + 1]
+        if arg.startswith(long + '='):
+            return arg.split('=', 1)[1]
+    return None
+
+
+def _gunicorn_args(argv):
+    """Command-line options, then GUNICORN_CMD_ARGS: both override gunicorn.conf.py."""
+    try:
+        extra = shlex.split(os.environ.get('GUNICORN_CMD_ARGS', ''))
+    except ValueError:
+        extra = []
+    return list(argv[1:]) + extra
+
+
 def gunicorn_worker_count(argv=None):
-    """The ``-w`` / ``--workers`` value gunicorn was started with, or None outside gunicorn."""
+    """How many worker processes gunicorn runs, or None outside gunicorn.
+
+    An explicit ``-w`` / ``--workers`` wins; otherwise the count gunicorn.conf.py chose (it
+    exports it as MAB_GUNICORN_WORKERS), else WEB_CONCURRENCY, else gunicorn's default of 1.
+    """
     argv = sys.argv if argv is None else argv
     if not argv or 'gunicorn' not in os.path.basename(argv[0]):
         return None
-    for index, arg in enumerate(argv):
-        if arg in ('-w', '--workers') and index + 1 < len(argv):
-            return argv[index + 1]
-        if arg.startswith('--workers='):
-            return arg.split('=', 1)[1]
-    return os.environ.get('WEB_CONCURRENCY', '1')
+    explicit = _gunicorn_option(_gunicorn_args(argv), '-w', '--workers')
+    if explicit:
+        return explicit
+    return os.environ.get('MAB_GUNICORN_WORKERS') or os.environ.get('WEB_CONCURRENCY', '1')
+
+
+def gunicorn_thread_count(argv=None):
+    """Request threads per gunicorn worker, or None outside gunicorn or when unknown."""
+    argv = sys.argv if argv is None else argv
+    if not argv or 'gunicorn' not in os.path.basename(argv[0]):
+        return None
+    return _gunicorn_option(_gunicorn_args(argv), '', '--threads') or os.environ.get('MAB_GUNICORN_THREADS')
 
 
 def _megabytes(value):
@@ -130,6 +160,7 @@ def collect_host_summary(data_dir):
         'memory_limit': cgroup_memory_limit_bytes(),
         'swap_total': psutil.swap_memory().total,
         'workers': gunicorn_worker_count(),
+        'threads': gunicorn_thread_count(),
         'data_fs': file_system_type(data_dir),
         'data_free': disk_free,
     }
@@ -178,7 +209,8 @@ def format_host_summary(summary, version):
         cpus,
         memory,
         f"host swap {_megabytes(summary['swap_total'])}" if summary.get('swap_total') is not None else 'swap unknown',
-        f"gunicorn workers: {summary.get('workers') or 'n/a'}",
+        f"gunicorn workers: {summary.get('workers') or 'n/a'}"
+        + (f" x {summary['threads']} threads" if summary.get('threads') else ''),
         f"data on {summary.get('data_fs') or 'unknown fs'}",
     ]
     if summary.get('data_free') is not None:

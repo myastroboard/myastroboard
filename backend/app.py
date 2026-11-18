@@ -107,6 +107,12 @@ TEMPLATE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'te
 
 app = Flask(__name__, template_folder=TEMPLATE_DIR, static_folder=STATIC_DIR)
 
+# Count the requests in flight so background calculations pause for them (one process serves
+# everything; see utils/request_activity.py).
+from utils.request_activity import RequestActivityMiddleware
+
+app.wsgi_app = RequestActivityMiddleware(app.wsgi_app)  # type: ignore[method-assign]
+
 # Load persistent app settings (replaces SECRET_KEY / TRUST_PROXY_HEADERS /
 # SESSION_COOKIE_SECURE / VAPID_CONTACT_EMAIL environment variables).
 from utils import app_settings as _app_settings

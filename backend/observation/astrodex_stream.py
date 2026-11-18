@@ -27,6 +27,7 @@ import hmac
 import io
 import os
 import random
+import threading
 import time
 from typing import Any
 
@@ -50,6 +51,8 @@ _CONNECTOR_NAME = AstrodexStreamConnector.name
 _FRAME_CACHE: dict[tuple[str, str, int], bytes] = {}
 _FRAME_CACHE_TTL_SECONDS = 2
 _FRAME_CACHE_MAX_ENTRIES = 256
+# Request threads share the cache; eviction walks the dict, which must not change meanwhile.
+_FRAME_CACHE_LOCK = threading.Lock()
 
 ASPECT_RATIOS: dict[str, tuple[int, int]] = {
     "16:9": (16, 9),
@@ -401,10 +404,18 @@ def _config_fingerprint(config: dict[str, Any]) -> str:
 def _render_cached(feed_key: str, pictures: list[dict[str, Any]], config: dict[str, Any]) -> bytes:
     bucket = int(time.time() // _FRAME_CACHE_TTL_SECONDS)
     cache_key = (feed_key, _config_fingerprint(config), bucket)
-    cached = _FRAME_CACHE.get(cache_key)
+    with _FRAME_CACHE_LOCK:
+        cached = _FRAME_CACHE.get(cache_key)
     if cached is not None:
         return cached
     data = render_current_frame(pictures, config, seed=feed_key)
+    with _FRAME_CACHE_LOCK:
+        _remember_frame(cache_key, bucket, data)
+    return data
+
+
+def _remember_frame(cache_key: tuple[str, str, int], bucket: int, data: bytes) -> None:
+    """Store a rendered frame and keep the cache under its cap (caller holds the lock)."""
     _FRAME_CACHE[cache_key] = data
     # Evict stale buckets first (the common case - entries age out as the clock advances), then
     # fall back to insertion-order eviction if the cap is still exceeded: enough distinct
@@ -415,7 +426,6 @@ def _render_cached(feed_key: str, pictures: list[dict[str, Any]], config: dict[s
             _FRAME_CACHE.pop(key, None)
     while len(_FRAME_CACHE) > _FRAME_CACHE_MAX_ENTRIES:
         _FRAME_CACHE.pop(next(iter(_FRAME_CACHE)), None)
-    return data
 
 
 def personal_frame(user_id: str, config: dict[str, Any]) -> bytes:

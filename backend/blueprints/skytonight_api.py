@@ -60,6 +60,7 @@ from utils.constants import (
     SKYTONIGHT_CALCULATION_LOG_FILE,
 )
 from utils.constellation_names import full_constellation_name
+from utils.json_file_cache import load_shared_json
 from utils.logging_config import get_logger
 from utils.repo_config import get_active_location, get_locations_for_user, load_config
 
@@ -923,7 +924,8 @@ def _build_dso_section_payload(
     _preloaded_wishlist: set = _preload_wishlist_index(user_id, username)
 
     if has_dso_results(location_id):
-        data = load_json_file(get_dso_results_file(location_id), default={})
+        # Shared, read-only copy: rows below are new dicts (see utils.json_file_cache).
+        data = load_shared_json(get_dso_results_file(location_id), default={})
         alttime_files = list_alttime_files(get_alttime_dir(location_id))
         rows = []
         rows_added = 0
@@ -1918,7 +1920,8 @@ def get_skytonight_recommendations_api():
         preferences = user_manager.get_user_preferences(user.user_id)
         experience_level = preferences.get('experience_level', 'advanced')
 
-        dso_data = load_json_file(get_dso_results_file(_skytonight_request_location().get('id')), default={})
+        # Shared, read-only copy: candidates is a new list and targets are new dicts.
+        dso_data = load_shared_json(get_dso_results_file(_skytonight_request_location().get('id')), default={})
         deep_sky = dso_data.get('deep_sky', []) if isinstance(dso_data, dict) else []
 
         candidates = _filter_targets_by_experience_level(deep_sky, experience_level)

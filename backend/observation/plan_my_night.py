@@ -1603,8 +1603,8 @@ def generate_plan_pdf(payload: dict, metrics: dict, i18n_manager) -> io.BytesIO:
     """
     import matplotlib.dates as mdates
     import matplotlib.gridspec as gridspec
-    import matplotlib.pyplot as plt
     from matplotlib.backends.backend_pdf import PdfPages
+    from matplotlib.figure import Figure
     from matplotlib.patches import Rectangle
 
     plan = payload.get('plan')
@@ -1820,7 +1820,7 @@ def generate_plan_pdf(payload: dict, metrics: dict, i18n_manager) -> io.BytesIO:
 
     with PdfPages(buffer) as pdf:
         # ─── PAGE 1 ─────────────────────────────────────────────────────────
-        fig = plt.figure(figsize=(8.27, 11.69))
+        fig = Figure(figsize=(8.27, 11.69))
         fig.patch.set_facecolor(C_WHITE)
 
         # rows: header | info | chart | spacer | list | footer
@@ -2116,7 +2116,6 @@ def generate_plan_pdf(payload: dict, metrics: dict, i18n_manager) -> io.BytesIO:
 
         _render_footer(fig.add_subplot(gs[5]))
         pdf.savefig(fig)
-        plt.close(fig)
 
         # ─── OVERFLOW PAGES ──────────────────────────────────────────────────
         if entries and len(entries) > MAX_P1:
@@ -2124,7 +2123,7 @@ def generate_plan_pdf(payload: dict, metrics: dict, i18n_manager) -> io.BytesIO:
             chunks = [remaining[i : i + PER_PAGE] for i in range(0, len(remaining), PER_PAGE)]
 
             for chunk_idx, chunk in enumerate(chunks):
-                fig2 = plt.figure(figsize=(8.27, 11.69))
+                fig2 = Figure(figsize=(8.27, 11.69))
                 fig2.patch.set_facecolor(C_WHITE)
                 gs2 = gridspec.GridSpec(
                     3,
@@ -2150,7 +2149,6 @@ def generate_plan_pdf(payload: dict, metrics: dict, i18n_manager) -> io.BytesIO:
 
                 _render_footer(fig2.add_subplot(gs2[2]))
                 pdf.savefig(fig2)
-                plt.close(fig2)
 
     buffer.seek(0)
     return buffer

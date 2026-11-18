@@ -39,8 +39,10 @@ from skytonight.skytonight_storage import (
 )
 from skytonight.skytonight_targets import choose_preferred_catalogue_name, load_targets_dataset, normalize_object_name
 from utils import load_json_file, save_json_file
+from utils.json_file_cache import load_shared_json
 from utils.logging_config import get_logger
 from utils.repo_config import load_config
+from utils.request_activity import yield_to_requests
 
 logger = get_logger(__name__)
 
@@ -104,6 +106,7 @@ def _save_alttime_json(
     Only targets that pass visibility constraints are saved; the presence of
     the file is used by the API to indicate that a graph is available.
     """
+    yield_to_requests()  # runs in the writer pool: give way to pages being served too
     try:
         if precomputed_times_iso is not None:
             times_iso = precomputed_times_iso
@@ -1578,6 +1581,7 @@ def run_calculations(
     for target in all_targets:
         if target.category != 'comets':
             continue
+        yield_to_requests()  # pages being served go first (one process serves everything)
         if target.coordinates is None:
             continue
         try:
@@ -1701,6 +1705,7 @@ def run_calculations(
         logger.info(f'Computing batch AltAz for {n_dso_batch} DSO targets over {n_steps} time steps...')
         _set_progress('deep_sky_altaz', 0, n_steps)
         for step_i in range(n_steps):
+            yield_to_requests()
             frame = AltAz(obstime=times[step_i], location=location_obj)
             altaz_batch: SkyCoord = all_dso_coords.transform_to(frame)  # type: ignore[assignment]
             alt_matrix[:, step_i] = altaz_batch.alt.deg  # type: ignore[index]
@@ -1712,6 +1717,7 @@ def run_calculations(
         _set_progress('deep_sky', 0, n_dso_batch)
         with ThreadPoolExecutor(max_workers=min(4, os.cpu_count() or 2)) as alttime_pool:
             for idx, target in enumerate(dso_targets_with_coords):
+                yield_to_requests()
                 result = _compute_target_result(
                     target=target,
                     times=times,
@@ -1841,7 +1847,8 @@ def load_calculation_results(location_id: str | None = None) -> dict[str, Any]:
     *location_id* of None resolves to the install default preset.
     """
     meta_file = load_json_file(get_results_file(location_id), default={})
-    dso_file = load_json_file(get_dso_results_file(location_id), default={})
+    # Shared, read-only copy: callers build their own rows from it (see utils.json_file_cache).
+    dso_file = load_shared_json(get_dso_results_file(location_id), default={})
     bodies_file = load_json_file(get_bodies_results_file(location_id), default={})
     comets_file = load_json_file(get_comets_results_file(location_id), default={})
 

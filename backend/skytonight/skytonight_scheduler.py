@@ -7,7 +7,7 @@ import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -21,7 +21,9 @@ from skytonight.skytonight_storage import (
     load_scheduler_status,
     save_scheduler_status,
 )
+from utils import json_file_cache
 from utils.logging_config import get_logger
+from utils.lru_cache import LruCache
 
 logger = get_logger(__name__)
 
@@ -31,6 +33,22 @@ SKYTONIGHT_SCHEDULER_SHUTDOWN_TIMEOUT_SECONDS = 3
 SKYTONIGHT_SCHEDULER_POLL_INTERVAL_SECONDS = 5
 SKYTONIGHT_PRE_NIGHT_OFFSET = timedelta(hours=1)
 SKYTONIGHT_POST_NIGHT_OFFSET = timedelta(hours=1)
+
+# Today's and tomorrow's sun reports per site: every status request and every scheduler poll
+# resolves the schedule, and the twilight search costs about 40 ms of Astropy each time.
+_twilight_reports_cache = LruCache(8)
+
+
+def _twilight_reports(latitude: float, longitude: float, timezone_name: str) -> tuple[Any, Any]:
+    """(today, tomorrow) sun reports for the site, computed once per site and day."""
+    # SunService dates its reports with date.today(), so that date is part of the key; the class
+    # is too, so a replaced implementation (tests) never reads another one's reports.
+    key = (SunService, latitude, longitude, timezone_name, date.today())
+    reports = _twilight_reports_cache.get(key)
+    if reports is None:
+        sun_service = SunService(latitude=latitude, longitude=longitude, timezone=timezone_name)
+        reports = _twilight_reports_cache.put(key, (sun_service.get_today_report(), sun_service.get_tomorrow_report()))
+    return reports
 
 
 @dataclass(frozen=True)
@@ -109,8 +127,7 @@ def resolve_schedule(config: dict[str, Any], now: datetime | None = None) -> Sky
     latitude = location.get('latitude')
     longitude = location.get('longitude')
     if latitude is not None and longitude is not None:
-        sun_service = SunService(latitude=latitude, longitude=longitude, timezone=timezone_name)
-        for report in (sun_service.get_today_report(), sun_service.get_tomorrow_report()):
+        for report in _twilight_reports(latitude, longitude, timezone_name):
             # Post-nautical-night run: 1 hour after nautical dawn
             dawn_time = _parse_local_datetime(report.nautical_dawn, timezone_name)
             if dawn_time is not None:
@@ -318,6 +335,8 @@ class SkyTonightScheduler:
                 logger.warning('Could not check for missed post-night run on startup: %s', exc)
 
         while self.running:
+            # Give the shared parsed results back once nobody reads them (an idle instance).
+            json_file_cache.drop_idle()
             config = self.config_loader()
             skytonight_config = config.get('skytonight', {}) if isinstance(config, dict) else {}
             if not bool(skytonight_config.get('enabled', False)):

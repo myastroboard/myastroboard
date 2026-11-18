@@ -1261,6 +1261,20 @@ class TestGenerateSessionPdf:
         assert hasattr(result, 'getvalue')
         assert result.getvalue().startswith(b'%PDF')
 
+    def test_does_not_use_pyplot(self, monkeypatch):
+        """Pages are standalone figures: pyplot's global registry is not thread-safe, and
+        request threads can export sessions at the same time."""
+        import matplotlib.pyplot as plt
+
+        def forbidden(*_args, **_kwargs):
+            raise AssertionError('pyplot used')
+
+        monkeypatch.setattr(plt, 'figure', forbidden)
+        monkeypatch.setattr(plt, 'close', forbidden)
+        session = {'id': 's1', 'nights': [{'id': 'n1', 'date': '2026-07-14'}], 'entries': [{'id': 'e1', 'name': 'M31'}]}
+        result = observation_sessions.generate_session_pdf(session, {}, _DummyI18n())
+        assert result.getvalue().startswith(b'%PDF')
+
     def test_with_entries_and_photo(self, tmp_path):
         import matplotlib
 

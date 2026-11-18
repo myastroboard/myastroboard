@@ -227,7 +227,7 @@ also [docs/AUTHENTICATION.md](AUTHENTICATION.md).
 
 `POST /api/backup/restore` (multipart form, field `file`) accepts a backup ZIP (from 1.7 or 1.6) and restores its contents. Every entry is validated before anything is written, then the database is updated in one transaction: each folder present in the archive replaces that kind of data, and `users.json` replaces the account list (accounts absent from it are deleted with their data). Documents of accounts that are not in the database are skipped.
 
-> **After a restore**: every gunicorn worker picks the restored data up on its next request. A page reload is required to reflect restored user accounts.
+> **After a restore**: the application picks the restored data up on its next request. A page reload is required to reflect restored user accounts.
 
 ---
 
@@ -244,7 +244,7 @@ also [docs/AUTHENTICATION.md](AUTHENTICATION.md).
 Set in *App settings -> Logs*: one level for the log file (default `INFO`) and one for the console output
 (default `WARNING`) - see `log_level` / `console_log_level` in [Application settings](#application-settings-admin).
 To troubleshoot, set the log file level to `DEBUG`, reproduce the issue, then export the logs. A change applies
-right away, without a restart (the other gunicorn worker follows within a few seconds). The `LOG_LEVEL` /
+right away, without a restart (with several gunicorn workers, the others follow within a few seconds). The `LOG_LEVEL` /
 `CONSOLE_LOG_LEVEL` environment variables still work and, when set, take precedence: the matching setting is
 then shown disabled in the UI.
 
