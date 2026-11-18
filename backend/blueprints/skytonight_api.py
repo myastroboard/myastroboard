@@ -1615,8 +1615,9 @@ def get_skytonight_framing_api():
 
     The payload carries the resolved target (coordinates, apparent size), the allowed
     background image fields of view, one frame per enabled and valid equipment
-    combination (own or shared) that has a camera sensor and a focal length, and the
-    combination to select by default (the best fit).
+    combination (own or shared) that has a camera sensor and a focal length, the other
+    combinations with what they lack (``unframeable``), and the combination to select by
+    default (the best fit).
     """
     target = (request.args.get('target') or '').strip()
     if not target or not re.match(r'^[A-Za-z0-9 _.+\-]{1,64}$', target):
@@ -1647,6 +1648,8 @@ def get_skytonight_framing_api():
                     'ra_deg': resolved['ra_deg'],
                     'dec_deg': resolved['dec_deg'],
                     'size_arcmin': resolved['size_arcmin'],
+                    'size_minor_arcmin': resolved.get('size_minor_arcmin'),
+                    'position_angle_deg': resolved.get('position_angle_deg'),
                 },
                 'image': {
                     'key': resolved['image_key'],
@@ -1656,6 +1659,7 @@ def get_skytonight_framing_api():
                 },
                 'has_combinations': bool(combinations),
                 'frames': frames,
+                'unframeable': equipment_framing.list_unframeable(combinations, telescopes_by_id, cameras_by_id),
                 'default_combination_id': equipment_framing.pick_default_frame(frames),
             }
         )

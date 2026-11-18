@@ -140,7 +140,12 @@ a Plan My Night entry, and as a **Framing** section in an Astrodex item detail.
   *tight* one, and among equals the one whose target fill is closest to 35% of the short side.
 - Rotate the sensor (position angle, from north through east) and drag the frame - or use the
   arrow keys - to move it off the target. The coordinates of the frame centre are shown.
-- A dashed circle marks the target's apparent size, when the catalogue gives one.
+- A dashed outline marks the target's apparent size, when the catalogue gives one: an ellipse
+  along the object's position angle when OpenNGC gives its minor axis and angle (most galaxies,
+  for example M 81: 21.6' x 11.3' at 157 degrees), otherwise a circle of its largest dimension.
+  These are catalogue sizes, often smaller than a deep stack reveals.
+- The zoom buttons over the image step the background field down to the smallest one that still
+  holds the rotated frame, for a sharper view of the target, and back up.
 - Each selected combination gets a verdict from the ratio "target size / short side of the field":
   below 10% *small* (with the target's width in pixels), 10-60% *good fit*, 60-100% *tight*, above
   *larger than the field*. In that last case an approximate mosaic grid is given, assuming 15%
@@ -151,8 +156,17 @@ a Plan My Night entry, and as a **Framing** section in an Astrodex item detail.
 
 A combination appears when it is enabled and valid (own or shared), has a camera with sensor
 dimensions and pixel size, and a focal length - the telescope's effective one, or the lens of a
-camera-only combination. Planets and comets are not supported: they move against the stars, so a
-fixed image of the sky does not apply (`supported: false`, `reason: "moving_target"`).
+camera-only combination. The other combinations are listed under the selector with what they lack
+(`unframeable`: no camera, camera without sensor or pixel size, no focal length), with a link to
+edit the user's own ones. A smart telescope saved without its built-in camera shows up there as
+"no camera": add its camera from the camera presets (see
+[EQUIPMENT.md](EQUIPMENT.md#bundles-smart-telescopes)). Planets and comets are not supported: they
+move against the stars, so a fixed image of the sky does not apply (`supported: false`,
+`reason: "moving_target"`).
+
+The sensor is drawn as the camera delivers its images: width across, height up. A camera that
+records in portrait (every Seestar) is stored with its short side as the width, so its frame opens
+taller than wide; the rotation control turns it like any other.
 
 ### Sky image
 
@@ -163,7 +177,7 @@ the frame is an exact rectangle on the image whatever the field of view.
 The server downloads each image once and keeps it in `data/cache/framing_images/` (trimmed to
 200 MiB, oldest first); the browser never calls CDS. To bound that cache, the field of view of a
 background is one of a fixed ladder (0.25 to 45 degrees): the page picks the smallest step that is
-about 2.2 times wider than the widest selected frame. The request carries the target's catalogue
+about 1.6 times wider than the widest selected frame, unless the zoom buttons chose another. The request carries the target's catalogue
 coordinates and nothing about the user.
 
 When CDS hips2fits cannot be reached, the server builds the same cut-out itself from the tiles of

@@ -1,7 +1,9 @@
 """Tests for the framing simulator's sensor geometry (equipment/framing.py)."""
 
+import json
 import sys
 import types
+from pathlib import Path
 
 import pytest
 
@@ -213,3 +215,78 @@ def test_pick_default_frame_without_fill_ratio_uses_first_frame():
 def test_pick_default_frame_without_frames_is_none():
     """No frame, no default."""
     assert framing.pick_default_frame([]) is None
+
+
+@pytest.mark.parametrize(
+    ('telescope', 'camera', 'combination', 'reason'),
+    [
+        (_TELESCOPE, None, _COMBINATION, framing.REASON_NO_CAMERA),
+        (_TELESCOPE, {**_CAMERA, 'pixel_size_um': None}, _COMBINATION, framing.REASON_CAMERA_INCOMPLETE),
+        ({'id': 'tel-1', 'name': 'No focal'}, _CAMERA, _COMBINATION, framing.REASON_NO_FOCAL_LENGTH),
+        (None, _CAMERA, {'id': 'combo-3', 'name': 'No lens', 'camera_id': 'cam-1'}, framing.REASON_NO_FOCAL_LENGTH),
+    ],
+)
+def test_list_unframeable_names_what_is_missing(telescope, camera, combination, reason):
+    """Each combination left out of the simulator comes with the reason it cannot be framed."""
+    telescopes = {'tel-1': telescope} if telescope else {}
+    cameras = {'cam-1': camera} if camera else {}
+
+    assert framing.list_unframeable([combination], telescopes, cameras) == [
+        {
+            'combination_id': combination['id'],
+            'combination_name': combination['name'],
+            'reason': reason,
+            'is_own': True,
+        }
+    ]
+
+
+def test_list_unframeable_skips_frameable_and_flags_shared():
+    """A complete combination is not listed; a shared one is listed as not the user's own."""
+    shared_visual = {'id': 'combo-9', 'name': 'Club Dob', 'telescope_id': 'tel-1', 'owner_id': 'someone-else'}
+
+    unframeable = framing.list_unframeable([_COMBINATION, shared_visual], {'tel-1': _TELESCOPE}, {'cam-1': _CAMERA})
+
+    assert [(item['combination_id'], item['is_own']) for item in unframeable] == [('combo-9', False)]
+
+
+def test_build_frame_keeps_portrait_sensor_orientation():
+    """A camera that records in portrait (short side as width) gives a field taller than wide."""
+    portrait = {**_CAMERA, 'sensor_width_mm': 10.0, 'sensor_height_mm': 20.0}
+
+    frame = framing.build_frame(_COMBINATION, _TELESCOPE, portrait, size_arcmin=None)
+
+    assert frame['fov_h_deg'] < frame['fov_v_deg']
+    assert frame['half_width_tan'] == pytest.approx(0.005)
+    assert frame['half_height_tan'] == pytest.approx(0.01)
+
+
+def _smart_telescope_presets():
+    """Telescope presets bundling their own camera, from static/data/equipment_presets.json."""
+    path = Path(__file__).resolve().parents[2] / 'static' / 'data' / 'equipment_presets.json'
+    presets = json.loads(path.read_text(encoding='utf-8'))
+    return [preset for preset in presets['telescopes'] if preset.get('bundle')]
+
+
+@pytest.mark.parametrize('preset', _smart_telescope_presets(), ids=lambda preset: preset['id'])
+def test_every_smart_telescope_preset_can_be_framed(preset):
+    """The combination a smart telescope preset creates has everything the simulator needs."""
+    cameras = [item for item in preset['bundle'] if item['kind'] == 'camera']
+    assert len(cameras) == 1, 'a bundle carries exactly one imaging camera'
+    telescope = {'id': 'tel', 'name': preset['label'], 'focal_length_mm': preset['focal_length_mm']}
+
+    frame = framing.build_frame({'id': 'combo', 'name': preset['label']}, telescope, cameras[0], size_arcmin=10.0)
+
+    assert frame is not None
+    assert frame['verdict'] != framing.VERDICT_UNKNOWN
+
+
+@pytest.mark.parametrize(
+    'preset', [p for p in _smart_telescope_presets() if p['manufacturer'] == 'ZWO'], ids=lambda preset: preset['id']
+)
+def test_seestar_presets_record_in_portrait(preset):
+    """Seestar images come out in portrait: the built-in camera's width is its short side."""
+    camera = next(item for item in preset['bundle'] if item['kind'] == 'camera')
+
+    assert camera['sensor_width_mm'] < camera['sensor_height_mm']
+    assert camera['resolution_w'] < camera['resolution_h']

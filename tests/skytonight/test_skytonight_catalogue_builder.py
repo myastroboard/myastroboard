@@ -1,6 +1,7 @@
 """Tests for SkyTonight catalogue dataset building."""
 
 import json
+from dataclasses import replace
 from unittest.mock import MagicMock
 
 import pytest
@@ -18,6 +19,7 @@ from skytonight.skytonight_catalogue_builder import (
     _merge_target,
     _ngc_ic_match_key,
     _normalize_identifier,
+    _outline,
     _safe_float,
     build_targets_from_rows,
 )
@@ -1271,3 +1273,50 @@ def test_build_standalone_targets_skips_name_normalizing_to_empty(monkeypatch):
     result = _build_standalone_targets_from_json('test.json', 'TestCat')
     assert len(result) == 1
     assert result[0].preferred_name == 'Valid'
+
+
+# ---------------------------------------------------------------------------
+# Object outline (minor axis and position angle)
+# ---------------------------------------------------------------------------
+
+
+def test_outline_keeps_minor_axis_and_folds_position_angle():
+    """A valid outline is kept, its angle folded into [0, 180): an ellipse turned by half a turn is the same."""
+    assert _outline(21.63, 11.25, 157) == (11.25, 157.0)
+    assert _outline(21.63, 11.25, 337) == (11.25, 157.0)
+
+
+@pytest.mark.parametrize(
+    ('size', 'minor'),
+    [(None, 5.0), (10.0, None), (10.0, 0.0), (10.0, -2.0), (10.0, 12.0), (10.0, 'abc')],
+)
+def test_outline_rejects_unusable_minor_axis(size, minor):
+    """No outline without a major axis, or with a minor axis missing, non-positive or larger than the major."""
+    assert _outline(size, minor, 45) == (None, None)
+
+
+def test_outline_keeps_minor_axis_without_angle():
+    """A minor axis with no position angle is kept; the angle stays unknown."""
+    assert _outline(10.0, 5.0, None) == (5.0, None)
+
+
+def test_build_targets_from_rows_carries_the_outline():
+    """The minor axis and position angle of a PyOngc row reach the built target."""
+    row = _make_row(size_minor_arcmin=61.7, position_angle_deg=35.0)
+
+    target = build_targets_from_rows([row])[0]
+
+    assert (target.size_minor_arcmin, target.position_angle_deg) == (61.7, 35.0)
+
+
+def test_merge_target_keeps_the_outline_of_the_kept_size():
+    """The outline goes with the size it belongs to, never mixed between records."""
+    with_outline = replace(_make_target(size_arcmin=10.0), size_minor_arcmin=5.0, position_angle_deg=20.0)
+    without_size = _make_target(size_arcmin=None)
+    sized_no_outline = _make_target(size_arcmin=12.0)
+
+    merged = _merge_target(without_size, with_outline)
+    assert (merged.size_arcmin, merged.size_minor_arcmin, merged.position_angle_deg) == (10.0, 5.0, 20.0)
+
+    merged = _merge_target(sized_no_outline, with_outline)
+    assert (merged.size_arcmin, merged.size_minor_arcmin, merged.position_angle_deg) == (12.0, None, None)

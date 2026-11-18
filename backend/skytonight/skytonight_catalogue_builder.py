@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 from collections.abc import Iterable
@@ -418,6 +419,8 @@ class PyOngcRow:
     ic_names: list[str]
     common_names: list[str]
     other_identifiers: list[str]
+    size_minor_arcmin: float | None = None
+    position_angle_deg: float | None = None
 
 
 def _safe_float(value: Any) -> float | None:
@@ -428,6 +431,22 @@ def _safe_float(value: Any) -> float | None:
     except TypeError, ValueError:
         return None
     return numeric
+
+
+def _outline(size_arcmin: float | None, minor: Any, position_angle: Any) -> tuple[float | None, float | None]:
+    """Validate an object's minor axis and position angle against its major axis.
+
+    Returns ``(minor_arcmin, position_angle_deg)``. The angle is kept only with a usable
+    minor axis (an outline needs both), and folded into [0, 180): an ellipse looks the
+    same turned by half a turn.
+    """
+    minor_arcmin = _safe_float(minor)
+    if not size_arcmin or minor_arcmin is None or not 0 < minor_arcmin <= size_arcmin:
+        return None, None
+    angle = _safe_float(position_angle)
+    if angle is None or not math.isfinite(angle):
+        return minor_arcmin, None
+    return minor_arcmin, angle % 180.0
 
 
 def _coerce_identifier_list(values: Any) -> list[str]:
@@ -554,6 +573,8 @@ def _merge_target(existing: SkyTonightTarget, incoming: SkyTonightTarget) -> Sky
 
     magnitude = existing.magnitude if existing.magnitude is not None else incoming.magnitude
     size_arcmin = existing.size_arcmin if existing.size_arcmin is not None else incoming.size_arcmin
+    # The outline goes with the size it was measured with.
+    outline_source = existing if existing.size_arcmin is not None else incoming
     coordinates = existing.coordinates or incoming.coordinates
     constellation = existing.constellation or incoming.constellation
     preferred_name = existing.preferred_name or incoming.preferred_name
@@ -576,6 +597,8 @@ def _merge_target(existing: SkyTonightTarget, incoming: SkyTonightTarget) -> Sky
         source_catalogues=source_catalogues,
         translation_key=existing.translation_key or incoming.translation_key,
         metadata=metadata,
+        size_minor_arcmin=outline_source.size_minor_arcmin,
+        position_angle_deg=outline_source.position_angle_deg,
     )
 
 
@@ -714,6 +737,8 @@ def _apply_cross_refs(
                 source_catalogues=new_source_catalogues,
                 translation_key=target.translation_key,
                 metadata=target.metadata,
+                size_minor_arcmin=target.size_minor_arcmin,
+                position_angle_deg=target.position_angle_deg,
             )
             enriched += 1
 
@@ -774,6 +799,8 @@ def build_targets_from_rows(
             source_catalogues=source_catalogues,
             translation_key=f"skytonight.type_{normalize_object_name(object_type) or 'unknown'}",
             metadata={'source': 'pyongc'},
+            size_minor_arcmin=row.size_minor_arcmin,
+            position_angle_deg=row.position_angle_deg,
         )
 
         key = (canonical_catalogue, canonical_name)
@@ -809,6 +836,12 @@ def _load_pyongc_rows() -> list[PyOngcRow]:
         dimensions = getattr(dso, 'dimensions', (None, None, None))
         magnitudes = getattr(dso, 'magnitudes', (None, None, None, None, None))
         identifiers = getattr(dso, 'identifiers', (None, None, None, None, None))
+        size_arcmin = _safe_float(dimensions[0] if len(dimensions) > 0 else None)
+        size_minor_arcmin, position_angle_deg = _outline(
+            size_arcmin,
+            dimensions[1] if len(dimensions) > 1 else None,
+            dimensions[2] if len(dimensions) > 2 else None,
+        )
 
         rows.append(
             PyOngcRow(
@@ -819,7 +852,7 @@ def _load_pyongc_rows() -> list[PyOngcRow]:
                 dec_degrees=dec_degrees,
                 magnitude=_safe_float(magnitudes[1] if len(magnitudes) > 1 else None)
                 or _safe_float(magnitudes[0] if len(magnitudes) > 0 else None),
-                size_arcmin=_safe_float(dimensions[0] if len(dimensions) > 0 else None),
+                size_arcmin=size_arcmin,
                 messier=(
                     _normalize_identifier(str(identifiers[0]))
                     if len(identifiers) > 0 and identifiers[0] is not None
@@ -838,6 +871,8 @@ def _load_pyongc_rows() -> list[PyOngcRow]:
                     _normalize_identifier(value)
                     for value in _coerce_identifier_list(identifiers[4] if len(identifiers) > 4 else [])
                 ],
+                size_minor_arcmin=size_minor_arcmin,
+                position_angle_deg=position_angle_deg,
             )
         )
 

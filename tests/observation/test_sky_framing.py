@@ -3,6 +3,7 @@
 import os
 import sys
 import types
+from dataclasses import replace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -69,6 +70,28 @@ def test_resolve_target_from_dataset_returns_degrees_size_and_image_key(monkeypa
     assert result['dec_deg'] == pytest.approx(41.26875)
     assert result['size_arcmin'] == pytest.approx(177.8)
     assert result['image_key'] == '10.684710_41.268750'
+
+
+def test_resolve_target_returns_the_outline_of_an_elongated_object(monkeypatch):
+    """The minor axis and position angle come along with the size, for the ellipse."""
+    target = replace(
+        _target('NGC3031', 9.92588, 69.0653, name='M 81', size=21.63), size_minor_arcmin=11.25, position_angle_deg=157.0
+    )
+    _patch_dataset(monkeypatch, [target])
+
+    result = sky_framing.resolve_target('M 81')
+
+    assert (result['size_minor_arcmin'], result['position_angle_deg']) == (11.25, 157.0)
+
+
+def test_resolve_target_drops_the_outline_without_a_size(monkeypatch):
+    """An outline without a major axis is meaningless and is not returned."""
+    target = replace(_target('NGC1', 1.0, 10.0, size=None), size_minor_arcmin=3.0, position_angle_deg=10.0)
+    _patch_dataset(monkeypatch, [target])
+
+    result = sky_framing.resolve_target('NGC1')
+
+    assert (result['size_minor_arcmin'], result['position_angle_deg']) == (None, None)
 
 
 def test_resolve_target_matches_exact_target_id(monkeypatch):

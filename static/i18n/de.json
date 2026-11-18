@@ -2299,7 +2299,11 @@
     "form_guide_camera": "Leitkamera",
     "form_lens_focal_length": "Objektivbrennweite (mm)",
     "form_lens_focal_ratio": "Objektiv-Blendenzahl (f/)",
-    "form_lens_focal_help": "Wird nur verwendet, wenn kein Teleskop ausgewählt ist (z. B. Kamera + Objektiv auf einer Nachführmontierung)."
+    "form_lens_focal_help": "Wird nur verwendet, wenn kein Teleskop ausgewählt ist (z. B. Kamera + Objektiv auf einer Nachführmontierung).",
+    "preset_bundle_create": "Auch die eingebaute Kamera und Montierung hinzufügen, mit einer fertigen Kombination",
+    "preset_bundle_help": "Ein Smart-Teleskop hat seine Kamera eingebaut: Ohne sie lassen sich weder der Bildausschnitt-Simulator noch das Bildfeld berechnen.",
+    "telescope_bundle_created": "Teleskop mit seiner eingebauten Ausrüstung und einer fertigen Kombination erstellt",
+    "telescope_bundle_failed": "Teleskop erstellt, aber die eingebaute Ausrüstung konnte nicht hinzugefügt werden. Füge seine Kamera aus den Kamera-Vorlagen hinzu."
   },
   "weather": {
     "observation_conditions": "Beobachtungsbedingungen",
@@ -2742,7 +2746,7 @@
     "loading_image": "Himmelsbild wird geladen...",
     "image_unavailable": "Das Himmelsbild ist derzeit nicht verfügbar. Der Rahmen bleibt maßstabsgetreu.",
     "no_combinations": "Füge im Tab Ausrüstung eine Ausrüstungskombination mit Kamera hinzu, um dein Bildfeld hier zu sehen.",
-    "no_frameable_combinations": "Keine deiner Ausrüstungskombinationen hat sowohl einen Kamerasensor als auch eine Brennweite. Vervollständige eine im Tab Ausrüstung, um dein Bildfeld hier zu sehen.",
+    "no_frameable_combinations": "Keine deiner Ausrüstungskombinationen kann bisher dargestellt werden: Jede braucht einen Kamerasensor und eine Brennweite. Unten steht, was fehlt.",
     "combinations_label": "Ausrüstungskombinationen",
     "max_selected": "Bis zu {max} Kombinationen können verglichen werden.",
     "rotation_label": "Sensordrehung: {deg}°",
@@ -2761,7 +2765,14 @@
     "verdict_tight": "Knapp: Das Ziel füllt {percent} % der kurzen Seite des Bildfelds, mit wenig Rand.",
     "verdict_too_large": "Größer als das Bildfeld ({percent} % der kurzen Seite). Ein Mosaik aus etwa {columns} x {rows} Feldern würde es abdecken (Schätzung anhand der größten Ausdehnung des Ziels).",
     "verdict_small": "Klein im Bildfeld ({percent} % der kurzen Seite): etwa {pixels} px breit auf dem Sensor.",
-    "verdict_unknown": "Der Katalog gibt für dieses Ziel keine Größe an."
+    "verdict_unknown": "Der Katalog gibt für dieses Ziel keine Größe an.",
+    "unframeable_title": "Nicht angezeigt:",
+    "unframeable_no_camera": "keine Kamera. Ein visuelles Setup hat kein Bildfeld; bei einem Smart-Teleskop füge seine eingebaute Kamera (in den Kamera-Vorlagen) zu dieser Kombination hinzu.",
+    "unframeable_camera_incomplete": "der Kamera fehlt die Sensorgröße oder die Pixelgröße.",
+    "unframeable_no_focal_length": "keine Brennweite: gib die des Teleskops an, oder die des Objektivs bei einer reinen Kamera-Kombination.",
+    "unframeable_edit": "Diese Kombination bearbeiten",
+    "zoom_in": "Vergrößern",
+    "zoom_out": "Verkleinern"
   },
   "share": {
     "title": "Teilen",

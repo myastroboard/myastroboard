@@ -35,6 +35,12 @@ VERDICT_GOOD = 'good'
 VERDICT_TIGHT = 'tight'
 VERDICT_TOO_LARGE = 'too_large'
 
+# Why a combination cannot be framed. "No camera" is a visual setup, or a smart telescope
+# whose built-in camera was never added (saved without its preset bundle).
+REASON_NO_CAMERA = 'no_camera'
+REASON_CAMERA_INCOMPLETE = 'camera_incomplete'
+REASON_NO_FOCAL_LENGTH = 'no_focal_length'
+
 
 def _positive_float(value: Any) -> float | None:
     """Return *value* as a finite float greater than zero, else None."""
@@ -75,6 +81,37 @@ def estimate_mosaic_grid(size_arcmin: float, fov_h_arcmin: float, fov_v_arcmin: 
     return columns, rows
 
 
+def _frame_optics(
+    combination: dict[str, Any],
+    telescope: dict[str, Any] | None,
+    camera: dict[str, Any] | None,
+) -> tuple[tuple[float, float, float, float] | None, str | None]:
+    """Return ``((sensor_w, sensor_h, pixel_um, focal), None)``, or ``(None, reason)``.
+
+    A combination can be framed when it has a camera with sensor dimensions and pixel
+    size, and a focal length: the telescope's effective one, or the combination's own lens
+    for a camera-only setup. The guide camera is never part of the field of view. The
+    sensor is taken as the camera delivers its images: a camera that records in portrait
+    is stored with its short side as the width.
+    """
+    if not camera:
+        return None, REASON_NO_CAMERA
+    sensor_w = _positive_float(camera.get('sensor_width_mm'))
+    sensor_h = _positive_float(camera.get('sensor_height_mm'))
+    pixel_um = _positive_float(camera.get('pixel_size_um'))
+    if not (sensor_w and sensor_h and pixel_um):
+        return None, REASON_CAMERA_INCOMPLETE
+    if telescope:
+        focal = _positive_float(telescope.get('effective_focal_length')) or _positive_float(
+            telescope.get('focal_length_mm')
+        )
+    else:
+        focal = _positive_float(combination.get('lens_focal_length_mm'))
+    if not focal:
+        return None, REASON_NO_FOCAL_LENGTH
+    return (sensor_w, sensor_h, pixel_um, focal), None
+
+
 def build_frame(
     combination: dict[str, Any],
     telescope: dict[str, Any] | None,
@@ -83,23 +120,12 @@ def build_frame(
 ) -> dict[str, Any] | None:
     """Return the framing data of one combination, or None when it cannot be framed.
 
-    A combination can be framed when it has a camera with sensor dimensions and pixel
-    size, and a focal length: the telescope's effective one, or the combination's own lens
-    for a camera-only setup. The guide camera is never part of the field of view.
+    See ``_frame_optics`` for what a combination needs to be framed.
     """
-    if not camera:
+    optics, _reason = _frame_optics(combination, telescope, camera)
+    if optics is None or camera is None:
         return None
-    sensor_w = _positive_float(camera.get('sensor_width_mm'))
-    sensor_h = _positive_float(camera.get('sensor_height_mm'))
-    pixel_um = _positive_float(camera.get('pixel_size_um'))
-    if telescope:
-        focal = _positive_float(telescope.get('effective_focal_length')) or _positive_float(
-            telescope.get('focal_length_mm')
-        )
-    else:
-        focal = _positive_float(combination.get('lens_focal_length_mm'))
-    if not (sensor_w and sensor_h and pixel_um and focal):
-        return None
+    sensor_w, sensor_h, pixel_um, focal = optics
 
     fov = equipment_profiles.calculate_fov(focal, sensor_w, sensor_h, pixel_um)
     fov_h_arcmin = fov.horizontal_fov_deg * 60.0
@@ -182,3 +208,31 @@ def build_frames(
             frames.append(frame)
     frames.sort(key=lambda frame: frame['fov_diagonal_deg'], reverse=True)
     return frames
+
+
+def list_unframeable(
+    combinations: list[dict[str, Any]],
+    telescopes_by_id: dict[str, dict[str, Any]],
+    cameras_by_id: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Return the combinations that cannot be framed, each with the reason.
+
+    Lets the simulator say what is missing instead of only "nothing to show". ``is_own``
+    tells whether the user can edit the combination: a shared one carries its owner's id.
+    """
+    unframeable = []
+    for combination in combinations:
+        telescope = telescopes_by_id.get(combination.get('telescope_id') or '')
+        camera = cameras_by_id.get(combination.get('camera_id') or '')
+        optics, reason = _frame_optics(combination, telescope, camera)
+        if optics is not None:
+            continue
+        unframeable.append(
+            {
+                'combination_id': str(combination.get('id') or ''),
+                'combination_name': str(combination.get('name') or ''),
+                'reason': reason,
+                'is_own': not combination.get('owner_id'),
+            }
+        )
+    return unframeable

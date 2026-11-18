@@ -174,7 +174,8 @@ def test_field_of_view_accounts_for_the_reducer():
     """The refractor's 0.85x reducer widens its field compared with the bare focal length."""
     smart = demo_life.field_of_view_deg(demo_life._setup_by_key('smart'))
     refractor = demo_life.field_of_view_deg(demo_life._setup_by_key('refractor'))
-    assert smart[0] == pytest.approx(57.2958 * 5.6 / 250)
+    # The Seestar records in portrait: its field is narrow across and tall.
+    assert smart == (pytest.approx(57.2958 * 3.2 / 250), pytest.approx(57.2958 * 5.6 / 250))
     assert refractor[0] == pytest.approx(57.2958 * 11.31 / (600 * 0.85))
 
 
