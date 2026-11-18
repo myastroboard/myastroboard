@@ -113,6 +113,34 @@
     font-size: 1.5rem;
 }
 
+/* Aurora forecast slot: header wraps in narrow (phone) columns instead of overflowing */
+.aurora-slot-header {
+    flex-wrap: wrap;
+    gap: 0.1rem 0.5rem;
+}
+
+.aurora-slot-header .weather-quality-label {
+    white-space: normal;
+    min-width: 0;
+}
+
+.aurora-slot-time {
+    font-size: 0.8rem;
+}
+
+/* Kp cell takes the room, the colored dot only what it needs */
+.aurora-kp-grid {
+    grid-template-columns: minmax(0, 1fr) auto;
+    container-type: inline-size;
+}
+
+/* Narrow slot (phone, 2 columns): drop the lightning icon so the Kp label fits */
+@container (max-width: 140px) {
+    .aurora-kp-grid .weather-metric-cell > i {
+        display: none;
+    }
+}
+
 /* Quality Classes */
 .quality-box {
     border-top-left-radius: var(--border-radius-card) !important;

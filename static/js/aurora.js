@@ -285,10 +285,9 @@ async function loadAurora() {
                 slotCard.className = 'card h-100';
 
                 const slotHeader = document.createElement('div');
-                slotHeader.className = `card-header d-flex justify-content-between align-items-center quality-box ${kpQualityClass}`;
+                slotHeader.className = `card-header d-flex justify-content-between align-items-center quality-box aurora-slot-header ${kpQualityClass}`;
                 const tsEl = document.createElement('span');
-                tsEl.className = 'fw-semibold';
-                tsEl.style.fontSize = '0.8rem';
+                tsEl.className = 'fw-semibold aurora-slot-time';
                 tsEl.textContent = formatTimeThenDate(new Date(f.timestamp));
                 const levelEl = document.createElement('span');
                 levelEl.className = 'weather-quality-label';
@@ -299,7 +298,7 @@ async function loadAurora() {
                 const slotBody = document.createElement('div');
                 slotBody.className = 'card-body p-2';
                 const kpGrid = document.createElement('div');
-                kpGrid.className = 'weather-metric-grid';
+                kpGrid.className = 'weather-metric-grid aurora-kp-grid';
                 kpGrid.appendChild(createForecastMetricCell('bi-lightning-charge', 'text-warning', `Kp ${kp.toFixed(1)}`, i18n.t('aurora.kp_index')));
                 const kpDot = document.createElement('div');
                 kpDot.className = 'aurora-kp-dot';
