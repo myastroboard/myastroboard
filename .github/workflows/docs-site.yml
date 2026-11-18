@@ -10,12 +10,14 @@ on:
       - 'docs/**'
       - 'docs-site/**'
       - 'scripts/build_docs_site.py'
+      - 'VERSION'  # the site shows the version: a release bump alone must republish it
       - '.github/workflows/docs-site.yml'
   pull_request:
     paths:
       - 'docs/**'
       - 'docs-site/**'
       - 'scripts/build_docs_site.py'
+      - 'VERSION'  # the site shows the version: a release bump alone must republish it
       - '.github/workflows/docs-site.yml'
   workflow_dispatch:
 
