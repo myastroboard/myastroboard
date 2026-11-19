@@ -210,8 +210,21 @@ Every repository that ships releases keeps a `CHANGELOG.md`:
   (`extend = ".github/org/ruff.base.toml"`) and may add rules with `extend-select` (never `select`,
   which replaces the baseline) or override the line length; it does not `ignore` a baseline rule
   without a comment saying why.
-- Type checking with **pyright** or **mypy**, as each repository has chosen; its AI file names the
-  exact command and scope.
+- **pyright** type-checks, not mypy. Each repository's `pyrightconfig.json`, at its root, extends
+  the shared baseline (`"extends": ".github/org/pyright.base.json"`) and sets its own `include`,
+  `exclude`, `extraPaths` and `pythonVersion`. The same file drives Pylance in VSCode, so a clean
+  `pyright` run means no problems shown in the editor either.
+- The baseline is `standard` mode plus: **every function is annotated** (parameters, and the type
+  arguments of generics: `list[str]`, not `list`; return types may be inferred), no untyped
+  decorators, and no dead `# type: ignore` or `cast()`. A repository may go stricter (`strict`
+  mode, more rules), never looser. The one allowed relaxation: a repository with existing
+  unannotated code may set the three annotation rules (`reportMissingParameterType`,
+  `reportUnknownParameterType`, `reportMissingTypeArgument`) to `"warning"`, never `"none"`, with a
+  comment, while it clears that debt. New and modified functions are annotated regardless.
+- **Pin both tools** in `requirements-dev.txt` (and in `.pre-commit-config.yaml`, if any), at the
+  same version across the organization; Dependabot bumps them.
+- The repository's AI file names the exact commands and the type-checked scope (for example
+  `pyright backend/`). Test code may stay out of that scope when mocks would drown real findings.
 - Tests with **pytest**.
 
 ## 14. Definition of done
