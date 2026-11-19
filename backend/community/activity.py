@@ -33,7 +33,7 @@ FEED_ITEMS_PER_KIND = 6
 REMAINING_EXAMPLES = 8
 
 
-def _natural_key(text: str) -> tuple:
+def _natural_key(text: str) -> tuple[Any, ...]:
     """ "M 2" before "M 10"."""
     parts: list[Any] = []
     number = ''
@@ -54,9 +54,9 @@ def _member_digests(member: dict[str, Any], since: str, pictures_shared: bool) -
     """One member's feed entries since ``since`` (YYYY-MM-DD), one per day with something new."""
     user = member['user']
     facts = member['facts']
-    days: dict[str, dict[str, list]] = {}
+    days: dict[str, dict[str, list[Any]]] = {}
 
-    def day_entry(day: str) -> dict[str, list]:
+    def day_entry(day: str) -> dict[str, list[Any]]:
         return days.setdefault(day, {'new_objects': [], 'pictures': [], 'badges': []})
 
     for capture in facts.get('captures', {}).values():

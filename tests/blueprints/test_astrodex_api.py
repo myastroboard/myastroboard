@@ -8,15 +8,15 @@ import uuid
 
 import pytest
 
-from observation import astrodex  # type: ignore[import-not-found]
-from skytonight import skytonight_targets  # type: ignore[import-not-found]
-from utils.auth import user_manager  # type: ignore[import-not-found]
+from observation import astrodex
+from skytonight import skytonight_targets
+from utils.auth import user_manager
 
 if 'psutil' not in sys.modules:
     sys.modules['psutil'] = types.ModuleType('psutil')
 
-from app import app  # type: ignore[import-not-found]
-from blueprints import astrodex as astrodex_bp_module  # type: ignore[import-not-found]
+from app import app
+from blueprints import astrodex as astrodex_bp_module
 
 
 @pytest.fixture
@@ -358,7 +358,7 @@ def test_get_astrodex_image_thumb_serves_a_small_webp_preview(client, monkeypatc
 
     from PIL import Image
 
-    from utils import image_thumbnails  # type: ignore[import-not-found]
+    from utils import image_thumbnails
 
     image_thumbnails.clear_cache()
     buffer = io.BytesIO()
@@ -390,7 +390,7 @@ def test_get_astrodex_image_medium_and_unknown_sizes(client, monkeypatch):
 
     from PIL import Image
 
-    from utils import image_thumbnails  # type: ignore[import-not-found]
+    from utils import image_thumbnails
 
     image_thumbnails.clear_cache()
     buffer = io.BytesIO()

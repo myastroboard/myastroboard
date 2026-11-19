@@ -17,6 +17,8 @@ the schema does not know yet is never lost. ``db/collections.py`` does the split
 assembling; the feature modules keep working on plain dicts.
 """
 
+from typing import Any
+
 from sqlalchemy import (
     JSON,
     Boolean,
@@ -111,7 +113,7 @@ legacy_import = Table(
 # application's own id, when the object has one) and ``data`` (the object, see above).
 
 
-def _collection_table(name, *columns, parent=None, unique_id=False):
+def _collection_table(name: str, *columns: Any, parent: str | None = None, unique_id: bool = False) -> Table:
     """A collection table with the shared bookkeeping columns plus ``columns``."""
     table_columns = [
         Column("pk", Integer, primary_key=True, autoincrement=True),

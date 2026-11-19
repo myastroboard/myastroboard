@@ -58,12 +58,12 @@ _DISPLAY_MATH_RE = re.compile(r'^(\s*)\$\$(.+?)\$\$\s*$')
 _INLINE_MATH_RE = re.compile(r'(?<![\\$\w])\$(?=[^\s$])([^$\n]+?)(?<=[^\s\\])\$(?![\w$])')
 
 
-def _tex_attr(tex):
+def _tex_attr(tex: str):
     """A formula as an HTML attribute value; "|" is escaped too so a formula never splits a table."""
     return html.escape(tex.strip(), quote=True).replace('|', '&#124;')
 
 
-def _rewrite_link(target, page):
+def _rewrite_link(target: str, page: Path) -> str:
     """GitHub URL for a link that leaves docs/, the link unchanged otherwise."""
     if re.match(r'^[a-z][a-z0-9+.-]*:', target, re.I) or target.startswith('#'):
         return target
@@ -77,7 +77,7 @@ def _rewrite_link(target, page):
         return GITHUB_BLOB + relative + (hash_sign + anchor if hash_sign else '')
 
 
-def _convert_inline(text, page):
+def _convert_inline(text: str, page: Path):
     """Rewrite links and inline formulas in one line, leaving inline code untouched."""
     parts = []
     last = 0
@@ -99,7 +99,7 @@ def _convert_inline(text, page):
     return ''.join(out)
 
 
-def convert_page(text, page):
+def convert_page(text: str, page: Path):
     """Adapt one Markdown page for the site (links leaving docs/, formulas)."""
     lines = text.split('\n')
     out = []
@@ -122,7 +122,7 @@ def convert_page(text, page):
     return '\n'.join(out)
 
 
-def _katex_archive(local_tgz):
+def _katex_archive(local_tgz: str | None):
     """KaTeX package archive, downloaded unless a local copy is given, checked against its hash."""
     data = Path(local_tgz).read_bytes() if local_tgz else urllib.request.urlopen(KATEX_URL, timeout=60).read()
     digest = 'sha512-' + base64.b64encode(hashlib.sha512(data).digest()).decode()
@@ -131,7 +131,7 @@ def _katex_archive(local_tgz):
     return data
 
 
-def install_katex(dest, local_tgz):
+def install_katex(dest: Path, local_tgz: str | None):
     """Extract the KaTeX script, stylesheet and woff2 fonts into dest."""
     with tarfile.open(fileobj=io.BytesIO(_katex_archive(local_tgz)), mode='r:gz') as archive:
         for member in archive.getmembers():
@@ -149,14 +149,14 @@ def install_katex(dest, local_tgz):
                 target.write_bytes(source.read())
 
 
-def landing_page(readme_text, version):
+def landing_page(readme_text: str, version: str):
     """Site home page: the landing template, then the docs index without its own title."""
     template = (SITE_SRC / 'landing.html').read_text(encoding='utf-8').replace('{{VERSION}}', version)
     body = re.sub(r'\A\s*# [^\n]*\n', '', readme_text, count=1)
     return template.rstrip() + '\n\n' + body.lstrip()
 
 
-def rewrite_images(text, converted):
+def rewrite_images(text: str, converted: set[str]):
     """Point img/<name>.png|gif references to the WebP copy made for the site."""
     return re.sub(
         r'(img/)([\w.-]+?)\.(png|gif)\b',
@@ -165,7 +165,7 @@ def rewrite_images(text, converted):
     )
 
 
-def convert_images(img_dir):
+def convert_images(img_dir: Path) -> set[str]:
     """Replace the PNG / GIF screenshots by WebP (animated for a GIF); return the converted names."""
     try:
         from PIL import Image
@@ -186,7 +186,7 @@ def convert_images(img_dir):
     return converted
 
 
-def last_updated(page):
+def last_updated(page: Path):
     """Date (YYYY-MM-DD) of the last commit that changed a docs page, or None outside a git checkout."""
     result = subprocess.run(
         ['git', 'log', '-1', '--format=%cs', '--', page.relative_to(ROOT).as_posix()],
@@ -198,7 +198,7 @@ def last_updated(page):
     return result.stdout.strip() or None
 
 
-def prepare(katex_tgz):
+def prepare(katex_tgz: str | None):
     """Assemble docs-site/build/ (book.toml, theme, pages, assets) from docs/ and docs-site/."""
     if BUILD.exists():
         shutil.rmtree(BUILD)
@@ -238,7 +238,7 @@ def prepare(katex_tgz):
     install_katex(assets / 'katex', katex_tgz)
 
 
-def write_crawler_files(site):
+def write_crawler_files(site: Path):
     """sitemap.xml with every page, and a robots.txt pointing to it."""
     skipped = {'404.html', 'print.html', 'toc.html'}
     pages = sorted(p.name for p in site.glob('*.html') if p.name not in skipped)
@@ -256,7 +256,7 @@ _ID_RE = re.compile(r'\bid="([^"]+)"')
 _ASSET_TAG_RE = re.compile(r'<(script|link|img|source|iframe)\b[^>]*>', re.I)
 
 
-def check_site(site):
+def check_site(site: Path) -> list[str]:
     """Problems in the generated HTML: dead internal links or anchors, assets from another host."""
     ids = {page: set(_ID_RE.findall(page.read_text(encoding='utf-8'))) for page in site.rglob('*.html')}
     problems = []

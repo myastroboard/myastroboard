@@ -17,6 +17,7 @@ They share this data source only; their business logic stays independent.
 """
 
 import ipaddress
+from typing import Any
 
 from utils.json_settings_store import get_settings_revision, load_json_settings, save_json_settings
 from utils.logging_config import get_logger
@@ -35,16 +36,16 @@ ALWAYS_TRUSTED_NETWORKS = ('127.0.0.0/8', '::1/128')
 # to trust something this broad is still honored, just called out.
 _UNUSUALLY_BROAD_PREFIX = {4: 8, 6: 32}
 
-_DEFAULTS: dict = {
+_DEFAULTS: dict[str, Any] = {
     "trusted_networks": [],
     "two_factor_enabled": False,
 }
 
-_cache: dict | None = None
+_cache: dict[str, Any] | None = None
 _cache_revision: int | None = None
 
 
-def normalize_network(value) -> str:
+def normalize_network(value: int | list[str] | str | None) -> str:
     """Return the canonical CIDR form of a network or bare IP.
 
     ``ipaddress.ip_network(..., strict=False)`` accepts both IPv4 and IPv6 and both
@@ -60,7 +61,7 @@ def normalize_network(value) -> str:
     return normalized
 
 
-def normalize_networks(values) -> list[str]:
+def normalize_networks(values: list[str] | str) -> list[str]:
     """Normalize a list of networks, dropping duplicates and preserving order."""
     if not isinstance(values, (list, tuple)):
         raise ValueError("trusted_networks must be a list")
@@ -93,7 +94,7 @@ def _warn_if_unusually_broad(network_str: str) -> None:
         )
 
 
-def client_ip_is_trusted(client_ip, networks) -> bool:
+def client_ip_is_trusted(client_ip: str | None, networks: list[str]) -> bool:
     """Return True when *client_ip* falls inside any network of *networks*.
 
     An unparseable or missing client IP is never trusted. Individual unparseable
@@ -130,7 +131,7 @@ def client_ip_is_trusted(client_ip, networks) -> bool:
     return False
 
 
-def get_effective_trusted_networks(settings: dict | None = None) -> list[str]:
+def get_effective_trusted_networks(settings: dict[str, Any] | None = None) -> list[str]:
     """Configured trusted networks unioned with the always-trusted loopback ranges."""
     if settings is None:
         settings = get_security_settings()
@@ -142,12 +143,12 @@ def get_effective_trusted_networks(settings: dict | None = None) -> list[str]:
     return effective
 
 
-def is_client_ip_trusted(client_ip, settings: dict | None = None) -> bool:
+def is_client_ip_trusted(client_ip: str | None, settings: dict[str, Any] | None = None) -> bool:
     """Convenience wrapper: check *client_ip* against the effective trusted networks."""
     return client_ip_is_trusted(client_ip, get_effective_trusted_networks(settings))
 
 
-def _coerce_and_enforce_cascade(settings: dict) -> dict:
+def _coerce_and_enforce_cascade(settings: dict[str, Any]) -> dict[str, Any]:
     """Normalize a raw settings dict's shape and enforce the 2FA/network invariant.
 
     A hand-edited value (or any other future writer that bypasses the API's own
@@ -171,7 +172,7 @@ def _coerce_and_enforce_cascade(settings: dict) -> dict:
     return settings
 
 
-def load_security_settings() -> dict:
+def load_security_settings() -> dict[str, Any]:
     """Load settings from the database and merge with defaults. Updates the module cache."""
     global _cache, _cache_revision
     revision = get_settings_revision(SECURITY_SETTINGS_KEY)
@@ -182,7 +183,7 @@ def load_security_settings() -> dict:
     return settings
 
 
-def save_security_settings(settings: dict) -> None:
+def save_security_settings(settings: dict[str, Any]) -> None:
     """Persist settings and update the module cache.
 
     Note: this is a defensive backstop, not the primary UX - update_security_settings_api()
@@ -201,7 +202,7 @@ def save_security_settings(settings: dict) -> None:
     _cache_revision = get_settings_revision(SECURITY_SETTINGS_KEY)
 
 
-def get_security_settings() -> dict:
+def get_security_settings() -> dict[str, Any]:
     """Return cached settings, reloading when cold or when another worker saved.
 
     The revision check keeps a long-lived worker process (`gunicorn -w N`) from serving a
@@ -213,7 +214,7 @@ def get_security_settings() -> dict:
     return _cache
 
 
-def reload_security_settings() -> dict:
+def reload_security_settings() -> dict[str, Any]:
     """Force a reload from the database (call after a restore)."""
     global _cache
     _cache = None

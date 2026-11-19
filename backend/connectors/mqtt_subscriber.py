@@ -29,7 +29,7 @@ import sys
 import threading
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from connectors.mqtt_connector import parse_broker_url
 from utils.constants import DATA_DIR_CACHE
@@ -41,6 +41,10 @@ if sys.platform == "win32":
     import msvcrt
 else:  # pragma: no cover - import-time platform choice; the flock calls are tested
     import fcntl
+
+if TYPE_CHECKING:
+    from paho.mqtt.client import Client, MQTTMessage
+    from paho.mqtt.reasoncodes import ReasonCode
 
 logger = get_logger(__name__)
 
@@ -148,7 +152,7 @@ class _Subscription:
         self.client_id = client_id
         self.topics = tuple(sorted(set(topics)))
 
-    def key(self) -> tuple:
+    def key(self) -> tuple[Any, ...]:
         """Everything whose change needs a new client."""
         return (
             self.connection.get("url"),
@@ -439,7 +443,7 @@ class MqttSubscriber:
     # paho callbacks (network thread)
     # ------------------------------------------------------------------
 
-    def _on_connect(self, name: str, client, reason_code) -> None:
+    def _on_connect(self, name: str, client: Client, reason_code: ReasonCode) -> None:
         if getattr(reason_code, "is_failure", False) or (isinstance(reason_code, int) and reason_code != 0):
             self._note_error(name, f"broker refused the connection: {reason_code}")
             return
@@ -455,13 +459,13 @@ class MqttSubscriber:
         except Exception as exc:
             self._note_error(name, f"subscribe failed: {type(exc).__name__}")
 
-    def _on_disconnect(self, name: str, reason_code) -> None:
+    def _on_disconnect(self, name: str, reason_code: ReasonCode) -> None:
         with self._state_lock:
             self._state_for(name)["connected"] = False
         if getattr(reason_code, "is_failure", False):
             logger.info("MQTT subscriber (%s): disconnected (%s), paho reconnects on its own", name, reason_code)
 
-    def _on_message(self, name: str, message) -> None:
+    def _on_message(self, name: str, message: MQTTMessage) -> None:
         try:
             payload, reason = parse_payload(bytes(message.payload or b""))
             if payload is None:

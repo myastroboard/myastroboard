@@ -37,7 +37,7 @@ _last_sent: dict[str, dict[str, float]] = {}
 _lock = threading.Lock()
 
 # {user_id: set_of_entry_ids} - prevents re-sending N2 for the same plan entry
-_n2_notified: dict[str, set] = {}
+_n2_notified: dict[str, set[Any]] = {}
 
 # True when any user has an active or near (≤30 min) observation session
 _any_active_night: bool = False
@@ -120,7 +120,7 @@ def _send(user: Any, trigger_id: str, title: str, body: str, url: str, ttl: int 
         _mark_notified(user.user_id, trigger_id)
 
 
-def _cleanup_dead_subscriptions(user: Any, endpoints: list) -> None:
+def _cleanup_dead_subscriptions(user: Any, endpoints: list[Any]) -> None:
     """Remove expired/invalid push subscriptions from the user."""
     try:
         from utils.auth import user_manager
@@ -141,18 +141,18 @@ def _cleanup_dead_subscriptions(user: Any, endpoints: list) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _get_notif_prefs(user: Any) -> dict:
+def _get_notif_prefs(user: Any) -> dict[str, Any]:
     """Extract notification trigger config from user preferences."""
     return user.preferences.get('notifications', {}).get('triggers', {})
 
 
-def _get_muted_location_ids(user: Any) -> set:
+def _get_muted_location_ids(user: Any) -> set[Any]:
     """Per-location mute list (v1.2): locations the user opted out of notifications for."""
     raw = user.preferences.get('notifications', {}).get('disabled_location_ids', [])
     return {lid for lid in raw if isinstance(lid, str)} if isinstance(raw, list) else set()
 
 
-def _t(user: Any, key: str, **params) -> str:
+def _t(user: Any, key: str, **params: Any) -> str:
     """Translate a push notification string using the user's preferred language."""
     from utils.i18n_utils import get_translated_message
 
@@ -176,7 +176,7 @@ def _loc_trigger_key(trigger_id: str, location_id: str | None) -> str:
     return f'{trigger_id}@{location_id}' if location_id else trigger_id
 
 
-def _check_n7_aurora(user: Any, cache_data: dict | None, loc: dict | None = None) -> None:
+def _check_n7_aurora(user: Any, cache_data: dict[str, Any] | None, loc: dict[str, Any] | None = None) -> None:
     if not cache_data:
         logger.debug(f"N7 skip {user.username}: no aurora cache")
         return
@@ -218,7 +218,7 @@ def _check_n7_aurora(user: Any, cache_data: dict | None, loc: dict | None = None
     )  # aurora: immediate delivery, can last ~1 h
 
 
-def _check_n1_plan_start(user: Any, plan_payload: dict | None, multi_location: bool = False) -> None:
+def _check_n1_plan_start(user: Any, plan_payload: dict[str, Any] | None, multi_location: bool = False) -> None:
     if not plan_payload or plan_payload.get('state') == 'none':
         logger.debug(f"N1 skip {user.username}: no active plan")
         return
@@ -264,7 +264,7 @@ def _check_n1_plan_start(user: Any, plan_payload: dict | None, multi_location: b
         logger.debug(f"N1 check error for {user.username}: {e}")
 
 
-def _check_n2_next_target(user: Any, plan_payload: dict | None, multi_location: bool = False) -> None:
+def _check_n2_next_target(user: Any, plan_payload: dict[str, Any] | None, multi_location: bool = False) -> None:
     if not plan_payload or plan_payload.get('state') == 'none':
         logger.debug(f"N2 skip {user.username}: no active plan")
         return
@@ -331,7 +331,7 @@ def _check_n2_next_target(user: Any, plan_payload: dict | None, multi_location: 
         logger.debug(f"N2 skip {user.username}: no undone targets with a future start time")
 
 
-def _check_n6_darkness(user: Any, cache_data: dict | None, loc: dict | None = None) -> None:
+def _check_n6_darkness(user: Any, cache_data: dict[str, Any] | None, loc: dict[str, Any] | None = None) -> None:
     if not cache_data:
         logger.debug(f"N6 skip {user.username}: no sun_report cache")
         return
@@ -385,7 +385,7 @@ def _check_n6_darkness(user: Any, cache_data: dict | None, loc: dict | None = No
         logger.debug(f"N6 check error for {user.username}: {e}")
 
 
-def _check_n3_iss(user: Any, cache_data: dict | None, loc: dict | None = None) -> None:
+def _check_n3_iss(user: Any, cache_data: dict[str, Any] | None, loc: dict[str, Any] | None = None) -> None:
     if not cache_data:
         logger.debug(f"N3 skip {user.username}: no iss_passes cache")
         return
@@ -450,7 +450,7 @@ def _check_n3_iss(user: Any, cache_data: dict | None, loc: dict | None = None) -
     )  # short window (≤10 min): needs immediate delivery
 
 
-def _check_n8_css(user: Any, cache_data: dict | None, loc: dict | None = None) -> None:
+def _check_n8_css(user: Any, cache_data: dict[str, Any] | None, loc: dict[str, Any] | None = None) -> None:
     if not cache_data:
         logger.debug(f"N8 skip {user.username}: no css_passes cache")
         return
@@ -515,7 +515,9 @@ def _check_n8_css(user: Any, cache_data: dict | None, loc: dict | None = None) -
     )  # short window (≤10 min): needs immediate delivery
 
 
-def _check_n4_n5_eclipse(user: Any, solar_data: dict | None, lunar_data: dict | None, loc: dict | None = None) -> None:
+def _check_n4_n5_eclipse(
+    user: Any, solar_data: dict[str, Any] | None, lunar_data: dict[str, Any] | None, loc: dict[str, Any] | None = None
+) -> None:
     triggers = _get_notif_prefs(user)
     now = datetime.now(UTC)
     loc = loc or {}
@@ -565,7 +567,7 @@ def _check_n4_n5_eclipse(user: Any, solar_data: dict | None, lunar_data: dict | 
 _N9_MIN_WINDOW_SECONDS = 36 * 60 * 60
 
 
-def _n9_event_title(user: Any, event: dict) -> str:
+def _n9_event_title(user: Any, event: dict[str, Any]) -> str:
     """Rebuild a solar-system-event title in the user's own language.
 
     The solar_system_events cache is built once by a background job with no
@@ -611,7 +613,7 @@ def _n9_days_until(peak: datetime, now: datetime, tz_name: str | None) -> int:
     return (peak.astimezone(tz).date() - now.astimezone(tz).date()).days
 
 
-def _check_n9_solsys_window(user: Any, cache_data: dict | None, loc: dict | None = None) -> None:
+def _check_n9_solsys_window(user: Any, cache_data: dict[str, Any] | None, loc: dict[str, Any] | None = None) -> None:
     """N9 - heads-up ahead of a multi-day solar-system event's peak (meteor shower, comet
     visibility window...). Unlike eclipses/transits, these events carry a start_time..end_time
     span around peak_time rather than being a single instant, but the trigger still follows the
@@ -689,7 +691,7 @@ def _check_n9_solsys_window(user: Any, cache_data: dict | None, loc: dict | None
 # ---------------------------------------------------------------------------
 
 
-def _load_cache(key: str) -> dict | None:
+def _load_cache(key: str) -> dict[str, Any] | None:
     try:
         from cache.cache_store import load_shared_cache_entry
 
@@ -699,7 +701,7 @@ def _load_cache(key: str) -> dict | None:
         return None
 
 
-def _pick_active_plan(user_id: str, username: str) -> dict | None:
+def _pick_active_plan(user_id: str, username: str) -> dict[str, Any] | None:
     """The user's live plan, if any - see observation.plan_my_night.pick_active_plan."""
     try:
         from observation.plan_my_night import pick_active_plan
@@ -737,9 +739,9 @@ def _poll() -> None:
             'lunar_eclipse',
             'solar_system_events',
         )
-        location_caches: dict[str, dict[str, dict | None]] = {}
+        location_caches: dict[str, dict[str, dict[str, Any] | None]] = {}
 
-        def _caches_for(location_id: str) -> dict[str, dict | None]:
+        def _caches_for(location_id: str) -> dict[str, dict[str, Any] | None]:
             if location_id not in location_caches:
                 location_caches[location_id] = {
                     name: _load_cache(f'{name}:{location_id}') for name in _LOCATION_CACHE_NAMES

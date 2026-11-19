@@ -14,7 +14,7 @@ does not hold up the three that are instant (see feature.md, decision D6).
 """
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from zoneinfo import ZoneInfo
 
 from flask import Blueprint, jsonify, request
@@ -32,6 +32,9 @@ from utils.auth import get_current_user, login_required, user_required
 from utils.constants import MAX_WISHLIST_ITEMS
 from utils.logging_config import get_logger
 from utils.route_helpers import _resolve_active_location
+
+if TYPE_CHECKING:
+    from utils.auth import User
 
 logger = get_logger(__name__)
 
@@ -72,14 +75,14 @@ def _requested_year(default_year: int) -> int | None:
     return year if _YEAR_MIN <= year <= _YEAR_MAX else None
 
 
-def _user_sessions(user) -> list:
+def _user_sessions(user: User) -> list[Any]:
     """The caller's own sessions. Never another user's - analytics are self-scoped."""
     data = observation_sessions.load_user_sessions(user.user_id, user.username)
     sessions = data.get('sessions', [])
     return sessions if isinstance(sessions, list) else []
 
 
-def _user_astrodex_items(user) -> list:
+def _user_astrodex_items(user: User) -> list[Any]:
     """The caller's own Astrodex items (the gallery half of the sky coverage map)."""
     data = astrodex.load_user_astrodex(user.user_id, user.username)
     items = data.get('items', [])
@@ -202,7 +205,7 @@ def get_session_analytics_best_months():
 # ---------------------------------------------------------------------------
 
 
-def _captured_index(user) -> set:
+def _captured_index(user: User) -> set[Any]:
     """Identifiers of everything the user has already captured.
 
     Derived on every read, never stored (see ``observation/wishlist.py``). Two sources,
@@ -246,7 +249,7 @@ def _request_flag(name: str, default: bool = True) -> bool:
     return str(raw).strip().lower() not in ('0', 'false', 'no')
 
 
-def _attach_visibility(items, location) -> None:
+def _attach_visibility(items: list[Any], location: dict[str, Any]) -> None:
     """Fold every wishlist item through one shared night grid per sampled night.
 
     The expensive part of a visibility sample is the Sun/Moon grid, which is identical for
@@ -330,7 +333,7 @@ def add_to_wishlist():
 
 @session_analytics_bp.route('/api/wishlist/<item_id>', methods=['PATCH'])
 @user_required
-def update_wishlist_item(item_id):
+def update_wishlist_item(item_id: str):
     """Update one item's priority or notes."""
     try:
         user = get_current_user()
@@ -352,7 +355,7 @@ def update_wishlist_item(item_id):
 
 @session_analytics_bp.route('/api/wishlist/<item_id>', methods=['DELETE'])
 @user_required
-def delete_wishlist_item(item_id):
+def delete_wishlist_item(item_id: str):
     """Remove one item from the wishlist."""
     try:
         user = get_current_user()

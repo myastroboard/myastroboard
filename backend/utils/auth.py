@@ -9,12 +9,14 @@ import os
 import re
 import threading
 import uuid
+from collections.abc import Callable
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from functools import wraps
+from typing import Any, Concatenate
 
 import pyotp
-from flask import jsonify, request, session
+from flask import Response, jsonify, request, session
 
 # pyotp re-exports TOTP only implicitly (py.typed since 2.12), so pyright needs the defining module.
 from pyotp.totp import TOTP
@@ -162,7 +164,7 @@ DEFAULT_USER_PREFERENCES = {
 }
 
 
-def normalize_account_scope(value):
+def normalize_account_scope(value: str | None) -> str:
     """Coerce a stored account_scope to a known value.
 
     Unlike `role`, an unrecognised scope does not invalidate the whole user table:
@@ -183,19 +185,19 @@ class User:
 
     def __init__(
         self,
-        username,
-        password_hash,
-        role,
-        user_id=None,
-        created_at=None,
-        last_login=None,
-        preferences=None,
-        push_subscriptions=None,
-        account_scope=None,
-        totp_secret=None,
-        totp_enabled=False,
-        totp_confirmed_at=None,
-        profile=None,
+        username: str,
+        password_hash: str,
+        role: str,
+        user_id: str | None = None,
+        created_at: str | None = None,
+        last_login: str | None = None,
+        preferences: dict[str, Any] | None = None,
+        push_subscriptions: str | list[Any] | None = None,
+        account_scope: str | None = None,
+        totp_secret: str | None = None,
+        totp_enabled: bool = False,
+        totp_confirmed_at: str | None = None,
+        profile: dict[str, Any] | None = None,
     ):
         self.user_id = user_id or str(uuid.uuid4())
         self.username = username
@@ -217,7 +219,7 @@ class User:
         # choices) - see utils/user_identity.py. Normalized on load, never invalid.
         self.profile = user_identity.sanitize_profile(profile)
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         """Convert user to dictionary"""
         return {
             'user_id': self.user_id,
@@ -236,7 +238,7 @@ class User:
         }
 
     @staticmethod
-    def from_dict(data):
+    def from_dict(data: dict[str, Any]):
         """Create user from dictionary.
 
         The 2FA and account-scope keys default to falsy/'global' so entries written by
@@ -263,17 +265,17 @@ class User:
         """The name other members see: the profile display name, else the login name."""
         return user_identity.display_name_of(self)
 
-    def check_password(self, password):
+    def check_password(self, password: str):
         """Check if password matches"""
         return check_password_hash(self.password_hash, password)
 
-    def get_totp_uri(self, issuer=TOTP_ISSUER):
+    def get_totp_uri(self, issuer: str = TOTP_ISSUER):
         """Return the otpauth:// provisioning URI for this user's current secret."""
         if not self.totp_secret:
             raise ValueError("No TOTP secret set for this user")
         return TOTP(self.totp_secret).provisioning_uri(name=self.username, issuer_name=issuer)
 
-    def verify_totp(self, code):
+    def verify_totp(self, code: str):
         """Check a 6-digit TOTP code against this user's secret (clock-drift tolerant)."""
         if not self.totp_secret or not code:
             return False
@@ -283,15 +285,15 @@ class User:
             logger.warning(f"TOTP verification error for user {self.username}: {e}")
             return False
 
-    def is_local_account(self):
+    def is_local_account(self) -> bool:
         """Check if this account may only sign in from a trusted network"""
         return self.account_scope == ACCOUNT_SCOPE_LOCAL
 
-    def is_admin(self):
+    def is_admin(self) -> bool:
         """Check if user is admin"""
         return self.role == ROLE_ADMIN
 
-    def is_user(self):
+    def is_user(self) -> bool:
         """Check if user is a regular user"""
         return self.role == ROLE_USER
 
@@ -310,12 +312,12 @@ class User:
         return result
 
 
-def _same_username(first, second):
+def _same_username(first: str | None, second: str):
     """Account names are compared without regard to case ("Emeric" and "emeric" are one name)."""
     return isinstance(first, str) and isinstance(second, str) and first.casefold() == second.casefold()
 
 
-def _astrodex_picture_filenames(user_id):
+def _astrodex_picture_filenames(user_id: str) -> set[Any]:
     """Safe file names of every picture in the user's Astrodex (empty on any read error)."""
     filenames = set()
     try:
@@ -331,12 +333,14 @@ def _astrodex_picture_filenames(user_id):
     return filenames
 
 
-def _canonical_user(user):
+def _canonical_user(user: User):
     """Stable JSON of a User, to tell which users changed since they were loaded."""
     return json.dumps(user.to_dict(), sort_keys=True, ensure_ascii=False, default=str)
 
 
-def _serialized_users_write(method):
+def _serialized_users_write[**P, R](
+    method: Callable[Concatenate[UserManager, P], R],
+) -> Callable[Concatenate[UserManager, P], R]:
     """Run a UserManager mutator inside one users write transaction.
 
     Every gunicorn worker keeps its own copy of the user table, so
@@ -345,7 +349,7 @@ def _serialized_users_write(method):
     """
 
     @wraps(method)
-    def wrapper(self, *args, **kwargs):
+    def wrapper(self: UserManager, *args: P.args, **kwargs: P.kwargs) -> R:
         with self._exclusive_write():
             return method(self, *args, **kwargs)
 
@@ -380,7 +384,7 @@ class UserManager:
             with db_transaction():
                 yield
 
-    def modify_user(self, user_id, mutate):
+    def modify_user[T](self, user_id: str, mutate: Callable[[User], T]) -> T | None:
         """Apply ``mutate(user)`` to the freshest copy of one user and save, atomically across workers.
 
         For callers outside this class that change a user they looked up
@@ -460,7 +464,7 @@ class UserManager:
         logger.debug(f"Saved {len(changed)} changed user(s)")
 
     @staticmethod
-    def validate_users_json_data(data):
+    def validate_users_json_data(data: list[Any] | dict[str, Any]):
         """Validate in-memory users JSON structure."""
         if not isinstance(data, dict):
             return False, "JSON root must be a dictionary"
@@ -495,7 +499,7 @@ class UserManager:
         return True, ""
 
     @staticmethod
-    def validate_user_preferences(preferences):
+    def validate_user_preferences(preferences: dict[str, Any]):
         """Validate user preference payload for allowed keys and values."""
         if not isinstance(preferences, dict):
             return False, "Preferences must be a dictionary"
@@ -616,7 +620,7 @@ class UserManager:
         return True, ""
 
     @staticmethod
-    def sanitize_user_preferences(preferences):
+    def sanitize_user_preferences(preferences: dict[str, Any] | None) -> dict[str, Any]:
         """Merge a partial preferences payload into defaults.
 
         Deep-copies the defaults so nested blocks (notifications, wizard,
@@ -644,7 +648,7 @@ class UserManager:
             self.create_user(DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_PASSWORD, ROLE_ADMIN)
 
     @staticmethod
-    def _all_location_ids():
+    def _all_location_ids() -> list[Any]:
         """Every currently configured location id (lazy import: avoids a
         module-load-time cycle with repo_config.py, which itself lazily
         imports auth.user_manager in get_scheduler_locations et al)."""
@@ -655,7 +659,7 @@ class UserManager:
         except Exception:
             return []
 
-    def create_user(self, username, password, role, account_scope=None):
+    def create_user(self, username: str, password: str, role: str, account_scope: str | None = None):
         """Create a new user.
 
         The password is hashed before the users write transaction opens: scrypt is the
@@ -667,7 +671,7 @@ class UserManager:
         password_hash = generate_password_hash(password)
         return self._insert_new_user(username, password_hash, role, account_scope)
 
-    def _check_new_user(self, username, role, account_scope):
+    def _check_new_user(self, username: str, role: str, account_scope: str | None):
         """Raise ValueError when an account cannot be created with these values."""
         if self._username_taken(username):
             raise ValueError(f"User {username} already exists")
@@ -679,7 +683,7 @@ class UserManager:
             raise ValueError(f"Invalid account scope: {account_scope}")
 
     @_serialized_users_write
-    def _insert_new_user(self, username, password_hash, role, account_scope):
+    def _insert_new_user(self, username: str, password_hash: str, role: str, account_scope: str | None):
         """Store a new account whose password is already hashed (inside the users write transaction)."""
         # Another worker may have taken the name since create_user() checked it
         self._reload_users_if_changed()
@@ -707,7 +711,7 @@ class UserManager:
         logger.info(f"Created user {username} (ID: {user.user_id}) with role {role}")
         return user
 
-    def get_user_by_username(self, username):
+    def get_user_by_username(self, username: str):
         """Get user by username, ignoring case.
 
         An exact match wins: accounts created before names were case-insensitive may
@@ -721,23 +725,30 @@ class UserManager:
         matches = [user for user in self.users.values() if _same_username(user.username, username)]
         return matches[0] if len(matches) == 1 else None
 
-    def _username_taken(self, username, exclude_user_id=None):
+    def _username_taken(self, username: str, exclude_user_id: str | None = None):
         """True when another account already uses ``username``, whatever its case."""
         return any(
             _same_username(user.username, username) for user in self.users.values() if user.user_id != exclude_user_id
         )
 
-    def get_user_by_id(self, user_id):
+    def get_user_by_id(self, user_id: str):
         """Get user by UUID"""
         self._reload_users_if_changed()
         return self.users.get(user_id)
 
-    def get_user(self, username):
+    def get_user(self, username: str):
         """Get user by username (for backwards compatibility)"""
         return self.get_user_by_username(username)
 
     @_serialized_users_write
-    def update_user(self, user_id, username=None, password=None, role=None, account_scope=None):
+    def update_user(
+        self,
+        user_id: str,
+        username: str | None = None,
+        password: str | None = None,
+        role: str | None = None,
+        account_scope: str | None = None,
+    ):
         """Update user username, password, role and/or account scope"""
         self._reload_users_if_changed()
         user = self.get_user_by_id(user_id)
@@ -773,7 +784,7 @@ class UserManager:
     # ------------------------------------------------------------------
 
     @_serialized_users_write
-    def start_totp_setup(self, user_id):
+    def start_totp_setup(self, user_id: str):
         """Generate and persist a fresh, unconfirmed TOTP secret for a user.
 
         Restarting setup always regenerates the secret, so an abandoned enrollment
@@ -800,7 +811,7 @@ class UserManager:
         return user
 
     @_serialized_users_write
-    def confirm_totp_setup(self, user_id, code):
+    def confirm_totp_setup(self, user_id: str, code: str):
         """Activate 2FA for a user once they prove they can generate a valid code."""
         self._reload_users_if_changed()
         user = self.get_user_by_id(user_id)
@@ -820,7 +831,7 @@ class UserManager:
         return user
 
     @_serialized_users_write
-    def disable_totp(self, user_id, password=None):
+    def disable_totp(self, user_id: str, password: str | None = None):
         """Clear a user's 2FA state.
 
         *password* re-authenticates the self-service path. Admin-driven removal
@@ -842,7 +853,7 @@ class UserManager:
         return user
 
     @_serialized_users_write
-    def change_own_password(self, user_id, current_password, new_password):
+    def change_own_password(self, user_id: str, current_password: str, new_password: str):
         """Change password for the authenticated user after verifying current password."""
         self._reload_users_if_changed()
 
@@ -865,7 +876,7 @@ class UserManager:
         return user
 
     @_serialized_users_write
-    def get_user_preferences(self, user_id):
+    def get_user_preferences(self, user_id: str) -> dict[str, Any]:
         """Return effective preferences for a given user."""
         self._reload_users_if_changed()
         user = self.get_user_by_id(user_id)
@@ -880,7 +891,7 @@ class UserManager:
         return effective.copy()
 
     @_serialized_users_write
-    def update_user_preferences(self, user_id, preferences):
+    def update_user_preferences(self, user_id: str, preferences: str | dict[str, Any]) -> dict[str, Any]:
         """Update preferences for a given user with validation."""
         self._reload_users_if_changed()
         user = self.get_user_by_id(user_id)
@@ -912,7 +923,7 @@ class UserManager:
     # Multi-location profiles (v1.2) - per-user location preference helpers
     # ------------------------------------------------------------------
 
-    def _get_location_prefs_block(self, user):
+    def _get_location_prefs_block(self, user: User) -> dict[str, Any]:
         """Return a normalized, mutable copy of a user's location prefs block."""
         import copy as _copy
 
@@ -926,7 +937,7 @@ class UserManager:
         return normalized
 
     @_serialized_users_write
-    def set_user_location_prefs(self, user_id, **updates):
+    def set_user_location_prefs(self, user_id: str, **updates: Any) -> dict[str, Any]:
         """Partially update a user's preferences.location block (validated keys only)."""
         self._reload_users_if_changed()
         user = self.get_user_by_id(user_id)
@@ -950,7 +961,7 @@ class UserManager:
         return block
 
     @_serialized_users_write
-    def set_location_attribution(self, location_id, user_ids):
+    def set_location_attribution(self, location_id: str, user_ids: list[Any]):
         """Attach *location_id* to exactly the users in *user_ids* (detach from others).
 
         Admin-controlled many-to-many: a location can be attributed to several
@@ -981,7 +992,7 @@ class UserManager:
         return changed
 
     @_serialized_users_write
-    def cleanup_location_references(self, location_id, fallback_location_id):
+    def cleanup_location_references(self, location_id: str, fallback_location_id: str | None):
         """Eagerly remove a deleted preset from every user's location prefs.
 
         default/active pointers that referenced the deleted preset are reset to
@@ -1015,7 +1026,7 @@ class UserManager:
         return changed
 
     @_serialized_users_write
-    def reset_active_location_on_login(self, user_id):
+    def reset_active_location_on_login(self, user_id: str):
         """On fresh login, reset active_location_id to default_location_id.
 
         This is the mechanism behind "the default location is what's shown when
@@ -1033,7 +1044,7 @@ class UserManager:
             logger.debug(f"Reset active location to default for user {user.username}")
 
     @_serialized_users_write
-    def delete_user(self, user_id, current_user_id=None):
+    def delete_user(self, user_id: str, current_user_id: str | None = None):
         """Delete a user, every document and every file they own (right to erasure)"""
 
         self._reload_users_if_changed()
@@ -1080,7 +1091,7 @@ class UserManager:
         removed = purge_user_files(user_id)
         logger.info(f"Deleted {removed} data file(s) for {username}")
 
-    def list_users(self):
+    def list_users(self) -> list[dict[str, Any]]:
         """List all users (without password hashes)"""
         self._reload_users_if_changed()
         return [
@@ -1098,7 +1109,7 @@ class UserManager:
             for user in self.users.values()
         ]
 
-    def display_names_by_id(self):
+    def display_names_by_id(self) -> dict[str, str]:
         """``{user_id: name shown to others}`` for every account (display name, else login name).
 
         This is what every "shared by" label uses, so a member is named the same way
@@ -1116,7 +1127,7 @@ class UserManager:
     # Profile (display name, bio, avatar, Community choices) - see utils/user_identity.py
     # ------------------------------------------------------------------
 
-    def _display_name_taken(self, name, exclude_user_id):
+    def _display_name_taken(self, name: str, exclude_user_id: str):
         """A display name may not be another member's display name or login name.
 
         Otherwise anyone could appear as "admin", or as somebody else.
@@ -1129,7 +1140,7 @@ class UserManager:
         return False
 
     @_serialized_users_write
-    def update_user_profile(self, user_id, updates):
+    def update_user_profile(self, user_id: str, updates: dict[str, Any]):
         """Apply a self-service profile change; raises ``user_identity.ProfileError``."""
         self._reload_users_if_changed()
         user = self.get_user_by_id(user_id)
@@ -1145,7 +1156,7 @@ class UserManager:
         return copy.deepcopy(user.profile)
 
     @_serialized_users_write
-    def set_user_avatar(self, user_id, filename):
+    def set_user_avatar(self, user_id: str, filename: str | None) -> str | None:
         """Point the profile at a new avatar file (None removes it); return the previous file name."""
         self._reload_users_if_changed()
         user = self.get_user_by_id(user_id)
@@ -1159,7 +1170,7 @@ class UserManager:
         return previous
 
     @_serialized_users_write
-    def reset_user_profile(self, user_id):
+    def reset_user_profile(self, user_id: str) -> str | None:
         """Moderation: clear the display name, bio and avatar (Community choices are kept).
 
         Returns the avatar file name that was dropped, so the caller deletes the file.
@@ -1177,11 +1188,11 @@ class UserManager:
         return previous
 
     @staticmethod
-    def _stamp_last_login(user):
+    def _stamp_last_login(user: User) -> User:
         user.last_login = datetime.now(UTC).isoformat()
         return user
 
-    def authenticate(self, username, password):
+    def authenticate(self, username: str, password: str) -> User | None:
         """Authenticate user"""
         self._reload_users_if_changed()
         user = self.get_user_by_username(username)
@@ -1200,8 +1211,8 @@ user_manager = UserManager()
 
 
 # Authentication decorators
-def _session_account():
-    """The account the session is signed in as, or ``(None, 401 response)``.
+def _session_account() -> User | tuple[Response, int]:
+    """The account the session is signed in as, or the 401 response to return instead.
 
     A session can outlive its account: deleted by an admin, or replaced by a backup restore,
     while the browser kept its cookie. Such a session is cleared and refused like a missing one,
@@ -1210,40 +1221,40 @@ def _session_account():
     client_ip = request.remote_addr
     if 'username' not in session:
         logger.warning(f"Unauthorized access attempt to {request.path} from {client_ip} (no valid session cookie)")
-        return None, (jsonify({'error': 'Authentication required'}), 401)
+        return jsonify({'error': 'Authentication required'}), 401
     user = user_manager.get_user(session['username'])
     if user is None:
         logger.warning(
             f"Session for missing account {session.get('username')} from {client_ip} on {request.path}: signed out"
         )
         session.clear()
-        return None, (jsonify({'error': 'Authentication required'}), 401)
-    return user, None
+        return jsonify({'error': 'Authentication required'}), 401
+    return user
 
 
 # Is read-only role, can only access GET endpoints (enforced in route handlers)
-def login_required(f):
+def login_required[**P, R](f: Callable[P, R]) -> Callable[P, R | tuple[Response, int]]:
     """Decorator to require a signed-in session whose account still exists"""
 
     @wraps(f)
-    def decorated_function(*args, **kwargs):
-        user, refusal = _session_account()
-        if user is None:
-            return refusal
+    def decorated_function(*args: P.args, **kwargs: P.kwargs) -> R | tuple[Response, int]:
+        user = _session_account()
+        if not isinstance(user, User):
+            return user
         return f(*args, **kwargs)
 
     return decorated_function
 
 
 # If user role is user, can access non-admin endpoints (enforced in route handlers)
-def user_required(f):
+def user_required[**P, R](f: Callable[P, R]) -> Callable[P, R | tuple[Response, int]]:
     """Decorator to require user or admin role"""
 
     @wraps(f)
-    def decorated_function(*args, **kwargs):
-        user, refusal = _session_account()
-        if user is None:
-            return refusal
+    def decorated_function(*args: P.args, **kwargs: P.kwargs) -> R | tuple[Response, int]:
+        user = _session_account()
+        if not isinstance(user, User):
+            return user
 
         if not (user.is_admin() or user.is_user()):
             client_ip = request.remote_addr
@@ -1259,14 +1270,14 @@ def user_required(f):
 
 
 # Only admin role can access
-def admin_required(f):
+def admin_required[**P, R](f: Callable[P, R]) -> Callable[P, R | tuple[Response, int]]:
     """Decorator to require admin role"""
 
     @wraps(f)
-    def decorated_function(*args, **kwargs):
-        user, refusal = _session_account()
-        if user is None:
-            return refusal
+    def decorated_function(*args: P.args, **kwargs: P.kwargs) -> R | tuple[Response, int]:
+        user = _session_account()
+        if not isinstance(user, User):
+            return user
 
         if not user.is_admin():
             client_ip = request.remote_addr
@@ -1280,7 +1291,7 @@ def admin_required(f):
     return decorated_function
 
 
-def get_current_user():
+def get_current_user() -> User | None:
     """Get current logged-in user"""
     if 'username' in session:
         return user_manager.get_user(session['username'])

@@ -1,6 +1,7 @@
 """Equipment Profiles Blueprint. Routes: /api/equipment/*"""
 
 from dataclasses import asdict
+from typing import TYPE_CHECKING, Any
 
 from flask import Blueprint, jsonify, request
 
@@ -10,12 +11,15 @@ from utils.auth import get_current_user, user_manager, user_required
 from utils.logging_config import get_logger
 from utils.repo_config import load_config
 
+if TYPE_CHECKING:
+    from utils.auth import User
+
 logger = get_logger(__name__)
 
 equipment_bp = Blueprint('equipment', __name__)
 
 
-def _resolve_astrodex_visibility_context():
+def _resolve_astrodex_visibility_context() -> tuple[Any, ...]:
     """Return (private_mode, usernames_by_id) - shared by every route that needs to resolve
     Astrodex picture visibility/ownership, so a future change to either only needs updating here.
     """
@@ -26,13 +30,13 @@ def _resolve_astrodex_visibility_context():
     return private_mode, usernames_by_id
 
 
-def _build_combination_photo_index_for_current_user(user, user_id):
+def _build_combination_photo_index_for_current_user(user: User, user_id: str):
     """Build the per-combination Astrodex photo index for the requesting user."""
     private_mode, usernames_by_id = _resolve_astrodex_visibility_context()
     return astrodex.build_combination_photo_index(user_id, user.username, private_mode, usernames_by_id)
 
 
-def _validate_numeric_ranges(data, specs):
+def _validate_numeric_ranges(data: dict[str, Any], specs: list[Any]):
     """Shared range-check helper: specs is a list of (field, lo, hi, unit) tuples.
     Returns an error message string for the first out-of-range/non-numeric field found among
     those present in ``data``, else None. Mirrors the min/max attributes on the matching
@@ -49,7 +53,7 @@ def _validate_numeric_ranges(data, specs):
     return None
 
 
-def _validate_telescope_data(data):
+def _validate_telescope_data(data: dict[str, Any]):
     """Return an error message string if telescope numeric fields are out of range, else None."""
     return _validate_numeric_ranges(
         data,
@@ -62,7 +66,7 @@ def _validate_telescope_data(data):
     )
 
 
-def _validate_camera_data(data):
+def _validate_camera_data(data: dict[str, Any]):
     """Return an error message string if camera numeric fields are out of range, else None."""
     return _validate_numeric_ranges(
         data,
@@ -78,7 +82,7 @@ def _validate_camera_data(data):
     )
 
 
-def _validate_mount_data(data):
+def _validate_mount_data(data: dict[str, Any]):
     """Return an error message string if mount numeric fields are out of range, else None."""
     return _validate_numeric_ranges(
         data,
@@ -91,7 +95,7 @@ def _validate_mount_data(data):
     )
 
 
-def _validate_filter_data(data):
+def _validate_filter_data(data: dict[str, Any]):
     """Return an error message string if filter numeric fields are out of range, else None."""
     return _validate_numeric_ranges(
         data,
@@ -102,12 +106,12 @@ def _validate_filter_data(data):
     )
 
 
-def _validate_accessory_data(data):
+def _validate_accessory_data(data: dict[str, Any]):
     """Return an error message string if accessory numeric fields are out of range, else None."""
     return _validate_numeric_ranges(data, [('weight_kg', 0, 50, 'kg')])
 
 
-def _validate_combination_data(data):
+def _validate_combination_data(data: dict[str, Any]):
     """Return an error message string if combination numeric fields are out of range, else None."""
     return _validate_numeric_ranges(
         data,
@@ -171,7 +175,7 @@ def create_telescope():
 
 @equipment_bp.route('/api/equipment/telescopes/<telescope_id>', methods=['GET'])
 @user_required
-def get_telescope(telescope_id):
+def get_telescope(telescope_id: str):
     """Get a specific telescope profile"""
     try:
         user = get_current_user()
@@ -192,7 +196,7 @@ def get_telescope(telescope_id):
 
 @equipment_bp.route('/api/equipment/telescopes/<telescope_id>', methods=['PUT'])
 @user_required
-def update_telescope(telescope_id):
+def update_telescope(telescope_id: str):
     """Update a telescope profile"""
     try:
         user = get_current_user()
@@ -220,7 +224,7 @@ def update_telescope(telescope_id):
 
 @equipment_bp.route('/api/equipment/telescopes/<telescope_id>', methods=['DELETE'])
 @user_required
-def delete_telescope(telescope_id):
+def delete_telescope(telescope_id: str):
     """Delete a telescope profile"""
     try:
         user = get_current_user()
@@ -294,7 +298,7 @@ def create_camera():
 
 @equipment_bp.route('/api/equipment/cameras/<camera_id>', methods=['GET'])
 @user_required
-def get_camera(camera_id):
+def get_camera(camera_id: str):
     """Get a specific camera profile"""
     try:
         user = get_current_user()
@@ -315,7 +319,7 @@ def get_camera(camera_id):
 
 @equipment_bp.route('/api/equipment/cameras/<camera_id>', methods=['PUT'])
 @user_required
-def update_camera(camera_id):
+def update_camera(camera_id: str):
     """Update a camera profile"""
     try:
         user = get_current_user()
@@ -343,7 +347,7 @@ def update_camera(camera_id):
 
 @equipment_bp.route('/api/equipment/cameras/<camera_id>', methods=['DELETE'])
 @user_required
-def delete_camera(camera_id):
+def delete_camera(camera_id: str):
     """Delete a camera profile"""
     try:
         user = get_current_user()
@@ -420,7 +424,7 @@ def create_mount():
 
 @equipment_bp.route('/api/equipment/mounts/<mount_id>', methods=['GET'])
 @user_required
-def get_mount(mount_id):
+def get_mount(mount_id: str):
     """Get a specific mount profile"""
     try:
         user = get_current_user()
@@ -441,7 +445,7 @@ def get_mount(mount_id):
 
 @equipment_bp.route('/api/equipment/mounts/<mount_id>', methods=['PUT'])
 @user_required
-def update_mount(mount_id):
+def update_mount(mount_id: str):
     """Update a mount profile"""
     try:
         user = get_current_user()
@@ -469,7 +473,7 @@ def update_mount(mount_id):
 
 @equipment_bp.route('/api/equipment/mounts/<mount_id>', methods=['DELETE'])
 @user_required
-def delete_mount(mount_id):
+def delete_mount(mount_id: str):
     """Delete a mount profile"""
     try:
         user = get_current_user()
@@ -543,7 +547,7 @@ def create_filter():
 
 @equipment_bp.route('/api/equipment/filters/<filter_id>', methods=['GET'])
 @user_required
-def get_filter(filter_id):
+def get_filter(filter_id: str):
     """Get a specific filter profile"""
     try:
         user = get_current_user()
@@ -564,7 +568,7 @@ def get_filter(filter_id):
 
 @equipment_bp.route('/api/equipment/filters/<filter_id>', methods=['PUT'])
 @user_required
-def update_filter(filter_id):
+def update_filter(filter_id: str):
     """Update a filter profile"""
     try:
         user = get_current_user()
@@ -592,7 +596,7 @@ def update_filter(filter_id):
 
 @equipment_bp.route('/api/equipment/filters/<filter_id>', methods=['DELETE'])
 @user_required
-def delete_filter(filter_id):
+def delete_filter(filter_id: str):
     """Delete a filter profile"""
     try:
         user = get_current_user()
@@ -666,7 +670,7 @@ def create_accessory():
 
 @equipment_bp.route('/api/equipment/accessories/<accessory_id>', methods=['GET'])
 @user_required
-def get_accessory(accessory_id):
+def get_accessory(accessory_id: str):
     """Get a specific accessory profile"""
     try:
         user = get_current_user()
@@ -687,7 +691,7 @@ def get_accessory(accessory_id):
 
 @equipment_bp.route('/api/equipment/accessories/<accessory_id>', methods=['PUT'])
 @user_required
-def update_accessory(accessory_id):
+def update_accessory(accessory_id: str):
     """Update an accessory profile"""
     try:
         user = get_current_user()
@@ -715,7 +719,7 @@ def update_accessory(accessory_id):
 
 @equipment_bp.route('/api/equipment/accessories/<accessory_id>', methods=['DELETE'])
 @user_required
-def delete_accessory(accessory_id):
+def delete_accessory(accessory_id: str):
     """Delete an accessory profile"""
     try:
         user = get_current_user()
@@ -806,7 +810,7 @@ def create_combination():
 
 @equipment_bp.route('/api/equipment/combinations/<combination_id>', methods=['GET'])
 @user_required
-def get_combination(combination_id):
+def get_combination(combination_id: str):
     """Get a specific equipment combination"""
     try:
         user = get_current_user()
@@ -847,7 +851,7 @@ def get_combination(combination_id):
 
 @equipment_bp.route('/api/equipment/combinations/<combination_id>', methods=['PUT'])
 @user_required
-def update_combination(combination_id):
+def update_combination(combination_id: str):
     """Update an equipment combination"""
     try:
         user = get_current_user()
@@ -872,7 +876,7 @@ def update_combination(combination_id):
 
 @equipment_bp.route('/api/equipment/combinations/<combination_id>', methods=['DELETE'])
 @user_required
-def delete_combination(combination_id):
+def delete_combination(combination_id: str):
     """Delete an equipment combination"""
     try:
         user = get_current_user()

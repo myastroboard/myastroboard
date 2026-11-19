@@ -7,10 +7,12 @@ import json
 import os
 import re
 import uuid
+from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
+from matplotlib.axes import Axes
 
 from db import documents, queries
 from skytonight import skytonight_targets
@@ -21,6 +23,9 @@ from skytonight.skytonight_calculator import (
     _meridian_transit_time,
 )
 from utils.logging_config import get_logger
+
+if TYPE_CHECKING:
+    from utils.i18n_utils import I18nManager
 
 logger = get_logger(__name__)
 
@@ -128,7 +133,9 @@ def _parse_utc(s: Any) -> datetime | None:
         return None
 
 
-def _clip_alttime_series(times_utc, altitudes, start_dt, end_dt):
+def _clip_alttime_series(
+    times_utc: list[Any], altitudes: list[Any], start_dt: datetime, end_dt: datetime
+) -> tuple[Any, ...]:
     """Clip parallel (time, altitude) arrays to [start_dt, end_dt], interpolating the boundary points."""
     if not times_utc or not altitudes or not start_dt or not end_dt or start_dt >= end_dt:
         return [], []
@@ -140,7 +147,7 @@ def _clip_alttime_series(times_utc, altitudes, start_dt, end_dt):
     if not pts:
         return [], []
 
-    def _lerp(p0, p1, x):
+    def _lerp(p0: tuple[Any, ...], p1: tuple[Any, ...], x: datetime) -> tuple[Any, ...]:
         span = (p1[0] - p0[0]).total_seconds()
         assert span > 0, (
             f'Invariant violated: interpolation points must be strictly increasing in time; '
@@ -567,7 +574,7 @@ def list_user_plan_combination_ids(user_id: str) -> list[str | None]:
     ]
 
 
-def _default_payload(user_id: str, username: str | None = None) -> dict:
+def _default_payload(user_id: str, username: str | None = None) -> dict[str, Any]:
     return {
         'user_id': user_id,
         'username': username or 'unknown',
@@ -577,7 +584,7 @@ def _default_payload(user_id: str, username: str | None = None) -> dict:
     }
 
 
-def load_user_plan(user_id: str, username: str | None = None, combination_id: str | None = None) -> dict:
+def load_user_plan(user_id: str, username: str | None = None, combination_id: str | None = None) -> dict[str, Any]:
     if not _is_valid_user_id(user_id):
         raise ValueError(f'Invalid user_id format: {user_id!r}')
     try:
@@ -630,7 +637,9 @@ def validate_plan_data(payload: Any) -> tuple[bool, str]:
     return True, ''
 
 
-def save_user_plan(user_id: str, payload: dict, username: str | None = None, combination_id: str | None = None) -> bool:
+def save_user_plan(
+    user_id: str, payload: dict[str, Any], username: str | None = None, combination_id: str | None = None
+) -> bool:
     """Validate and store one plan (one transaction, nothing half-written)."""
     if not _is_valid_user_id(user_id):
         raise ValueError(f'Invalid user_id format: {user_id!r}')
@@ -668,7 +677,7 @@ def _target_aliases(catalogue: str, name: str) -> dict[str, str]:
     return aliases if isinstance(aliases, dict) else {}
 
 
-def _entry_matches(entry: dict, catalogue: str, name: str) -> bool:
+def _entry_matches(entry: dict[str, Any], catalogue: str, name: str) -> bool:
     requested_group = _target_group_id(catalogue, name)
     if requested_group and entry.get('catalogue_group_id') == requested_group:
         return True
@@ -686,7 +695,7 @@ def _entry_matches(entry: dict, catalogue: str, name: str) -> bool:
     return False
 
 
-def is_target_in_entries(plan_entries: list, catalogue: str, name: str) -> bool:
+def is_target_in_entries(plan_entries: list[Any], catalogue: str, name: str) -> bool:
     """Check if a target matches any of the given pre-loaded plan entries.
 
     Avoids repeated disk reads when checking many items against the same plan
@@ -740,7 +749,7 @@ def _minutes_to_hhmm(minutes: int) -> str:
     return f'{hours:02d}:{remainder:02d}'
 
 
-def get_plan_state(plan: dict | None, now_dt: datetime | None = None) -> str:
+def get_plan_state(plan: dict[str, Any] | None, now_dt: datetime | None = None) -> str:
     if not plan:
         return 'none'
 
@@ -752,7 +761,7 @@ def get_plan_state(plan: dict | None, now_dt: datetime | None = None) -> str:
     return 'current'
 
 
-def _build_target_payload(item_data: dict, catalogue: str) -> dict:
+def _build_target_payload(item_data: dict[str, Any], catalogue: str) -> dict[str, Any]:
     item_name = str(item_data.get('name') or item_data.get('id') or item_data.get('target name') or '').strip()
     group_id = _target_group_id(catalogue, item_name)
     aliases = _target_aliases(catalogue, item_name)
@@ -793,7 +802,7 @@ def _build_target_payload(item_data: dict, catalogue: str) -> dict:
 def create_or_add_target(
     user_id: str,
     username: str,
-    item_data: dict,
+    item_data: dict[str, Any],
     catalogue: str,
     night_start: Any,
     night_end: Any,
@@ -802,7 +811,7 @@ def create_or_add_target(
     combination_name: str | None = None,
     location_id: str | None = None,
     location_name: str | None = None,
-) -> tuple[bool, str, dict | None, dict | None]:
+) -> tuple[bool, str, dict[str, Any] | None, dict[str, Any] | None]:
     payload = load_user_plan(user_id, username, combination_id=combination_id)
     plan = payload.get('plan')
     now_dt = _now()
@@ -871,7 +880,7 @@ def clear_all_plans(user_id: str) -> int:
     return deleted
 
 
-def _iter_all_plans():
+def _iter_all_plans() -> Iterator[tuple[str, str, dict[str, Any]]]:
     """``(user_id, doc_key, plan)`` for every stored plan dict (all users)."""
     for user_id, doc_key, payload in documents.list_documents(PLAN_KIND):
         plan = payload.get('plan') if isinstance(payload, dict) else None
@@ -959,8 +968,8 @@ def remove_target(user_id: str, username: str, entry_id: str, combination_id: st
 
 
 def update_target(
-    user_id: str, username: str, entry_id: str, updates: dict, combination_id: str | None = None
-) -> dict | None:
+    user_id: str, username: str, entry_id: str, updates: dict[str, Any], combination_id: str | None = None
+) -> dict[str, Any] | None:
     payload = load_user_plan(user_id, username, combination_id=combination_id)
     plan = payload.get('plan')
     if not plan:
@@ -1001,7 +1010,9 @@ def update_target(
     return target_entry
 
 
-def update_plan_meta(user_id: str, username: str, updates: dict, combination_id: str | None = None) -> dict | None:
+def update_plan_meta(
+    user_id: str, username: str, updates: dict[str, Any], combination_id: str | None = None
+) -> dict[str, Any] | None:
     """Update plan-level metadata fields (e.g. start_delay_minutes)."""
     payload = load_user_plan(user_id, username, combination_id=combination_id)
     plan = payload.get('plan')
@@ -1051,7 +1062,7 @@ def reorder_target(
     return save_user_plan(user_id, payload, username=username, combination_id=combination_id)
 
 
-def pick_active_plan(user_id: str, username: str) -> dict | None:
+def pick_active_plan(user_id: str, username: str) -> dict[str, Any] | None:
     """Return the most relevant plan payload across all of the user's plan files.
 
     Plans are stored per combination, so every plan file (default and combination-specific)
@@ -1095,7 +1106,7 @@ def pick_active_plan(user_id: str, username: str) -> dict | None:
     return candidates[0]
 
 
-def get_plan_with_timeline(user_id: str, username: str, combination_id: str | None = None) -> dict:
+def get_plan_with_timeline(user_id: str, username: str, combination_id: str | None = None) -> dict[str, Any]:
     payload = load_user_plan(user_id, username, combination_id=combination_id)
     plan = payload.get('plan')
     if not plan:
@@ -1373,7 +1384,7 @@ def apply_optimized_schedule(
     return save_user_plan(user_id, payload, username=username, combination_id=combination_id)
 
 
-def _csv_normalize_ra(val) -> str:
+def _csv_normalize_ra(val: str | None) -> str:
     """Normalize RA to HH:MM:SS (J2000 sexagesimal)."""
     if val is None:
         return ''
@@ -1396,7 +1407,7 @@ def _csv_normalize_ra(val) -> str:
         return s
 
 
-def _csv_normalize_dec(val) -> str:
+def _csv_normalize_dec(val: str | None) -> str:
     """Normalize Dec to ±DD:MM:SS (J2000 sexagesimal)."""
     if val is None:
         return ''
@@ -1424,7 +1435,7 @@ def _csv_normalize_dec(val) -> str:
         return s
 
 
-def _csv_fmt_local_hm(iso_str) -> str:
+def _csv_fmt_local_hm(iso_str: str | None) -> str:
     """Format an ISO datetime string as local HH:MM."""
     if not iso_str:
         return ''
@@ -1434,7 +1445,7 @@ def _csv_fmt_local_hm(iso_str) -> str:
         return str(iso_str)
 
 
-def _csv_fmt_observable_pct(val) -> str:
+def _csv_fmt_observable_pct(val: float | str | None) -> str:
     """Format a 0-1 fraction as an integer percentage string."""
     if val is None or val == '':
         return ''
@@ -1444,7 +1455,7 @@ def _csv_fmt_observable_pct(val) -> str:
         return str(val)
 
 
-def serialize_plan_csv(plan_payload: dict, labels: dict[str, str] | None = None) -> str:
+def serialize_plan_csv(plan_payload: dict[str, Any], labels: dict[str, str] | None = None) -> str:
     labels = labels or {}
 
     def _label(key: str, fallback: str) -> str:
@@ -1500,7 +1511,7 @@ def serialize_plan_csv(plan_payload: dict, labels: dict[str, str] | None = None)
     return output.getvalue()
 
 
-def get_all_plan_states(user_id: str, username: str, combinations: list) -> list:
+def get_all_plan_states(user_id: str, username: str, combinations: list[Any]) -> list[Any]:
     """Return a list of plan summaries for each combination plus the default (no-combination) plan.
 
     Each element: {combination_id, combination_name, state, entries_count, night_start, night_end,
@@ -1530,7 +1541,7 @@ def get_all_plan_states(user_id: str, username: str, combinations: list) -> list
             }
         )
 
-    known_ids: set = set()
+    known_ids: set[Any] = set()
     for combination in combinations:
         cid = combination.get('id')
         cname = combination.get('name', '')
@@ -1592,7 +1603,7 @@ def get_all_plan_states(user_id: str, username: str, combinations: list) -> list
 # ---------------------------------------------------------------------------
 
 
-def generate_plan_pdf(payload: dict, metrics: dict, i18n_manager) -> io.BytesIO:
+def generate_plan_pdf(payload: dict[str, Any], metrics: dict[str, Any], i18n_manager: I18nManager) -> io.BytesIO:
     """Render the observation plan as a print-friendly A4 PDF.
 
     Parameters
@@ -1659,7 +1670,7 @@ def generate_plan_pdf(payload: dict, metrics: dict, i18n_manager) -> io.BytesIO:
         dt = _parse_utc(iso_str)
         return dt.strftime('%B %d, %Y') if dt else '?'
 
-    def _fmt_min(minutes) -> str:
+    def _fmt_min(minutes: int) -> str:
         m = max(0, int(minutes))
         return f"{m // 60}h{m % 60:02d}"
 
@@ -1683,7 +1694,7 @@ def generate_plan_pdf(payload: dict, metrics: dict, i18n_manager) -> io.BytesIO:
         _tz_name = 'UTC'
 
     # ── shared header / footer ───────────────────────────────────────────────
-    def _render_header(ax, subtitle: str = '') -> None:
+    def _render_header(ax: Axes, subtitle: str = '') -> None:
         ax.axis('off')
         ax.set_facecolor(C_HDR_BG)
         ax.text(
@@ -1715,7 +1726,7 @@ def generate_plan_pdf(payload: dict, metrics: dict, i18n_manager) -> io.BytesIO:
             0.985, 0.5, 'myastroboard.org', va='center', ha='right', fontsize=8, color='#8898cc', transform=ax.transAxes
         )
 
-    def _render_footer(ax) -> None:
+    def _render_footer(ax: Axes) -> None:
         ax.axis('off')
         ax.set_facecolor(C_HDR_BG)
         ax.text(
@@ -1739,7 +1750,7 @@ def generate_plan_pdf(payload: dict, metrics: dict, i18n_manager) -> io.BytesIO:
         t('plan_my_night.export_pdf_constellation') or 'Constellation',
     ]
 
-    def _render_col_headers(ax, y: float) -> float:
+    def _render_col_headers(ax: Axes, y: float) -> float:
         for cx, cl in zip(COL_X, COL_H, strict=False):
             ax.text(
                 cx, y, cl, va='top', ha='left', fontsize=7, color=C_TXT_MID, fontweight='bold', transform=ax.transAxes
@@ -1750,7 +1761,7 @@ def generate_plan_pdf(payload: dict, metrics: dict, i18n_manager) -> io.BytesIO:
 
     ROW_H = 0.030  # compact fixed row height
 
-    def _render_entry_row(ax, abs_idx: int, entry: dict, y: float) -> None:
+    def _render_entry_row(ax: Axes, abs_idx: int, entry: dict[str, Any], y: float) -> None:
         color = PALETTE[abs_idx % len(PALETTE)]
         done = bool(entry.get('done'))
         name = (entry.get('name') or entry.get('target_name') or '?')[:26]
@@ -1807,7 +1818,7 @@ def generate_plan_pdf(payload: dict, metrics: dict, i18n_manager) -> io.BytesIO:
                 transform=ax.transAxes,
             )
 
-    def _setup_list_ax(ax) -> None:
+    def _setup_list_ax(ax: Axes) -> None:
         ax.set_facecolor(C_WHITE)
         ax.axis('off')
         ax.set_xlim(0, 1)

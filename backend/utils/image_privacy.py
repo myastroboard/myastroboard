@@ -21,6 +21,7 @@ maps, depth maps - each with its own EXIF). GIF has no EXIF/GPS in practice and 
 
 import io
 import os
+from typing import Any
 
 from PIL import Image
 
@@ -231,7 +232,7 @@ def _decodes(data: bytes) -> bool:
         return False
 
 
-def strip_stored_pictures(directories, dry_run: bool = False) -> dict:
+def strip_stored_pictures(directories: list[str], dry_run: bool = False) -> dict[str, Any]:
     """Strip the metadata of every picture already stored in ``directories`` (not recursive).
 
     For pictures uploaded before the upload stripping existed. Same lossless stripping as on

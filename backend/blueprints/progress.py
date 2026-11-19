@@ -11,7 +11,7 @@ the ephemeris-backed challenges (``observation/challenges.py``) are a separate r
 badges, which are instant, never wait for them.
 """
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from flask import Blueprint, jsonify, request
 
@@ -22,6 +22,9 @@ from utils.auth import get_current_user, login_required, user_manager
 from utils.logging_config import get_logger
 from utils.repo_config import get_all_locations, load_config
 from utils.route_helpers import _resolve_active_location
+
+if TYPE_CHECKING:
+    from utils.auth import User
 
 logger = get_logger(__name__)
 
@@ -43,7 +46,7 @@ def _location_bortle() -> dict[str, Any]:
         return {}
 
 
-def _user_facts(user) -> tuple[list, list, dict[str, Any]]:
+def _user_facts(user: User) -> tuple[list[Any], list[Any], dict[str, Any]]:
     """The caller's sessions, Astrodex items and the progress facts built from both."""
     sessions = _user_sessions(user)
     items = _user_astrodex_items(user)
@@ -51,7 +54,7 @@ def _user_facts(user) -> tuple[list, list, dict[str, Any]]:
     return sessions, items, facts
 
 
-def _user_preferences(user) -> dict[str, Any]:
+def _user_preferences(user: User) -> dict[str, Any]:
     preferences = user_manager.get_user_preferences(user.user_id)
     if _demo_mode.is_demo_session():
         preferences = _demo_mode.visitor_preferences(preferences)

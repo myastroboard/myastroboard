@@ -11,6 +11,8 @@ from datetime import date, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from flask import Flask
+
 from astroweather.sun_phases import SunService
 from skytonight.skytonight_calculator import load_calculation_results
 from skytonight.skytonight_storage import (
@@ -167,7 +169,7 @@ def resolve_schedule(config: dict[str, Any], now: datetime | None = None) -> Sky
     )
 
 
-def _set_calculation_progress_listener(listener):
+def _set_calculation_progress_listener(listener: Callable[..., Any] | None):
     """Have the calculator persist live progress via ``listener`` (None to stop).
 
     Only this worker runs the calculation, but status polls reach every
@@ -188,7 +190,7 @@ class SkyTonightScheduler:
         self,
         config_loader: Callable[[], dict[str, Any]],
         runner: Callable[[], dict[str, Any]],
-        app=None,
+        app: Flask | None = None,
         cache_ready_event: threading.Event | None = None,
     ):
         self.config_loader = config_loader

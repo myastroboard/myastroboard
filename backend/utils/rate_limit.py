@@ -9,6 +9,7 @@ existing OTP and connector rate limiters accept.
 import time
 from collections import deque
 from threading import Lock
+from typing import Any
 
 
 class SlidingWindowCounter:
@@ -21,9 +22,9 @@ class SlidingWindowCounter:
         self.max_events = max_events
         self.window_seconds = window_seconds
         self._lock = Lock()
-        self._events: dict[str, deque] = {}
+        self._events: dict[str, deque[Any]] = {}
 
-    def _expire(self, hits: deque, now: float) -> None:
+    def _expire(self, hits: deque[Any], now: float) -> None:
         while hits and hits[0] <= now - self.window_seconds:
             hits.popleft()
 

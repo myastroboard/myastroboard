@@ -17,6 +17,7 @@ AllSky's live in ``blueprints/connectors_allsky.py``. See docs/MYASTROSHINE.md.
 
 import ipaddress
 import socket
+from typing import Any
 from urllib.parse import urlparse
 
 import requests
@@ -41,7 +42,7 @@ class MyAstroShineConnector(BaseConnector):
     target_modules = ["astrodex"]
 
     # No independently-toggleable features: the round-trip is the whole connector.
-    MODULES: list[dict] = []
+    MODULES: list[dict[str, Any]] = []
 
     SECRET_FIELDS = ("token", "signing_secret")
 
@@ -68,7 +69,7 @@ class MyAstroShineConnector(BaseConnector):
         """A URL alone is not enough — without both credentials no handoff can be signed."""
         return bool(self.base_url and self.config.get("token") and self.config.get("signing_secret"))
 
-    def health_check(self) -> dict:
+    def health_check(self) -> dict[str, Any]:
         """Probe ``<url>/api/health``.
 
         MyAstroShine is LAN-only: "unreachable" is expected and normal when the board runs on

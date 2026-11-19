@@ -603,13 +603,15 @@ Full details live in [CONTRIBUTING.md](../../CONTRIBUTING.md#before-submitting) 
 pytest                              # full test suite
 ruff format .                       # Python formatting (120-char lines, quotes left as written)
 ruff check .                        # Python linting (pyproject.toml extends .github/org/ruff.base.toml)
-pyright backend/                    # static type checking (reads pyrightconfig.json at repo root)
+pyright                             # type checking: backend/ + scripts/, from pyrightconfig.json
 djlint templates/ static/offline.html --profile jinja --lint --ignore H021,H023,H030,H031,J004,J018
 ```
 
 - `ruff` is declared in `requirements-dev.txt` and covers the whole repository; CI runs both commands on every push.
-- `pyright` stays scoped to `backend/` only - test code's heavy use of `monkeypatch`/`MagicMock`/dynamic attributes would drown real findings in false positives.
-- `pyright` mirrors the Pylance errors shown inline in VSCode - a clean `pyright backend/` run means Pylance should be clean too. If VSCode still shows stale errors after a config edit, run "Python: Restart Language Server".
+- `pyright` runs bare: `pyrightconfig.json` extends the organization baseline (`.github/org/pyright.base.json`, synced - never edit it) and sets the scope to `backend/` and `scripts/`. It must report **0 errors and 0 warnings**, with the baseline unrelaxed: every parameter annotated, generics with their type arguments (`dict[str, Any]`, not `dict`). A type used only in annotations whose import would close a cycle (`User` from `utils.auth`, the schedulers) is imported under `if TYPE_CHECKING:` - annotations are evaluated lazily on Python 3.15.
+- `tests/` stays **out** of the pyright scope, by choice: measured 2026-11-19, it gives 1,551 errors (mostly `Optional` subscripts on `get_json()` results and `MagicMock` attributes) that would drown real findings. ruff still covers it.
+- Suppressions name the rule, with a one-line comment above giving the reason: `# pyright: ignore[reportArgumentType]`. Never a bare `# type: ignore`; pyright reports dead ones (`reportUnnecessaryTypeIgnoreComment`) and dead `cast()` calls (`reportUnnecessaryCast`) as errors. Nearly all existing ones mark untyped library internals: astropy's dynamic attributes (`SkyCoord.alt`, `Time.jd`) and skyfield's (`Angle.degrees`, `VectorSum.at()`).
+- `pyright` mirrors the Pylance errors shown inline in VSCode - a clean `pyright` run means Pylance should be clean too. If VSCode still shows stale errors after a config edit, run "Python: Restart Language Server".
 - `djlint` lints `templates/` (Jinja2) and `static/offline.html`; the ignored rule codes are explained in [CONTRIBUTING.md](../../CONTRIBUTING.md#ignored-rules-and-why) - do not silently add more ignores without documenting why there.
 - JavaScript has no standalone lint step: formatting is applied on save by VSCode's built-in formatter (`.vscode/settings.json` + `.editorconfig`). Just make sure the file was opened/saved in VSCode, or match the existing 4-space/single-quote style by hand.
 
@@ -628,7 +630,7 @@ Update `EXPECTED_ROUTES` in that file to match, and document the change in `CHAN
 - [ ] `pytest` passes
 - [ ] `ruff format --check .` produces no diff
 - [ ] `ruff check .` reports no issues
-- [ ] `pyright backend/` reports no errors
+- [ ] `pyright` reports no errors
 - [ ] `djlint` passes for any touched template
 - [ ] `pytest tests/blueprints/test_route_inventory.py` passes if routes changed
 - [ ] The organization standards' definition of done (section 14): changelog entry, English and

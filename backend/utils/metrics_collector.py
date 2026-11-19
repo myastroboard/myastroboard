@@ -8,7 +8,7 @@ import platform
 import threading
 import time
 from datetime import datetime
-from typing import TypedDict
+from typing import Any, TypedDict
 
 import psutil
 
@@ -28,7 +28,7 @@ logger = get_logger(__name__)
 
 
 class _MetricsCache(TypedDict):
-    data: dict | None
+    data: dict[str, Any] | None
     ts: float
 
 
@@ -87,7 +87,7 @@ def is_running_in_container():
     return False, None
 
 
-def get_folder_disk_usage(folder_path):
+def get_folder_disk_usage(folder_path: str):
     """
     Calculate total disk usage for a folder and its subfolders.
     Returns size in bytes or None if folder doesn't exist.
@@ -114,7 +114,7 @@ def get_folder_disk_usage(folder_path):
     return total_size
 
 
-def _compute_disk_space_details():
+def _compute_disk_space_details() -> dict[str, Any]:
     """
     Get detailed disk space information for important folders.
     Returns dict with folder paths, sizes, and percentages of root filesystem.
@@ -167,7 +167,7 @@ def _compute_disk_space_details():
 
 
 class _DiskDetailsCache(TypedDict):
-    data: dict | None
+    data: dict[str, Any] | None
     ts: float
     refreshing: bool
 
@@ -182,7 +182,7 @@ _disk_details_cache: _DiskDetailsCache = {'data': None, 'ts': 0.0, 'refreshing':
 _DISK_DETAILS_CACHE_TTL = 300.0
 
 
-def _pending_disk_space_details():
+def _pending_disk_space_details() -> dict[str, Any]:
     """Placeholder returned while the first background scan is still running.
 
     Keeps /api/metrics fast on a cold cache; a later poll picks up the real
@@ -207,7 +207,7 @@ def prime_disk_space_details_cache():
     threading.Thread(target=_refresh_disk_details_cache, daemon=True).start()
 
 
-def get_disk_space_details(block_if_cold: bool = True):
+def get_disk_space_details(block_if_cold: bool = True) -> dict[str, Any]:
     """
     Disk space details, served from a background-refreshed cache so a slow
     recursive scan never blocks the /api/metrics request. Returns the last
@@ -252,7 +252,7 @@ def _refresh_disk_details_cache():
             _disk_details_cache['refreshing'] = False
 
 
-def get_environment_processes():
+def get_environment_processes() -> list[Any]:
     """
     Collect all visible processes with useful details for diagnostics.
     Returns a list sorted by CPU usage, then memory usage.
@@ -309,7 +309,7 @@ def get_environment_processes():
     return processes
 
 
-def detect_docker_in_docker(processes):
+def detect_docker_in_docker(processes: list[Any]) -> dict[str, Any]:
     """
     Best-effort Docker-in-Docker detection using process and socket hints.
     """
@@ -343,7 +343,7 @@ def _database_status():
         return None
 
 
-def collect_metrics():
+def collect_metrics() -> dict[str, Any]:
     """
     Collect all system metrics with container/VM detection.
     Returns comprehensive metrics dictionary. Result is cached for 30 seconds

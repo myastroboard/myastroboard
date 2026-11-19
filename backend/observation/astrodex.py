@@ -8,6 +8,7 @@ import os
 import re
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
 from constellation import Constellation
 
@@ -35,7 +36,7 @@ MAX_EXTERNAL_ALIASES = 20
 MAX_EXTERNAL_ALIAS_STRING_LENGTH = 80
 
 
-def _sanitize_external_aliases(value) -> dict[str, str]:
+def _sanitize_external_aliases(value: str | dict[str, Any] | None) -> dict[str, str]:
     """Validate/clean a client-supplied external_aliases mapping (catalogue key -> name).
 
     Persists SIMBAD-derived alternate names (CommonName, HD, HIP, SAO, TYC, …) captured
@@ -154,7 +155,7 @@ def _get_alias_metadata(catalogue: str, object_name: str) -> tuple[str, dict[str
     return group_id, aliases
 
 
-def _get_item_alias_metadata(item: dict) -> tuple[str, dict[str, str]]:
+def _get_item_alias_metadata(item: dict[str, Any]) -> tuple[str, dict[str, str]]:
     """Get item aliases metadata from current aliases table (no persisted cache)."""
     inferred_group_id, inferred_aliases = _get_alias_metadata(item.get('catalogue', ''), item.get('name', ''))
     if inferred_aliases:
@@ -163,7 +164,7 @@ def _get_item_alias_metadata(item: dict) -> tuple[str, dict[str, str]]:
     return '', {}
 
 
-def _sanitize_item_for_persistence(item: dict) -> None:
+def _sanitize_item_for_persistence(item: dict[str, Any]) -> None:
     """Remove transient and unused fields from a persisted astrodex item."""
     if not isinstance(item, dict):
         return
@@ -172,7 +173,7 @@ def _sanitize_item_for_persistence(item: dict) -> None:
         item.pop(field_name, None)
 
 
-def _sanitize_astrodex_for_persistence(astrodex_data: dict) -> None:
+def _sanitize_astrodex_for_persistence(astrodex_data: dict[str, Any]) -> None:
     """Normalize astrodex payload before writing to disk."""
     if not isinstance(astrodex_data, dict):
         return
@@ -185,7 +186,7 @@ def _sanitize_astrodex_for_persistence(astrodex_data: dict) -> None:
         _sanitize_item_for_persistence(item)
 
 
-def _get_item_merge_key(item: dict) -> str:
+def _get_item_merge_key(item: dict[str, Any]) -> str:
     """Build a stable merge key for an astrodex item (aliases group first)."""
     group_id, aliases = _get_item_alias_metadata(item)
     if group_id:
@@ -203,7 +204,9 @@ def _get_item_merge_key(item: dict) -> str:
     return f"id:{item.get('id', '')}"
 
 
-def _attach_picture_owner_metadata(item: dict, owner_user_id: str, owner_username: str, current_user_id: str) -> None:
+def _attach_picture_owner_metadata(
+    item: dict[str, Any], owner_user_id: str, owner_username: str, current_user_id: str
+) -> None:
     """Attach ownership metadata to all pictures of an item for UI permissions."""
     pictures = item.get('pictures', [])
     if not isinstance(pictures, list):
@@ -221,7 +224,7 @@ def _attach_picture_owner_metadata(item: dict, owner_user_id: str, owner_usernam
 _PRIVATE_PICTURE_FIELDS = ('latitude', 'longitude', 'elevation')
 
 
-def _strip_private_picture_fields(picture: dict) -> dict:
+def _strip_private_picture_fields(picture: dict[str, Any]) -> dict[str, Any]:
     """Remove a picture's precise coordinates in place, keeping location_name.
 
     Coordinates are private to the picture's owner (v1.2) - the shared/merged
@@ -235,7 +238,7 @@ def _strip_private_picture_fields(picture: dict) -> dict:
     return picture
 
 
-def _build_stats_from_items(items: list[dict]) -> dict:
+def _build_stats_from_items(items: list[dict[str, Any]]) -> dict[str, Any]:
     """Build astrodex stats from an arbitrary visible items list."""
     total_items = len(items)
     items_with_pictures = sum(1 for item in items if item.get('pictures'))
@@ -255,11 +258,11 @@ def _build_stats_from_items(items: list[dict]) -> dict:
     }
 
 
-def load_all_users_astrodex(usernames_by_id: dict[str, str] | None = None) -> list[dict]:
+def load_all_users_astrodex(usernames_by_id: dict[str, str] | None = None) -> list[dict[str, Any]]:
     """Load astrodex collections for all users that have one."""
     usernames_by_id = usernames_by_id or {}
 
-    collections: list[dict] = []
+    collections: list[dict[str, Any]] = []
     for user_id, _doc_key, data in documents.list_documents(ASTRODEX_KIND):
         if not isinstance(data, dict):
             continue
@@ -282,7 +285,7 @@ def get_visible_astrodex(
     current_username: str | None = None,
     private_mode: bool = False,
     usernames_by_id: dict[str, str] | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """
     Return astrodex payload visible to current user.
 
@@ -293,7 +296,7 @@ def get_visible_astrodex(
     own_items = current_user.get('items', []) if isinstance(current_user.get('items', []), list) else []
 
     if private_mode:
-        visible_items: list[dict] = []
+        visible_items: list[dict[str, Any]] = []
         for raw_item in own_items:
             item = copy.deepcopy(raw_item)
             enrich_item_with_catalogue_aliases(item)
@@ -317,7 +320,7 @@ def get_visible_astrodex(
     usernames_by_id = usernames_by_id or {}
     all_collections = load_all_users_astrodex(usernames_by_id)
 
-    grouped: dict[str, list[dict]] = {}
+    grouped: dict[str, list[dict[str, Any]]] = {}
 
     for collection in all_collections:
         owner_user_id = collection.get('user_id', '')
@@ -333,7 +336,7 @@ def get_visible_astrodex(
             merge_key = _get_item_merge_key(item)
             grouped.setdefault(merge_key, []).append(item)
 
-    merged_items: list[dict] = []
+    merged_items: list[dict[str, Any]] = []
     for source_items in grouped.values():
         own_item = next((item for item in source_items if item.get('owner_user_id') == current_user_id), None)
         base_item = own_item or source_items[0]
@@ -341,7 +344,7 @@ def get_visible_astrodex(
         merged_item = copy.deepcopy(base_item)
         merged_item['is_owned_by_current_user'] = own_item is not None
 
-        merged_pictures: list[dict] = []
+        merged_pictures: list[dict[str, Any]] = []
         seen_picture_keys = set()
         for source_item in source_items:
             for picture in source_item.get('pictures', []):
@@ -386,7 +389,7 @@ def get_astrodex_map_points(
     current_username: str | None = None,
     map_private: bool = False,
     usernames_by_id: dict[str, str] | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """
     Return a flat list of geotagged Astrodex pictures for the Photo Map view.
 
@@ -411,7 +414,7 @@ def get_astrodex_map_points(
     else:
         collections = load_all_users_astrodex(usernames_by_id or {})
 
-    points: list[dict] = []
+    points: list[dict[str, Any]] = []
     total_without_location = 0
 
     for collection in collections:
@@ -466,7 +469,7 @@ def ensure_astrodex_directories():
     os.makedirs(ASTRODEX_IMAGES_DIR, exist_ok=True)
 
 
-def _empty_astrodex(user_id: str, username: str | None) -> dict:
+def _empty_astrodex(user_id: str, username: str | None) -> dict[str, Any]:
     return {
         'user_id': user_id,
         'username': username or 'unknown',
@@ -475,7 +478,7 @@ def _empty_astrodex(user_id: str, username: str | None) -> dict:
     }
 
 
-def load_user_astrodex(user_id: str, username: str | None = None) -> dict:
+def load_user_astrodex(user_id: str, username: str | None = None) -> dict[str, Any]:
     """Load a user's astrodex data using user UUID
 
     Args:
@@ -500,7 +503,7 @@ def load_user_astrodex(user_id: str, username: str | None = None) -> dict:
     return data
 
 
-def validate_astrodex_data(data) -> tuple[bool, str]:
+def validate_astrodex_data(data: list[int] | dict[str, Any]) -> tuple[bool, str]:
     """
     Validate an astrodex document before it is stored
 
@@ -528,7 +531,7 @@ def validate_astrodex_data(data) -> tuple[bool, str]:
     return True, ""
 
 
-def save_user_astrodex(user_id: str, astrodex_data: dict, username: str | None = None) -> bool:
+def save_user_astrodex(user_id: str, astrodex_data: dict[str, Any], username: str | None = None) -> bool:
     """
     Validate and store a user's astrodex data (one transaction, so nothing half-written)
 
@@ -560,7 +563,7 @@ def save_user_astrodex(user_id: str, astrodex_data: dict, username: str | None =
         return False
 
 
-def create_astrodex_item(user_id: str, item_data: dict, username: str | None = None) -> dict | None:
+def create_astrodex_item(user_id: str, item_data: dict[str, Any], username: str | None = None) -> dict[str, Any] | None:
     """
     Create a new item in user's astrodex
 
@@ -621,7 +624,7 @@ def create_astrodex_item(user_id: str, item_data: dict, username: str | None = N
     return None
 
 
-def get_astrodex_item(user_id: str, item_id: str) -> dict | None:
+def get_astrodex_item(user_id: str, item_id: str) -> dict[str, Any] | None:
     """Get a specific item from user's astrodex"""
     astrodex = load_user_astrodex(user_id)
 
@@ -662,7 +665,7 @@ def build_combination_photo_index(
     current_username: str | None = None,
     private_mode: bool = False,
     usernames_by_id: dict[str, str] | None = None,
-) -> dict[str, list[dict]]:
+) -> dict[str, list[dict[str, Any]]]:
     """Index every visible Astrodex picture by its combination_id (pictures with none are
     skipped). Reuses get_visible_astrodex()'s privacy rules (own-only vs merged-across-users),
     so combination photo stats never expose more than the rest of Astrodex already does.
@@ -672,7 +675,7 @@ def build_combination_photo_index(
     once per combination.
     """
     visible = get_visible_astrodex(current_user_id, current_username, private_mode, usernames_by_id)
-    index: dict[str, list[dict]] = {}
+    index: dict[str, list[dict[str, Any]]] = {}
     for item in visible.get('items', []):
         for picture in item.get('pictures', []):
             combination_id = picture.get('combination_id')
@@ -691,11 +694,11 @@ def get_pictures_for_combination(
     current_username: str | None = None,
     private_mode: bool = False,
     usernames_by_id: dict[str, str] | None = None,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Like build_combination_photo_index() but for a single combination_id - use this for the
     single-combination endpoint instead of indexing every other combination's pictures too."""
     visible = get_visible_astrodex(current_user_id, current_username, private_mode, usernames_by_id)
-    pictures: list[dict] = []
+    pictures: list[dict[str, Any]] = []
     for item in visible.get('items', []):
         for picture in item.get('pictures', []):
             if picture.get('combination_id') != combination_id:
@@ -707,7 +710,7 @@ def get_pictures_for_combination(
     return pictures
 
 
-def summarize_combination_pictures(pictures: list[dict]) -> dict:
+def summarize_combination_pictures(pictures: list[dict[str, Any]]) -> dict[str, Any]:
     """Compute {photo_count, average_rating, picture_refs} for one combination's pictures.
 
     average_rating is the mean of only the *rated* pictures (unrated ones count toward
@@ -738,7 +741,7 @@ def summarize_combination_pictures(pictures: list[dict]) -> dict:
     }
 
 
-def update_astrodex_item(user_id: str, item_id: str, updates: dict) -> dict | None:
+def update_astrodex_item(user_id: str, item_id: str, updates: dict[str, Any]) -> dict[str, Any] | None:
     """Update an existing item in user's astrodex"""
     astrodex = load_user_astrodex(user_id)
 
@@ -812,7 +815,7 @@ def delete_astrodex_item(user_id: str, item_id: str) -> bool:
     return False
 
 
-def add_picture_to_item(user_id: str, item_id: str, picture_data: dict) -> dict | None:
+def add_picture_to_item(user_id: str, item_id: str, picture_data: dict[str, Any]) -> dict[str, Any] | None:
     """
     Add a picture to an astrodex item
 
@@ -915,7 +918,7 @@ def add_picture_to_item(user_id: str, item_id: str, picture_data: dict) -> dict 
     return None
 
 
-def update_picture(user_id: str, item_id: str, picture_id: str, updates: dict) -> dict | None:
+def update_picture(user_id: str, item_id: str, picture_id: str, updates: dict[str, Any]) -> dict[str, Any] | None:
     """Update a picture in an astrodex item"""
     astrodex = load_user_astrodex(user_id)
 
@@ -1025,7 +1028,7 @@ def set_main_picture(user_id: str, item_id: str, picture_id: str) -> bool:
     return False
 
 
-def get_main_picture(item: dict) -> dict | None:
+def get_main_picture(item: dict[str, Any]) -> dict[str, Any] | None:
     """Get the main picture for an item, or None if no pictures"""
     if not item.get('pictures'):
         return None
@@ -1039,7 +1042,9 @@ def get_main_picture(item: dict) -> dict | None:
     return item['pictures'][0] if item['pictures'] else None
 
 
-def _find_matching_astrodex_item(items: list[dict], item_name: str, catalogue: str = '') -> dict | None:
+def _find_matching_astrodex_item(
+    items: list[dict[str, Any]], item_name: str, catalogue: str = ''
+) -> dict[str, Any] | None:
     """Return the first item in *items* that represents the same object as ``item_name``.
 
     Shared matching core behind ``is_item_in_astrodex*`` / ``find_item_in_astrodex``.
@@ -1057,8 +1062,8 @@ def _find_matching_astrodex_item(items: list[dict], item_name: str, catalogue: s
         _normalize_name(candidate) for candidate in requested_candidates if _normalize_name(candidate)
     }
 
-    requested_group_ids: set = set()
-    requested_alias_names: set = set()
+    requested_group_ids: set[Any] = set()
+    requested_alias_names: set[Any] = set()
     for candidate in requested_candidates or [item_name]:
         group_id, aliases = _get_alias_metadata(catalogue, candidate)
         if group_id:
@@ -1108,13 +1113,13 @@ def is_item_in_astrodex(user_id: str, item_name: str, catalogue: str = '') -> bo
     return is_item_in_astrodex_with_catalogue(user_id, item_name, catalogue)
 
 
-def find_item_in_astrodex(user_id: str, item_name: str, catalogue: str = '') -> dict | None:
+def find_item_in_astrodex(user_id: str, item_name: str, catalogue: str = '') -> dict[str, Any] | None:
     """Return the matching astrodex item (or None) — same matching rules as is_item_in_astrodex."""
     astrodex = load_user_astrodex(user_id)
     return _find_matching_astrodex_item(astrodex['items'], item_name, catalogue)
 
 
-def is_item_in_preloaded_astrodex(astrodex_data: dict, item_name: str, catalogue: str = '') -> bool:
+def is_item_in_preloaded_astrodex(astrodex_data: dict[str, Any], item_name: str, catalogue: str = '') -> bool:
     """Same logic as is_item_in_astrodex_with_catalogue but uses pre-loaded data.
 
     Avoids repeated disk reads when checking many items against the same
@@ -1124,7 +1129,7 @@ def is_item_in_preloaded_astrodex(astrodex_data: dict, item_name: str, catalogue
     return _find_matching_astrodex_item(items, item_name, catalogue) is not None
 
 
-def enrich_item_with_catalogue_aliases(item: dict) -> dict:
+def enrich_item_with_catalogue_aliases(item: dict[str, Any]) -> dict[str, Any]:
     """Attach aliases metadata at runtime (not persisted).
 
     Prefers the live SkyTonight DSO catalogue lookup; falls back to the item's own
@@ -1139,7 +1144,7 @@ def enrich_item_with_catalogue_aliases(item: dict) -> dict:
     return item
 
 
-def switch_item_catalogue_name(user_id: str, item_id: str, target_catalogue: str) -> dict | None:
+def switch_item_catalogue_name(user_id: str, item_id: str, target_catalogue: str) -> dict[str, Any] | None:
     """Switch displayed object name to one of its catalogue aliases."""
     astrodex = load_user_astrodex(user_id)
 
@@ -1189,7 +1194,7 @@ def switch_item_catalogue_name(user_id: str, item_id: str, target_catalogue: str
     return None
 
 
-def get_astrodex_stats(user_id: str) -> dict:
+def get_astrodex_stats(user_id: str) -> dict[str, Any]:
     """Get statistics about user's astrodex"""
     astrodex = load_user_astrodex(user_id)
     return _build_stats_from_items(astrodex['items'])

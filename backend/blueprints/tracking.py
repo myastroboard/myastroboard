@@ -50,7 +50,7 @@ def _safe_cache_path(base_dir: str, filename: str) -> str:
 
 @tracking_bp.route('/api/object/<path:identifier>', methods=['GET'])
 @login_required
-def get_object_info_api(identifier):
+def get_object_info_api(identifier: str):
     """Return metadata, image URL and localized description for a deep-sky object.
 
     Query parameters:
@@ -98,7 +98,7 @@ def get_object_info_api(identifier):
 
 @tracking_bp.route('/api/object-image/<filename>', methods=['GET'])
 @login_required
-def get_object_image_api(filename):
+def get_object_image_api(filename: str):
     """Serve a locally cached DSS2 (hips2fits) image, e.g. "10.684000_41.269000.jpg".
 
     Downloads from CDS hips2fits on first request (or renders it from a mirror of the
@@ -327,7 +327,7 @@ def get_spaceflight_events_api():
 
 @tracking_bp.route("/api/spaceflight/img/<filename>", methods=["GET"])
 @login_required
-def spaceflight_image(filename):
+def spaceflight_image(filename: str):
     """Serve a locally cached spaceflight/astronaut image.
     If the image file is missing but a .url sidecar exists, re-download it
     on the fly so stale cache entries pointing to deleted files self-heal.
@@ -367,7 +367,7 @@ def spaceflight_image(filename):
 
 @tracking_bp.route("/api/spaceflight/launch/<launch_id>/vidurls", methods=["GET"])
 @login_required
-def get_spaceflight_launch_vidurls(launch_id):
+def get_spaceflight_launch_vidurls(launch_id: str):
     """Return live video URLs for a specific launch from the LL2 detail endpoint.
     Results are cached in-process for 5 minutes to protect the free-tier rate limit.
     Only call this for launches where webcast_live=true."""

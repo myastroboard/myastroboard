@@ -28,6 +28,7 @@ import time
 import uuid
 from contextlib import contextmanager
 from datetime import UTC, datetime
+from typing import Any
 
 # The two AllSky cache TTLs are the connector's own, declared on its class.
 # connectors/ imports nothing from cache/, so this edge closes no cycle.
@@ -63,7 +64,7 @@ from utils.file_lock import interprocess_lock
 if sys.platform == "win32":
     import msvcrt
 
-    def _msvcrt_lock(fileno):
+    def _msvcrt_lock(fileno: int):
         """Acquire a 1-byte msvcrt lock, retrying past the default ~10s deadlock timeout.
 
         msvcrt.locking(LK_LOCK) raises OSError after ~10 blocked seconds; under brief
@@ -208,7 +209,7 @@ def _cache_file_write_lock():
 _cache_file_lock = _cache_file_write_lock
 
 
-def _read_shared_cache():
+def _read_shared_cache() -> dict[str, Any]:
     """Read shared cache file safely"""
     _ensure_data_dir()
     if not os.path.exists(_SHARED_CACHE_FILE):
@@ -221,7 +222,7 @@ def _read_shared_cache():
         return {}
 
 
-def _write_shared_cache(shared_cache):
+def _write_shared_cache(shared_cache: dict[str, Any]):
     """Write the shared cache file atomically (temp file + os.replace).
 
     Writers hold the exclusive lock, but an unlocked reader (e.g. get_cache_metrics)
@@ -235,7 +236,7 @@ def _write_shared_cache(shared_cache):
     os.replace(tmp_path, _SHARED_CACHE_FILE)
 
 
-def update_shared_cache_entry(key, data, timestamp):
+def update_shared_cache_entry(key: str, data: Any, timestamp: float):
     """Update a single shared cache entry"""
     with _cache_file_lock():
         shared_cache = _read_shared_cache()
@@ -243,7 +244,7 @@ def update_shared_cache_entry(key, data, timestamp):
         _write_shared_cache(shared_cache)
 
 
-def load_shared_cache_entry(key):
+def load_shared_cache_entry(key: str) -> dict[str, Any] | None:
     """Load a single cache entry from shared cache"""
     with _cache_file_read_lock():
         shared_cache = _read_shared_cache()
@@ -255,7 +256,7 @@ def load_shared_cache_entry(key):
         return entry
 
 
-def sync_cache_from_shared(key, cache_entry):
+def sync_cache_from_shared(key: str, cache_entry: dict[str, Any]):
     """Sync in-memory cache entry from shared cache file"""
     entry = load_shared_cache_entry(key)
     if not entry or entry.get("data") is None:
@@ -265,7 +266,7 @@ def sync_cache_from_shared(key, cache_entry):
     return True
 
 
-def get_version_update_cache_entry():
+def get_version_update_cache_entry() -> dict[str, Any]:
     """Return the mutable cache entry used by version checker."""
     return _version_update_cache
 
@@ -275,12 +276,12 @@ def get_version_update_cache_entry():
 # ---------------------------------------------------------------------------
 
 
-def location_cache_key(name, location_id):
+def location_cache_key(name: str, location_id: str | None):
     """On-disk shared-cache key for a (cache name, location preset id) pair."""
     return f"{name}:{location_id}"
 
 
-def get_location_cache_entry(name, location_id):
+def get_location_cache_entry(name: str, location_id: str | None) -> dict[str, Any]:
     """Return the mutable in-memory entry for (name, location), creating it if needed."""
     if name not in _location_caches:
         raise KeyError(f"Unknown location-scoped cache: {name}")
@@ -290,7 +291,7 @@ def get_location_cache_entry(name, location_id):
     return slots[location_id]
 
 
-def load_location_cache(name, location_id):
+def load_location_cache(name: str, location_id: str | None) -> dict[str, Any]:
     """Return the (name, location) entry, syncing from the shared file when the
     in-memory copy is empty or older than the persisted one."""
     entry = get_location_cache_entry(name, location_id)
@@ -301,7 +302,7 @@ def load_location_cache(name, location_id):
     return entry
 
 
-def update_location_cache(name, location_id, data, timestamp=None):
+def update_location_cache(name: str, location_id: str, data: Any, timestamp: float | None = None) -> dict[str, Any]:
     """Write a (name, location) cache entry to memory and to the shared file."""
     entry = get_location_cache_entry(name, location_id)
     entry["data"] = data
@@ -310,7 +311,7 @@ def update_location_cache(name, location_id, data, timestamp=None):
     return entry
 
 
-def reset_caches_for_location(location_id):
+def reset_caches_for_location(location_id: str):
     """Invalidate every location-scoped cache slot for one preset only.
 
     Called when a preset's coordinates/timezone change - other presets' caches
@@ -326,7 +327,7 @@ def reset_caches_for_location(location_id):
         _write_shared_cache(shared)
 
 
-def drop_location_caches(location_id):
+def drop_location_caches(location_id: str):
     """Remove all cache slots and the tracked signature for a deleted preset."""
     for name in _location_caches:
         _location_caches[name].pop(location_id, None)
@@ -339,7 +340,7 @@ def drop_location_caches(location_id):
     remove_location_signature(location_id)
 
 
-def migrate_legacy_cache_keys(location_id):
+def migrate_legacy_cache_keys(location_id: str):
     """One-time upgrade: move pre-v1.2 global cache keys onto a location id.
 
     Renames plain keys (e.g. ``"sun_report"``) to ``"sun_report:<id>"`` in the
@@ -432,7 +433,7 @@ def _location_signatures_write():
 _load_location_signatures()
 
 
-def get_current_location_signature(location_config):
+def get_current_location_signature(location_config: dict[str, Any] | None) -> dict[str, Any] | None:
     """Create a signature of location parameters for change detection"""
     if not location_config:
         return None
@@ -444,14 +445,14 @@ def get_current_location_signature(location_config):
     }
 
 
-def _signature_slot(location_config):
+def _signature_slot(location_config: dict[str, Any] | None) -> str:
     """Signature dict key for a location payload: its preset id, or the legacy slot."""
     if isinstance(location_config, dict) and location_config.get("id"):
         return location_config["id"]
     return _LEGACY_SIGNATURE_KEY
 
 
-def has_location_changed(new_location_config):
+def has_location_changed(new_location_config: dict[str, Any] | None) -> bool:
     """Check if location parameters have changed (per preset id).
 
     Accepts either a v1.2 preset dict (compared against its own id's stored
@@ -478,14 +479,14 @@ def has_location_changed(new_location_config):
     )
 
 
-def is_location_tracked(location_config):
+def is_location_tracked(location_config: dict[str, Any]):
     """Return True when a signature is already stored for this location."""
     _refresh_location_signatures()
     stored = _last_known_location_signatures.get(_signature_slot(location_config))
     return bool(stored) and stored.get("latitude") is not None
 
 
-def update_location_config(new_location_config):
+def update_location_config(new_location_config: dict[str, Any] | None):
     """Update the tracked signature for this location and persist to disk"""
     signature = get_current_location_signature(new_location_config)
     if signature:
@@ -494,14 +495,14 @@ def update_location_config(new_location_config):
             _save_location_signatures()
 
 
-def remove_location_signature(location_id):
+def remove_location_signature(location_id: str):
     """Forget the tracked signature of a deleted preset."""
     with _location_signatures_write():
         if _last_known_location_signatures.pop(location_id, None) is not None:
             _save_location_signatures()
 
 
-def pop_legacy_location_signature():
+def pop_legacy_location_signature() -> dict[str, Any] | None:
     """Return and clear the pre-v1.2 flat signature (upgrade path helper)."""
     with _location_signatures_write():
         legacy = _last_known_location_signatures.pop(_LEGACY_SIGNATURE_KEY, None)
@@ -510,7 +511,7 @@ def pop_legacy_location_signature():
     return legacy
 
 
-def is_cache_valid(cache_entry, ttl_seconds):
+def is_cache_valid(cache_entry: dict[str, Any], ttl_seconds: int) -> bool:
     """Check if a cache entry is still valid based on TTL"""
     if not cache_entry or cache_entry["data"] is None:
         return False
@@ -521,7 +522,7 @@ def is_cache_valid(cache_entry, ttl_seconds):
     return elapsed < ttl_seconds
 
 
-def is_cache_valid_for_today(cache_entry, ttl_seconds, tz_name=None):
+def is_cache_valid_for_today(cache_entry: dict[str, Any], ttl_seconds: int, tz_name: str | None = None):
     """Like is_cache_valid, but also invalidates when the calendar day has changed.
 
     Use this for caches that are computed for 'today' (sun report, horizon graph,
@@ -547,7 +548,7 @@ def is_cache_valid_for_today(cache_entry, ttl_seconds, tz_name=None):
     return cache_date == datetime.now(tz).date()
 
 
-def _default_status_location_ids():
+def _default_status_location_ids() -> list[Any]:
     """Location ids the readiness/status checks should cover (lazy config read)."""
     try:
         from utils.repo_config import get_scheduler_locations, load_config
@@ -578,7 +579,7 @@ def _allsky_job_availability():
     return bool(allsky_cfg.get("enabled") and allsky_cfg.get("url"))
 
 
-def _sync_all_from_shared():
+def _sync_all_from_shared() -> dict[str, Any]:
     """Read astro_cache.json ONCE and sync all in-memory caches in a single pass."""
     with _cache_file_read_lock():
         shared = _read_shared_cache()
@@ -601,7 +602,7 @@ def _sync_all_from_shared():
     return shared
 
 
-def is_astronomical_cache_ready(location_ids=None):
+def is_astronomical_cache_ready(location_ids: list[Any] | None = None) -> bool:
     """Check if all astronomical caches are valid and ready.
 
     Covers every location the scheduler keeps warm (or the explicit
@@ -626,7 +627,7 @@ def is_astronomical_cache_ready(location_ids=None):
     )
 
 
-def _is_execution_metrics_valid(job_name, ttl):
+def _is_execution_metrics_valid(job_name: str, ttl: int) -> bool:
     """Check cache validity from persisted execution metrics.
 
     Allsky caches are in-memory only (no shared-file sync), so in multi-worker
@@ -649,7 +650,7 @@ def _is_execution_metrics_valid(job_name, ttl):
         return False
 
 
-def get_cache_init_status(location_ids=None):
+def get_cache_init_status(location_ids: list[Any] | None = None) -> dict[str, bool]:
     """Get detailed cache initialization status.
 
     Top-level per-cache booleans reflect the install default location (first id
@@ -677,14 +678,14 @@ def get_cache_init_status(location_ids=None):
         if total_steps > 0:
             progress_percent = int((current_step / total_steps) * 100)
 
-    def _loc_valid(name, location_id):
+    def _loc_valid(name: str, location_id: str | None) -> bool:
         if location_id is None:
             return False
         return is_cache_valid(get_location_cache_entry(name, location_id), LOCATION_SCOPED_CACHE_TTLS[name])
 
     allsky_health_available = _allsky_job_availability()
 
-    status = {name: _loc_valid(name, primary_id) for name in LOCATION_SCOPED_CACHE_TTLS}
+    status: dict[str, Any] = {name: _loc_valid(name, primary_id) for name in LOCATION_SCOPED_CACHE_TTLS}
     status.update(
         {
             "spaceflight_launches": is_cache_valid(_spaceflight_launches_cache, CACHE_TTL_SPACEFLIGHT_LAUNCHES),
@@ -731,7 +732,7 @@ def get_cache_init_status(location_ids=None):
     return status
 
 
-def set_cache_initialization_in_progress(value, current_step=0, total_steps=0, step_name=""):
+def set_cache_initialization_in_progress(value: bool, current_step: int = 0, total_steps: int = 0, step_name: str = ""):
     """Set the cache initialization progress flag in shared cache for cross-worker visibility"""
     with _cache_file_write_lock():
         shared_cache = _read_shared_cache()
@@ -745,7 +746,7 @@ def set_cache_initialization_in_progress(value, current_step=0, total_steps=0, s
         _write_shared_cache(shared_cache)
 
 
-def record_cache_execution(job_name, duration_seconds, success, location_id=None):
+def record_cache_execution(job_name: str, duration_seconds: float, success: bool, location_id: str | None = None):
     """Persist per-job execution timing and result to shared cache for metrics reporting.
 
     ``job_name`` is the (possibly location-suffixed) job label used across the
@@ -766,7 +767,7 @@ def record_cache_execution(job_name, duration_seconds, success, location_id=None
         _write_shared_cache(shared)
 
 
-def get_cache_metrics():
+def get_cache_metrics() -> dict[str, Any]:
     """Return per-job execution metrics from shared cache."""
     with _cache_file_read_lock():
         shared = _read_shared_cache()

@@ -9,13 +9,13 @@ import pytest
 if 'psutil' not in sys.modules:
     sys.modules['psutil'] = types.ModuleType('psutil')
 
-import app as app_module  # type: ignore[import-not-found]
-from blueprints import skytonight_api as skytonight_api_module  # type: ignore[import-not-found]
-from utils.auth import user_manager  # type: ignore[import-not-found]
+import app as app_module
+from blueprints import skytonight_api as skytonight_api_module
+from utils.auth import user_manager
 
 app = app_module.app
-from observation import visibility_calendar as visibility_calendar_module  # type: ignore[import-not-found]
-from skytonight.skytonight_models import SkyTonightTarget  # type: ignore[import-not-found]
+from observation import visibility_calendar as visibility_calendar_module
+from skytonight.skytonight_models import SkyTonightTarget
 
 
 @pytest.fixture
@@ -389,7 +389,8 @@ class TestResolveSourceCatalogue:
     def test_none_catalogue_names_returns_skytonight(self):
         """catalogue_names is None → return 'SkyTonight'."""
         _resolve_source_catalogue = skytonight_api_module._resolve_source_catalogue
-        assert _resolve_source_catalogue(None, 'M 31') == 'SkyTonight'  # type: ignore
+        # the test passes a deliberately invalid value
+        assert _resolve_source_catalogue(None, 'M 31') == 'SkyTonight'  # pyright: ignore[reportArgumentType]
 
     def test_matching_catalogue_is_returned(self, monkeypatch):
         """exact match found → return catalogue label."""

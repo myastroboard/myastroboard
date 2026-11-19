@@ -30,7 +30,9 @@ def create_weather_client():
         os.path.join(DATA_DIR_CACHE, ".weather_cache"), expire_after=WEATHER_CACHE_TTL
     )
     retry_session = retry(cache_session, retries=OPENMETEO_RETRY_COUNT, backoff_factor=OPENMETEO_BACKOFF_FACTOR)
-    client = openmeteo_requests.Client(session=retry_session)  # type: ignore[arg-type]
+    # openmeteo_requests annotates a niquests Session but only calls get() / post() on it, which the requests (-cache)
+    # session provides
+    client = openmeteo_requests.Client(session=retry_session)  # pyright: ignore[reportArgumentType]
     return client
 
 
@@ -46,5 +48,7 @@ def create_fresh_weather_client():
     """
     session = requests.Session()
     retry_session = retry(session, retries=OPENMETEO_RETRY_COUNT, backoff_factor=OPENMETEO_BACKOFF_FACTOR)
-    client = openmeteo_requests.Client(session=retry_session)  # type: ignore[arg-type]
+    # openmeteo_requests annotates a niquests Session but only calls get() / post() on it, which the requests (-cache)
+    # session provides
+    client = openmeteo_requests.Client(session=retry_session)  # pyright: ignore[reportArgumentType]
     return client

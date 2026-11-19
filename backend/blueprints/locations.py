@@ -1,6 +1,7 @@
 """Config + multi-location profiles Blueprint. Routes: /api/config, /api/locations/*"""
 
 from datetime import UTC, datetime
+from typing import Any
 from zoneinfo import available_timezones
 
 from flask import Blueprint, jsonify, request
@@ -43,7 +44,7 @@ def get_config_api():
     return jsonify(response)
 
 
-def _validate_location_payload(payload, partial=False):
+def _validate_location_payload(payload: dict[str, Any], partial: bool = False) -> tuple[Any, ...]:
     """Validate an incoming location preset payload. Returns (cleaned, error)."""
     if not isinstance(payload, dict):
         return None, "Invalid payload"
@@ -135,7 +136,7 @@ _CONSTRAINTS_RANGES = {
 }
 
 
-def _validate_constraints_payload(payload):
+def _validate_constraints_payload(payload: str | dict[str, Any]) -> tuple[Any, ...]:
     """Validate an incoming ``skytonight.constraints`` payload. Returns (cleaned, error).
 
     Only keys present in the payload are checked/copied - this is always merged onto the
@@ -317,7 +318,7 @@ def update_config_api():
 # ---------------------------------------------------------------------------
 
 
-def _location_admin_view(config, preset):
+def _location_admin_view(config: dict[str, Any], preset: dict[str, Any]) -> dict[str, Any]:
     """Admin-facing serialization of a preset, including attribution info."""
     attributed_to = []
     for user in user_manager.users.values():
@@ -388,7 +389,7 @@ def create_location_api():
 
 @locations_bp.route('/api/locations/<location_id>', methods=['PUT'])
 @admin_required
-def update_location_api(location_id):
+def update_location_api(location_id: str):
     """Edit a location preset. Coordinate/timezone changes reset only that preset's caches."""
     try:
         config = load_config()
@@ -430,7 +431,7 @@ def update_location_api(location_id):
 
 @locations_bp.route('/api/locations/<location_id>/references', methods=['GET'])
 @admin_required
-def location_references_api(location_id):
+def location_references_api(location_id: str):
     """Lightweight pre-delete check: who/what references this preset."""
     try:
         config = load_config()
@@ -462,7 +463,7 @@ def location_references_api(location_id):
 
 @locations_bp.route('/api/locations/<location_id>', methods=['DELETE'])
 @admin_required
-def delete_location_api(location_id):
+def delete_location_api(location_id: str):
     """Delete a preset.
 
     Blocked while the preset is the install default (promote another one
@@ -513,7 +514,7 @@ def delete_location_api(location_id):
 
 @locations_bp.route('/api/locations/<location_id>/attribute', methods=['POST'])
 @admin_required
-def attribute_location_api(location_id):
+def attribute_location_api(location_id: str):
     """Attach/detach a preset to a set of user ids (admin-controlled many-to-many)."""
     try:
         config = load_config()
@@ -538,7 +539,7 @@ def attribute_location_api(location_id):
         return jsonify({'error': 'Internal server error'}), 500
 
 
-def _cached_location_score(location_id):
+def _cached_location_score(location_id: str):
     """Best-effort current observation score (0-10) for a location, read from the
     already-warm astro_weather cache - never triggers a live Open-Meteo call.
 

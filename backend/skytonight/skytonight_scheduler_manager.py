@@ -7,7 +7,9 @@ import json
 import os
 import sys
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any, Literal
+
+from flask import Flask
 
 from skytonight.skytonight_calculator import load_calculation_results, run_calculations
 from skytonight.skytonight_catalogue_builder import build_and_save_default_dataset
@@ -25,6 +27,11 @@ from utils import json_file_cache
 from utils.constants import MAX_LOCATIONS, SKYTONIGHT_CALCULATION_LOG_FILE
 from utils.logging_config import get_logger
 from utils.repo_config import load_config
+
+if TYPE_CHECKING:
+    import threading
+
+    from skytonight.skytonight_scheduler import SkyTonightScheduler
 
 # Windows-compatible file locking
 if sys.platform == 'win32':
@@ -177,7 +184,9 @@ def _run_skytonight_refresh() -> dict[str, Any]:
 # ============================================================
 
 
-def get_or_create_skytonight_scheduler(app, cache_ready_event=None):
+def get_or_create_skytonight_scheduler(
+    app: Flask, cache_ready_event: threading.Event | None = None
+) -> SkyTonightScheduler | None:
     """Get the SkyTonight scheduler instance, creating it if necessary.
 
     *app* must be the Flask application instance (the real object, not a proxy).
@@ -243,14 +252,15 @@ def get_or_create_skytonight_scheduler(app, cache_ready_event=None):
     return app.config.get('skytonight_scheduler')
 
 
-def get_skytonight_scheduler_for_api():
+def get_skytonight_scheduler_for_api() -> SkyTonightScheduler | Literal['remote_scheduler'] | None:
     """Get SkyTonight scheduler for API endpoints (call inside a request context)."""
     from flask import current_app
 
     # The scheduler keeps the app for its background thread, where the request-bound proxy no
     # longer resolves: hand it the real object. This path runs when the worker that owned the
     # scheduler died (OOM kill) and another worker takes the lock over.
-    scheduler = get_or_create_skytonight_scheduler(current_app._get_current_object())  # type: ignore[attr-defined]
+    # current_app is a werkzeug LocalProxy at runtime; Flask types it as Flask
+    scheduler = get_or_create_skytonight_scheduler(current_app._get_current_object())  # pyright: ignore[reportAttributeAccessIssue]
     if scheduler:
         return scheduler
 

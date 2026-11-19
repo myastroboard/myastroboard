@@ -12,10 +12,10 @@ import requests as _req_module
 if 'psutil' not in sys.modules:
     sys.modules['psutil'] = types.ModuleType('psutil')
 
-from observation import object_info as oi  # type: ignore[import-not-found]
-from observation import sky_framing  # type: ignore[import-not-found]
-from skytonight.skytonight_models import SkyTonightCoordinates, SkyTonightTarget  # type: ignore[import-not-found]
-from utils.file_cache import WritePruner  # type: ignore[import-not-found]
+from observation import object_info as oi
+from observation import sky_framing
+from skytonight.skytonight_models import SkyTonightCoordinates, SkyTonightTarget
+from utils.file_cache import WritePruner
 
 
 def _target(target_id, ra_hours, dec_degrees, category='deep_sky', object_type='Galaxy', name=None, size=None):

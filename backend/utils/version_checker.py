@@ -10,6 +10,7 @@ remote fetch.
 
 import re
 import time
+from typing import Any
 
 import requests
 from packaging.version import InvalidVersion
@@ -61,11 +62,13 @@ def _absolutize_links(text: str, tag: str) -> str:
     return _RELATIVE_LINK_RE.sub(lambda m: f"]({GITHUB_REPO_URL}/blob/{tag}/{m.group(1)})", text)
 
 
-def _new_release(version: str, date: str) -> dict:
+def _new_release(version: str, date: str) -> dict[str, Any]:
     return {"version": version, "date": date, "features": [], "fixes": [], "breaking": []}
 
 
-def parse_changelog(markdown: str, current_version: str, latest_version: str, tag: str, release_date: str = "") -> list:
+def parse_changelog(
+    markdown: str, current_version: str, latest_version: str, tag: str, release_date: str = ""
+) -> list[Any]:
     """
     Extract the released sections strictly newer than current_version and up to latest_version.
 
@@ -81,9 +84,9 @@ def parse_changelog(markdown: str, current_version: str, latest_version: str, ta
     """
     releases = []
     unreleased = _new_release(latest_version, release_date)
-    release: dict | None = None
+    release: dict[str, Any] | None = None
     group: str | None = None
-    bullet: list | None = None
+    bullet: list[Any] | None = None
 
     def _flush_bullet():
         nonlocal bullet
@@ -133,7 +136,9 @@ def parse_changelog(markdown: str, current_version: str, latest_version: str, ta
     return releases[:CHANGELOG_MAX_RELEASES]
 
 
-def fetch_release_changes(current_version: str, latest_version: str, tag: str, release_date: str = "") -> list | None:
+def fetch_release_changes(
+    current_version: str, latest_version: str, tag: str, release_date: str = ""
+) -> list[Any] | None:
     """
     Fetch CHANGELOG.md at the latest release tag and return the parsed changes since current_version.
     Returns None when the file cannot be fetched or parsed, so the UI falls back to the release link.
@@ -156,7 +161,7 @@ def fetch_release_changes(current_version: str, latest_version: str, tag: str, r
         return None
 
 
-def _save_version_result(result: dict) -> None:
+def _save_version_result(result: dict[str, Any]) -> None:
     """Persist a version-check result to the in-memory and shared cache."""
     cache_entry = cache_store.get_version_update_cache_entry()
     cache_entry["data"] = result
@@ -168,7 +173,7 @@ def _save_version_result(result: dict) -> None:
     )
 
 
-def check_for_updates():
+def check_for_updates() -> dict[str, Any]:
     """
     Check for available updates from GitHub.
     Uses cache to avoid excessive API calls (respects rate limits).

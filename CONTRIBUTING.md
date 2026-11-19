@@ -522,15 +522,23 @@ The failure output lists exactly which routes are unexpected or missing, so you 
    pytest
    ruff format .
    ruff check .
-   pyright backend/
+   pyright
    djlint templates/ static/offline.html --profile jinja --lint --ignore H021,H023,H030,H031,J004,J018
    ```
-   `ruff` covers the whole repository (`backend/`, `tests/`, `scripts/`). `pyright` stays scoped to
-   `backend/` - test code leans heavily on `monkeypatch`, `MagicMock` and other dynamic
-   attributes that would drown real findings in false positives.
+   `ruff` covers the whole repository (`backend/`, `tests/`, `scripts/`). `pyright`, run bare,
+   checks the scope set in `pyrightconfig.json`: `backend/` and `scripts/`, on top of the
+   organization baseline (`.github/org/pyright.base.json`, synced - do not edit it). `tests/` stays
+   out: test code leans heavily on `monkeypatch`, `MagicMock` and API JSON read without `None`
+   checks, which gives about 1,550 errors that are not real findings (measured 2026-11-19).
+   It must report 0 errors and 0 warnings, with the baseline unrelaxed: every parameter is
+   annotated, and generics carry their type arguments (`dict[str, Any]`, not `dict`). A
+   suppression names its rule and gives a reason (`# pyright: ignore[reportArgumentType]` with a
+   comment above saying why), never a bare `# type: ignore`. Types used only in annotations that
+   would close an import cycle are imported under `if TYPE_CHECKING:` (annotations are evaluated
+   lazily on Python 3.15).
    `pyright` is the CLI equivalent of the Pylance errors VSCode shows inline - both come from
    `requirements-dev.txt` and read the same `pyrightconfig.json` at the repo root, so a clean
-   `pyright backend/` run means Pylance should show no problems either. If VSCode still shows
+   `pyright` run means Pylance should show no problems either. If VSCode still shows
    stale errors after a config change, run "Python: Restart Language Server" from the command palette.
    For JavaScript, open the file in VSCode - formatting is applied on save automatically.
    No separate JS lint step is required.

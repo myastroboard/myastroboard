@@ -11,13 +11,15 @@ object - existing tests reset a module's cache by setting ``<module>._cache = No
 directly, and that contract is preserved by keeping the cache in the calling module.
 """
 
+from typing import Any
+
 from db import settings_store
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
 
-def load_json_settings(key: str, defaults: dict, label: str) -> dict:
+def load_json_settings(key: str, defaults: dict[str, Any], label: str) -> dict[str, Any]:
     """Read setting *key*, merge its known keys over *defaults*.
 
     A missing value, a value of the wrong shape, or any read error falls back to the
@@ -42,7 +44,7 @@ def load_json_settings(key: str, defaults: dict, label: str) -> dict:
     return settings
 
 
-def save_json_settings(key: str, defaults: dict, settings: dict, label: str) -> dict:
+def save_json_settings(key: str, defaults: dict[str, Any], settings: dict[str, Any], label: str) -> dict[str, Any]:
     """Merge *settings* over *defaults* and store the result under *key*."""
     merged = dict(defaults)
     for name in defaults:

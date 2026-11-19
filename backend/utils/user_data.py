@@ -21,9 +21,12 @@ import re
 import tempfile
 import zipfile
 from datetime import UTC, datetime
-from typing import IO
+from typing import IO, TYPE_CHECKING, Any
 
 from utils.logging_config import get_logger
+
+if TYPE_CHECKING:
+    from utils.auth import User
 
 logger = get_logger(__name__)
 
@@ -74,12 +77,12 @@ def user_data_dirs() -> list[tuple[str, str]]:
 _EXPORT_FOLDERS = {'equipments': 'equipment', 'projects': 'plans'}
 
 
-def _user_documents(user_id: str) -> list[tuple[str, dict]]:
+def _user_documents(user_id: str) -> list[tuple[str, dict[str, Any]]]:
     """``(archive path, document)`` for every per-user document of ``user_id``."""
     from db import documents
     from db.json_layout import document_path
 
-    exported: list[tuple[str, dict]] = []
+    exported: list[tuple[str, dict[str, Any]]] = []
     for kind, doc_key, data in documents.list_all_user_documents(user_id):
         try:
             path = document_path(kind, user_id, doc_key)
@@ -112,7 +115,7 @@ def _iter_user_files(user_id: str, include_working_files: bool):
                 yield folder, filename, file_path
 
 
-def purge_user_files(user_id) -> int:
+def purge_user_files(user_id: str) -> int:
     """Delete every per-user file of ``user_id`` (``<user_id>_*``) and return how many were removed.
 
     Only the binary files: the documents go with the account row (db/users_store.delete_user).
@@ -157,7 +160,7 @@ def _legacy_astrodex_pictures(user_id: str) -> list[tuple[str, str]]:
     return pictures
 
 
-def _account_record(user) -> dict:
+def _account_record(user: User) -> dict[str, Any]:
     return {
         'user_id': user.user_id,
         'username': user.username,
@@ -172,7 +175,7 @@ def _account_record(user) -> dict:
     }
 
 
-def _locations_record(user) -> list[dict]:
+def _locations_record(user: User) -> list[dict[str, Any]]:
     from utils.repo_config import get_locations_for_user, load_config
 
     try:
@@ -182,7 +185,7 @@ def _locations_record(user) -> list[dict]:
         return []
 
 
-def _write_json(archive: zipfile.ZipFile, name: str, payload) -> None:
+def _write_json(archive: zipfile.ZipFile, name: str, payload: dict[str, Any] | list[Any]) -> None:
     archive.writestr(name, json.dumps(payload, indent=2, ensure_ascii=False), compress_type=zipfile.ZIP_DEFLATED)
 
 
@@ -190,7 +193,7 @@ def _compression_for(filename: str) -> int:
     return zipfile.ZIP_STORED if os.path.splitext(filename)[1].lower() in _STORED_EXTENSIONS else zipfile.ZIP_DEFLATED
 
 
-def build_user_export(user) -> tuple[IO[bytes], str]:
+def build_user_export(user: User) -> tuple[IO[bytes], str]:
     """Write a ZIP of everything stored about ``user``; return ``(file object at offset 0, download name)``.
 
     The archive goes to a temporary file rather than memory, since pictures can be

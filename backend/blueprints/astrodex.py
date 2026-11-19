@@ -2,7 +2,7 @@
 
 import os
 import uuid
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from flask import Blueprint, Response, jsonify, request, send_from_directory
 from werkzeug.utils import secure_filename
@@ -23,6 +23,9 @@ from utils.logging_config import get_logger
 from utils.repo_config import get_location_by_id, get_locations_for_user, load_config
 from utils.route_helpers import _resolve_active_location
 
+if TYPE_CHECKING:
+    from utils.auth import User
+
 logger = get_logger(__name__)
 
 astrodex_bp = Blueprint('astrodex', __name__)
@@ -36,7 +39,7 @@ _EMPTY_PICTURE_LOCATION = {
 }
 
 
-def _safe_picture_coordinate(value, min_value, max_value):
+def _safe_picture_coordinate(value: float | str | None, min_value: int, max_value: int):
     """Best-effort float parse for a manually-typed coordinate. Returns None
     for anything empty, unparseable, or out of range - a bad value is simply
     dropped (same low-stakes trust level as notes), not a 400."""
@@ -51,7 +54,7 @@ def _safe_picture_coordinate(value, min_value, max_value):
     return parsed
 
 
-def _validate_and_coerce_picture_rating(picture_data: dict) -> Any:
+def _validate_and_coerce_picture_rating(picture_data: dict[str, Any]) -> Any:
     """Validate picture_data['rating'] in place (0.0-5.0 in 0.5 steps) and coerce it to a clean
     float, or None if left blank. Returns an error message string on failure, else None.
 
@@ -72,7 +75,7 @@ def _validate_and_coerce_picture_rating(picture_data: dict) -> Any:
     return None
 
 
-def _validate_and_coerce_picture_capture(picture_data: dict) -> Any:
+def _validate_and_coerce_picture_capture(picture_data: dict[str, Any]) -> Any:
     """Validate/coerce picture_data['exposition_time'], ['frames'] and
     ['integration_minutes'] in place. Only touches keys actually present, so a PUT that
     edits unrelated fields (notes, iso, ...) never disturbs these.
@@ -125,7 +128,7 @@ def _validate_and_coerce_picture_capture(picture_data: dict) -> Any:
     return None
 
 
-def _resolve_picture_combination_reference(combination_id, user_id) -> str | None:
+def _resolve_picture_combination_reference(combination_id: str | None, user_id: str) -> str | None:
     """Return combination_id if it resolves to an accessible (own or shared) combination for this
     user, else None. Resolved server-side so a picture can never end up tagged with a combination
     id that doesn't actually exist or that the uploader has no access to."""
@@ -140,8 +143,12 @@ def _resolve_picture_combination_reference(combination_id, user_id) -> str | Non
 
 
 def _resolve_picture_location_snapshot(
-    location_id, user, custom_name=None, custom_latitude=None, custom_longitude=None
-):
+    location_id: str | None,
+    user: User | None,
+    custom_name: str | None = None,
+    custom_latitude: float | str | None = None,
+    custom_longitude: float | str | None = None,
+) -> dict[str, Any]:
     """Resolve a picture's location into a frozen Astrodex snapshot (v1.2):
     either a preset (looked up + access-checked server-side) or a free-text
     "somewhere else" label the uploader typed themselves - a one-off trip
@@ -188,7 +195,7 @@ def _resolve_picture_location_snapshot(
 _difficulty_lookup_cache: dict[str, dict[str, Any]] = {}
 
 
-def _build_difficulty_lookup(location_id=None) -> dict[str, str]:
+def _build_difficulty_lookup(location_id: str | None = None) -> dict[str, str]:
     """Build a normalized-catalogue-name -> difficulty lookup from a location's dso_results.json.
 
     Cached in memory per location, keyed by the file's mtime - dso_results.json is only
@@ -221,7 +228,7 @@ def _build_difficulty_lookup(location_id=None) -> dict[str, str]:
     return lookup
 
 
-def _enrich_astrodex_items_with_difficulty(items, location_id=None):
+def _enrich_astrodex_items_with_difficulty(items: list[Any], location_id: str | None = None) -> list[Any]:
     """Attach a `difficulty` field to each Astrodex item by cross-referencing SkyTonight's dso_results.json.
 
     Items with no catalogue/name match (e.g. manual entries not present in SkyTonight's
@@ -410,7 +417,7 @@ def add_astrodex_item():
 
 @astrodex_bp.route('/api/astrodex/items/<item_id>/catalogue-name', methods=['POST'])
 @user_required
-def switch_astrodex_item_catalogue_name(item_id):
+def switch_astrodex_item_catalogue_name(item_id: str):
     """Switch Astrodex item displayed name to a catalogue-specific alias."""
     try:
         user = get_current_user()
@@ -438,7 +445,7 @@ def switch_astrodex_item_catalogue_name(item_id):
 
 
 def _apply_observation_session_backlinks(
-    items: list[dict], matches_by_item: dict, first_match_by_picture: dict
+    items: list[dict[str, Any]], matches_by_item: dict[str, Any], first_match_by_picture: dict[str, Any]
 ) -> None:
     """Attach 'which Observation Log session produced this' to items/pictures in place.
 
@@ -448,7 +455,8 @@ def _apply_observation_session_backlinks(
     load_user_astrodex() has no caching, so this never leaks into a later save.
     """
     for item in items:
-        item['observation_sessions'] = matches_by_item.get(item.get('id'), [])
+        item_id = item.get('id')
+        item['observation_sessions'] = matches_by_item.get(item_id, []) if item_id is not None else []
         # 'own_pictures' (private_mode's own-copy list, and the merged view's
         # current-user-only list) is a *separate* deepcopy taken before this runs
         # (observation/astrodex.py's get_visible_astrodex()), not the same objects as
@@ -460,7 +468,7 @@ def _apply_observation_session_backlinks(
                 picture['observation_session'] = first_match_by_picture.get(picture_id) if picture_id else None
 
 
-def _with_observation_session_backlinks(user_id: str, item: dict) -> dict:
+def _with_observation_session_backlinks(user_id: str, item: dict[str, Any]) -> dict[str, Any]:
     """Single-item variant of _apply_observation_session_backlinks(), for the one-item GET route."""
     from observation.observation_sessions import build_astrodex_session_backlink_index
 
@@ -471,7 +479,7 @@ def _with_observation_session_backlinks(user_id: str, item: dict) -> dict:
 
 @astrodex_bp.route('/api/astrodex/items/<item_id>', methods=['GET'])
 @login_required
-def get_astrodex_item_api(item_id):
+def get_astrodex_item_api(item_id: str):
     """Get a specific astrodex item"""
     try:
         user = get_current_user()
@@ -492,7 +500,7 @@ def get_astrodex_item_api(item_id):
 
 @astrodex_bp.route('/api/astrodex/items/<item_id>', methods=['PUT'])
 @user_required
-def update_astrodex_item_api(item_id):
+def update_astrodex_item_api(item_id: str):
     """Update an astrodex item"""
     try:
         user = get_current_user()
@@ -515,7 +523,7 @@ def update_astrodex_item_api(item_id):
 
 @astrodex_bp.route('/api/astrodex/items/<item_id>', methods=['DELETE'])
 @user_required
-def delete_astrodex_item_api(item_id):
+def delete_astrodex_item_api(item_id: str):
     """Delete an astrodex item"""
     try:
         user = get_current_user()
@@ -534,7 +542,7 @@ def delete_astrodex_item_api(item_id):
 
 @astrodex_bp.route('/api/astrodex/items/<item_id>/pictures', methods=['POST'])
 @user_required
-def add_picture_to_astrodex_item(item_id):
+def add_picture_to_astrodex_item(item_id: str):
     """Add a picture to an astrodex item"""
     try:
         user = get_current_user()
@@ -594,7 +602,7 @@ def add_picture_to_astrodex_item(item_id):
 
 @astrodex_bp.route('/api/astrodex/items/<item_id>/pictures/<picture_id>', methods=['PUT'])
 @user_required
-def update_picture_api(item_id, picture_id):
+def update_picture_api(item_id: str, picture_id: str) -> Response | tuple[Response, int]:
     """Update a picture in an astrodex item"""
     try:
         user = get_current_user()
@@ -652,7 +660,7 @@ def update_picture_api(item_id, picture_id):
 
 @astrodex_bp.route('/api/astrodex/items/<item_id>/pictures/<picture_id>', methods=['DELETE'])
 @user_required
-def delete_picture_api(item_id, picture_id):
+def delete_picture_api(item_id: str, picture_id: str):
     """Delete a picture from an astrodex item"""
     try:
         user = get_current_user()
@@ -671,7 +679,7 @@ def delete_picture_api(item_id, picture_id):
 
 @astrodex_bp.route('/api/astrodex/items/<item_id>/pictures/<picture_id>/main', methods=['POST'])
 @user_required
-def set_main_picture_api(item_id, picture_id):
+def set_main_picture_api(item_id: str, picture_id: str):
     """Set a picture as the main picture for an item"""
     try:
         user = get_current_user()
@@ -782,7 +790,7 @@ def _astrodex_image_preview(filename: str, max_side: int) -> Response | None:
 
 @astrodex_bp.route('/api/astrodex/images/<filename>', methods=['GET'])
 @login_required
-def get_astrodex_image(filename):
+def get_astrodex_image(filename: str):
     """Serve an astrodex image; ``?size=thumb`` or ``?size=medium`` serves a WebP preview instead.
 
     Previews are for pages that show many pictures at once (the Community feed, the Astrodex
@@ -814,7 +822,7 @@ def get_astrodex_image(filename):
 
 @astrodex_bp.route('/api/astrodex/check/<item_name>', methods=['GET'])
 @login_required
-def check_item_in_astrodex(item_name):
+def check_item_in_astrodex(item_name: str):
     """Check if an item is in user's astrodex"""
     try:
         user = get_current_user()

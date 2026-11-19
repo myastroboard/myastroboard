@@ -17,6 +17,7 @@ import sys
 import uuid
 from copy import deepcopy
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
 from db import settings_store
 from db.engine import transaction
@@ -25,12 +26,15 @@ from utils.config_defaults import DEFAULT_CONFIG, DEFAULT_LOCATION, LOCATION_PRE
 from utils.logging_config import get_logger
 from utils.mqtt_connections import normalize_legacy_mqtt
 
+if TYPE_CHECKING:
+    from utils.auth import User
+
 logger = get_logger(__name__)
 
 CONFIG_KEY = 'config'
 
 
-def _merge_defaults(config, defaults):
+def _merge_defaults(config: dict[str, Any], defaults: dict[str, Any]) -> dict[str, Any]:
     """Recursively merge missing default keys into a config payload."""
     if not isinstance(defaults, dict):
         return deepcopy(defaults)
@@ -53,7 +57,7 @@ def _utcnow_iso():
     return datetime.now(UTC).isoformat()
 
 
-def new_location_preset(base=None, is_install_default=False):
+def new_location_preset(base: dict[str, Any] | str | None = None, is_install_default: bool = False) -> dict[str, Any]:
     """Build a full location preset dict from a base location payload.
 
     ``id`` is server-generated (uuid4), never client-supplied, and immutable
@@ -77,7 +81,7 @@ def new_location_preset(base=None, is_install_default=False):
     return preset
 
 
-def _ensure_locations(config, seeded_location_ids=None):
+def _ensure_locations(config: dict[str, Any], seeded_location_ids: list[Any] | None = None):
     """Guarantee the ``locations`` list invariants; migrate legacy shape in place.
 
     Returns True when the config dict was modified (caller should persist).
@@ -168,7 +172,7 @@ def _ensure_locations(config, seeded_location_ids=None):
     return changed
 
 
-def _attribute_new_location_to_all_users(location_id):
+def _attribute_new_location_to_all_users(location_id: str):
     """Attach *location_id* to every existing user's attribution list.
 
     Lazy import to avoid a module-load-time cycle with auth.py (which itself
@@ -194,7 +198,7 @@ def _attribute_new_location_to_all_users(location_id):
         logger.warning(f"Could not attribute location {location_id!r} to existing users: {exc}")
 
 
-def read_raw_config():
+def read_raw_config() -> dict[str, Any] | None:
     """The stored configuration dict, or None when there is none yet (or it is damaged)."""
     try:
         raw = settings_store.get_setting(CONFIG_KEY)
@@ -214,7 +218,7 @@ def config_revision():
     return settings_store.setting_revision(CONFIG_KEY)
 
 
-def load_config():
+def load_config() -> dict[str, Any]:
     """Load the configuration (migrating the legacy location shape once)."""
     raw = read_raw_config()
     if raw is not None:
@@ -245,7 +249,7 @@ def load_config():
     return config
 
 
-def _read_merged_config(raw):
+def _read_merged_config(raw: dict[str, Any]) -> dict[str, Any]:
     """``raw`` (the stored config) merged over the defaults, with legacy keys normalized (no persistence)."""
     merged = _merge_defaults(raw, DEFAULT_CONFIG)
     # Strip legacy top-level 'constraints' key - constraints live exclusively
@@ -269,7 +273,7 @@ def _read_merged_config(raw):
     return merged
 
 
-def save_config(config):
+def save_config(config: dict[str, Any]):
     """Store the configuration; True on success."""
     try:
         settings_store.put_setting(CONFIG_KEY, _sanitize_for_json(config))
@@ -284,13 +288,13 @@ def save_config(config):
 # ---------------------------------------------------------------------------
 
 
-def get_all_locations(config):
+def get_all_locations(config: dict[str, Any]) -> list[Any]:
     """Return the full preset list (admin view)."""
     locations = config.get("locations", [])
     return [loc for loc in locations if isinstance(loc, dict) and loc.get("id")]
 
 
-def get_location_by_id(config, location_id):
+def get_location_by_id(config: dict[str, Any], location_id: str | None) -> dict[str, Any] | None:
     """Return the preset with the given id, or None."""
     if not location_id:
         return None
@@ -300,7 +304,7 @@ def get_location_by_id(config, location_id):
     return None
 
 
-def get_install_default_location(config):
+def get_install_default_location(config: dict[str, Any]) -> dict[str, Any]:
     """Return the preset flagged is_install_default (always exists post-migration)."""
     locations = get_all_locations(config)
     if not locations:
@@ -311,7 +315,7 @@ def get_install_default_location(config):
     return locations[0]
 
 
-def get_user_location_prefs(user):
+def get_user_location_prefs(user: User | None) -> dict[str, Any]:
     """Return the (possibly missing) per-user location preference block, normalized."""
     prefs = {}
     if user is not None and isinstance(getattr(user, "preferences", None), dict):
@@ -326,7 +330,7 @@ def get_user_location_prefs(user):
     }
 
 
-def get_locations_for_user(config, user):
+def get_locations_for_user(config: dict[str, Any], user: User | None) -> list[Any]:
     """Return the presets accessible to *user*, in the user's preferred order.
 
     Admins bypass attribution entirely - every preset is implicitly theirs.
@@ -352,7 +356,7 @@ def get_locations_for_user(config, user):
     return accessible
 
 
-def get_active_location(config, user=None):
+def get_active_location(config: dict[str, Any], user: User | None = None) -> dict[str, Any]:
     """Resolve the location dict that should drive calculations for this request.
 
     Fallback chain: user's active -> user's default -> install default ->
@@ -387,7 +391,7 @@ def get_active_location(config, user=None):
     return next(iter(accessible.values()))
 
 
-def get_scheduler_locations(config):
+def get_scheduler_locations(config: dict[str, Any]) -> list[Any]:
     """Return the presets the cache scheduler must keep warm.
 
     The install default + every preset attributed to at least one user +

@@ -39,6 +39,7 @@ Example output (Europe/Paris, September 2026):
 import calendar
 import datetime
 import math
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from astronomy import MoonPhase, NextMoonQuarter, SearchMoonQuarter, Time
@@ -75,7 +76,7 @@ def _illumination_percent(phase_angle_deg: float) -> float:
     return (1 - math.cos(math.radians(phase_angle_deg))) / 2 * 100
 
 
-def phase_at(instant: datetime.datetime) -> dict:
+def phase_at(instant: datetime.datetime) -> dict[str, Any]:
     """Moon phase state at a single instant.
 
     Uses the same engine and formula as MoonService.get_report() (Astronomy
@@ -97,7 +98,7 @@ def phase_at(instant: datetime.datetime) -> dict:
     }
 
 
-def build_phase_calendar(year: int, month: int, timezone: str) -> dict:
+def build_phase_calendar(year: int, month: int, timezone: str) -> dict[str, Any]:
     """Per-day Moon phase data for one calendar month.
 
     Args:
@@ -117,8 +118,8 @@ def build_phase_calendar(year: int, month: int, timezone: str) -> dict:
     month_start_local = datetime.datetime(year, month, 1, tzinfo=tz)
     search_from_utc = (month_start_local - datetime.timedelta(days=2)).astimezone(datetime.UTC)
 
-    principal_phases: list[dict] = []
-    events_by_day: dict[int, dict] = {}
+    principal_phases: list[dict[str, Any]] = []
+    events_by_day: dict[int, dict[str, Any]] = {}
     quarter = SearchMoonQuarter(_astro_time(search_from_utc))
     while True:
         instant_local = quarter.time.Utc().replace(tzinfo=datetime.UTC).astimezone(tz)
@@ -132,10 +133,10 @@ def build_phase_calendar(year: int, month: int, timezone: str) -> dict:
         quarter = NextMoonQuarter(quarter)
 
     # --- per-day phase state, sampled at the same night hour for every day ---
-    days: list[dict] = []
+    days: list[dict[str, Any]] = []
     for day in range(1, days_in_month + 1):
         night_local = datetime.datetime(year, month, day, _SAMPLE_HOUR, tzinfo=tz)
-        event: dict | None = events_by_day.get(day)
+        event: dict[str, Any] | None = events_by_day.get(day)
         days.append(
             {
                 "date": datetime.date(year, month, day).isoformat(),

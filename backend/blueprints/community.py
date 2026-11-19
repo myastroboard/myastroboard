@@ -12,7 +12,7 @@ Nothing here ranks members: the directory is alphabetical, the feed chronologica
 """
 
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from flask import Blueprint, Response, jsonify, request, send_file
 
@@ -28,6 +28,9 @@ from utils.logging_config import get_logger
 from utils.repo_config import load_config
 from utils.route_helpers import _resolve_active_location
 
+if TYPE_CHECKING:
+    from utils.auth import User
+
 logger = get_logger(__name__)
 
 community_bp = Blueprint('community', __name__)
@@ -40,7 +43,15 @@ def clear_caches() -> None:
     _activity_cache.clear()
 
 
-def _own_profile_payload(user) -> dict[str, Any]:
+def _fresh_own_profile_payload(user_id: str) -> dict[str, Any]:
+    """The caller's profile payload, re-read after a write (the account exists: the request is authenticated)."""
+    user = user_manager.get_user_by_id(user_id)
+    if user is None:
+        raise LookupError(f'User {user_id} no longer exists')
+    return _own_profile_payload(user)
+
+
+def _own_profile_payload(user: User) -> dict[str, Any]:
     config = load_config()
     return {
         'username': user.username,
@@ -112,7 +123,7 @@ def update_own_profile():
         updates = {key: payload[key] for key in ('display_name', 'bio', 'community') if key in payload}
         user_manager.update_user_profile(user.user_id, updates)
         clear_caches()
-        return jsonify({'status': 'success', **_own_profile_payload(user_manager.get_user_by_id(user.user_id))})
+        return jsonify({'status': 'success', **_fresh_own_profile_payload(user.user_id)})
     except user_identity.ProfileError as error:
         return _profile_error(error)
     except Exception as error:
@@ -142,7 +153,7 @@ def upload_own_avatar():
             user_identity.remove_avatar_file(previous)
         clear_caches()
         logger.info(f'Avatar updated for user {user.username}')
-        return jsonify({'status': 'success', **_own_profile_payload(user_manager.get_user_by_id(user.user_id))})
+        return jsonify({'status': 'success', **_fresh_own_profile_payload(user.user_id)})
     except user_identity.ProfileError as error:
         logger.warning(f'Avatar upload rejected for user {getattr(get_current_user(), "username", "?")}: {error}')
         return _profile_error(error)
@@ -162,7 +173,7 @@ def delete_own_avatar():
         previous = user_manager.set_user_avatar(user.user_id, None)
         user_identity.remove_avatar_file(previous)
         clear_caches()
-        return jsonify({'status': 'success', **_own_profile_payload(user_manager.get_user_by_id(user.user_id))})
+        return jsonify({'status': 'success', **_fresh_own_profile_payload(user.user_id)})
     except Exception as error:
         logger.error(f'Error removing the avatar: {error}')
         return jsonify({'error': 'Internal server error'}), 500
@@ -170,7 +181,7 @@ def delete_own_avatar():
 
 @community_bp.route('/api/users/<user_id>/avatar', methods=['GET'])
 @login_required
-def get_user_avatar(user_id):
+def get_user_avatar(user_id: str):
     """A member's avatar: the uploaded picture, else a generated initials picture.
 
     Any signed-in member may load it: it stands next to a name that is already shown to
@@ -204,7 +215,7 @@ def get_user_avatar(user_id):
 
 @community_bp.route('/api/users/<user_id>/profile', methods=['DELETE'])
 @admin_required
-def admin_reset_profile(user_id):
+def admin_reset_profile(user_id: str):
     """Moderation: clear a member's display name, bio and avatar."""
     try:
         if not user_manager.get_user_by_id(user_id):
@@ -232,7 +243,7 @@ def _pictures_shared(config: dict[str, Any]) -> bool:
     return not bool((config.get('astrodex') or {}).get('private', False))
 
 
-def _member_data(user, location_bortle: dict[str, Any]) -> dict[str, Any]:
+def _member_data(user: User | _ListedView, location_bortle: dict[str, Any]) -> dict[str, Any]:
     data = members.load_member_data(user, location_bortle)
     data['badges'] = (
         members.earned_badges(data['facts'], achievements.catalogue_totals()) if members.badges_allowed(user) else []
@@ -287,7 +298,7 @@ def list_members():
 
 @community_bp.route('/api/community/members/<user_id>', methods=['GET'])
 @login_required
-def get_member_profile(user_id):
+def get_member_profile(user_id: str):
     """One member's profile, with only the blocks they show (404 for a member not listed).
 
     The caller may always open their own, to preview what the others see.
@@ -308,7 +319,7 @@ def get_member_profile(user_id):
         today = _observer_today(_resolve_active_location())
         cache: dict[str, Any] = {}
 
-        def loader(member):
+        def loader(member: User | _ListedView) -> dict[str, Any]:
             if 'data' not in cache:
                 cache['data'] = _member_data(member, location_bortle)
             return cache['data']
@@ -344,17 +355,17 @@ class _ListedView:
     profile, it renders the blocks exactly as the others would see them after joining.
     """
 
-    def __init__(self, user):
+    def __init__(self, user: User):
         self._user = user
         profile = user_identity.sanitize_profile(user.profile)
         profile['community']['listed'] = True
         self.profile = profile
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str):
         return getattr(self._user, name)
 
 
-def _as_listed(user):
+def _as_listed(user: User):
     return _ListedView(user)
 
 

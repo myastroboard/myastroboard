@@ -7,6 +7,7 @@ Routes: /api/skyquality, /api/convert-coordinates, /api/timezones,
 
 import re
 from datetime import UTC, datetime
+from typing import Any
 from zoneinfo import ZoneInfo, available_timezones
 
 from flask import Blueprint, Response, jsonify, request, session
@@ -241,7 +242,9 @@ def check_updates_api():
         )
 
 
-def _serve_map_resource(kind, url_params, path_parts, content_type):
+def _serve_map_resource(
+    kind: map_tiles.MapResourceKind, url_params: dict[str, Any], path_parts: tuple[Any, ...], content_type: str
+):
     """Serve one map resource through the server's cache (see utils/map_tiles.py)."""
     try:
         content = map_tiles.get_resource(kind, url_params, path_parts, user_key=session.get('username', ''))
@@ -260,7 +263,7 @@ def _serve_map_resource(kind, url_params, path_parts, content_type):
 
 @misc_bp.route('/api/map-tiles/raster/<int:z>/<int:x>/<int:y>.png', methods=['GET'])
 @login_required
-def get_map_raster_tile_api(z, x, y):
+def get_map_raster_tile_api(z: int, x: int, y: int):
     """OpenStreetMap PNG tile: the basemap of browsers without WebGL."""
     if not map_tiles.is_valid_tile(z, x, y, map_tiles.RASTER_MAX_ZOOM):
         return jsonify({"error": "Invalid tile"}), 404
@@ -269,7 +272,7 @@ def get_map_raster_tile_api(z, x, y):
 
 @misc_bp.route('/api/map-tiles/vector/<int:z>/<int:x>/<int:y>.mvt', methods=['GET'])
 @login_required
-def get_map_vector_tile_api(z, x, y):
+def get_map_vector_tile_api(z: int, x: int, y: int):
     """OpenStreetMap Shortbread vector tile, drawn in the browser with static/map-styles/."""
     if not map_tiles.is_valid_tile(z, x, y, map_tiles.VECTOR_MAX_ZOOM):
         return jsonify({"error": "Invalid tile"}), 404
@@ -280,7 +283,7 @@ def get_map_vector_tile_api(z, x, y):
 
 @misc_bp.route('/api/map-tiles/fonts/<fontstack>/<glyph_range>.pbf', methods=['GET'])
 @login_required
-def get_map_glyphs_api(fontstack, glyph_range):
+def get_map_glyphs_api(fontstack: str, glyph_range: str):
     """Label glyphs of the vector map styles (one 256-character block of one font)."""
     if fontstack not in map_tiles.FONT_STACKS or not map_tiles.is_valid_glyph_range(glyph_range):
         return jsonify({"error": "Invalid glyph range"}), 404
@@ -294,7 +297,7 @@ def get_map_glyphs_api(fontstack, glyph_range):
 
 @misc_bp.route('/api/map-tiles/sprites/<sprite_name>', methods=['GET'])
 @login_required
-def get_map_sprite_api(sprite_name):
+def get_map_sprite_api(sprite_name: str):
     """Icon sheet (PNG) or its index (JSON) of the vector map styles."""
     content_type = map_tiles.sprite_content_type(sprite_name)
     if content_type is None:

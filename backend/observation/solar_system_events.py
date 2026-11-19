@@ -706,11 +706,13 @@ class SolarSystemEventsService:
                 return False
 
             # Radiant should be above horizon
-            alt_val = altaz.alt.degree  # type: ignore
+            # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+            alt_val = altaz.alt.degree  # pyright: ignore[reportOptionalMemberAccess]
             if isinstance(alt_val, (np.ndarray, complex)):
                 altitude = float(np.real(np.atleast_1d(alt_val).flat[0]))
             else:
-                altitude = float(alt_val)  # type: ignore
+                # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+                altitude = float(alt_val)  # pyright: ignore[reportArgumentType]
 
             return altitude > 10
         except Exception:

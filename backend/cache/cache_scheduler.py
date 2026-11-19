@@ -24,7 +24,7 @@ CACHE_SCHEDULER_SHUTDOWN_TIMEOUT_SECONDS = 3
 
 
 class CacheScheduler:
-    def __init__(self, interval_seconds=CACHE_SCHEDULER_INTERVAL_SECONDS):
+    def __init__(self, interval_seconds: int = CACHE_SCHEDULER_INTERVAL_SECONDS):
         """
         Scheduler to pre-compute heavy caches in the background.
         interval_seconds: frequency of calculations (default 300s = 5 min; TTL gating prevents unnecessary work)

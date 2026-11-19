@@ -210,8 +210,11 @@ def seasonal_challenges(
 
 
 def _latitude(location: dict[str, Any]) -> float | None:
+    latitude = location.get('latitude')
+    if latitude is None:
+        return None
     try:
-        return float(location.get('latitude'))  # type: ignore[arg-type]
+        return float(latitude)
     except TypeError, ValueError:
         return None
 
@@ -254,7 +257,7 @@ def marathon_nights(year: int, timezone_name: str) -> list[tuple[datetime.date, 
     return nights
 
 
-def _sun_grid(lat_deg: float, lon_deg: float, timezone_name: str, night: datetime.date):
+def _sun_grid(lat_deg: float, lon_deg: float, timezone_name: str, night: datetime.date) -> tuple[Any, ...]:
     """Sun altitude, LST and local time over a whole marathon night.
 
     Wider than the shared 18:00-06:00 night grid: a marathon starts in the evening
@@ -272,7 +275,8 @@ def _sun_grid(lat_deg: float, lon_deg: float, timezone_name: str, night: datetim
         moment += datetime.timedelta(minutes=_MARATHON_STEP_MINUTES)
     times = Time(moments)
     frame = AltAz(obstime=times, location=EarthLocation(lat=lat_deg * u.deg, lon=lon_deg * u.deg))
-    sun_alt = np.asarray(get_sun(times).transform_to(frame).alt.deg)  # type: ignore[union-attr]
+    # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+    sun_alt = np.asarray(get_sun(times).transform_to(frame).alt.deg)  # pyright: ignore[reportOptionalMemberAccess]
     lst_hours = np.asarray(times.sidereal_time('apparent', longitude=lon_deg * u.deg).hour)
     local = [instant.astimezone(tz) for instant in moments]
     return sun_alt, lst_hours, local
@@ -366,7 +370,7 @@ def _compute_marathon(location: dict[str, Any], year: int) -> dict[str, Any]:
     }
 
 
-def _natural_key(name: str) -> tuple:
+def _natural_key(name: str) -> tuple[Any, ...]:
     """Order "M 9" before "M 10"."""
     digits = ''.join(character for character in name if character.isdigit())
     return (int(digits) if digits else 0, name)

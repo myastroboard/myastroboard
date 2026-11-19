@@ -5,8 +5,10 @@ Routes: /api/auth/*, /api/users/*
 
 import time
 from collections import deque
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from threading import Lock
+from typing import TYPE_CHECKING, Any
 
 from flask import Blueprint, jsonify, request, send_file, session
 
@@ -24,6 +26,9 @@ from utils.auth import (
 from utils.logging_config import get_logger
 from utils.rate_limit import SlidingWindowCounter
 from utils.user_data import build_user_export
+
+if TYPE_CHECKING:
+    from utils.auth import User
 
 logger = get_logger(__name__)
 
@@ -58,7 +63,7 @@ _PENDING_2FA_KEYS = (
 # PENDING_2FA_MAX_ATTEMPTS per worker rather than truly global - still bounded, and
 # consistent with how this codebase already rate-limits elsewhere).
 _otp_attempts_lock = Lock()
-_otp_attempts: dict = {}
+_otp_attempts: dict[str, Any] = {}
 
 
 def _otp_attempts_exceeded(user_id: str) -> bool:
@@ -106,18 +111,18 @@ def _clear_otp_attempts(user_id: str) -> None:
         _otp_attempts.pop(user_id, None)
 
 
-def _eq(message):
+def _eq(message: str) -> Callable[[str], bool]:
     """Predicate builder: exact match against a ValueError's str()."""
     return lambda text: text == message
 
 
-def _prefix_suffix(prefix, suffix=''):
+def _prefix_suffix(prefix: str, suffix: str = '') -> Callable[[str], bool]:
     """Predicate builder: match a ValueError whose str() carries dynamic content
     (a user id, a username) between a known prefix and suffix."""
     return lambda text: text.startswith(prefix) and text.endswith(suffix)
 
 
-def _resolve_error_key(exc: ValueError, rules, default: str) -> str:
+def _resolve_error_key(exc: ValueError, rules: list[Any], default: str) -> str:
     """Map a ValueError to an i18n error_key via an ordered list of (predicate, key)
     pairs, tried in order against str(exc). Falls back to *default* when nothing
     matches (e.g. after a future wording change in utils/auth.py) - the generic
@@ -140,7 +145,7 @@ def _clear_pending_2fa():
         session.pop(key, None)
 
 
-def _finish_login(user, remember_me):
+def _finish_login(user: User, remember_me: bool):
     """Set the authenticated session and build the login response.
 
     Shared tail of the password-only flow and the OTP-verified flow, so both end
@@ -773,7 +778,7 @@ def create_user():
 
 @auth_bp.route('/api/users/<user_id>', methods=['PUT'])
 @admin_required
-def update_user(user_id):
+def update_user(user_id: str):
     """Update a user (admin only)"""
     try:
         data = request.json
@@ -832,7 +837,7 @@ def update_user(user_id):
 
 @auth_bp.route('/api/users/<user_id>', methods=['DELETE'])
 @admin_required
-def delete_user(user_id):
+def delete_user(user_id: str):
     """Delete a user (admin only)"""
     try:
         current_user_id = session.get('user_id')
@@ -856,7 +861,7 @@ def delete_user(user_id):
 
 @auth_bp.route('/api/users/<user_id>/2fa', methods=['DELETE'])
 @admin_required
-def admin_disable_user_2fa(user_id):
+def admin_disable_user_2fa(user_id: str):
     """Clear a user's two-factor state (admin only).
 
     The recovery path for a lost authenticator: no password check, admin
@@ -880,7 +885,7 @@ def admin_disable_user_2fa(user_id):
 # ============================================================
 
 
-def _send_user_export(user, requested_by):
+def _send_user_export(user: User, requested_by: str):
     archive, download_name = build_user_export(user)
     logger.info(f"Personal data export of {user.username!r} downloaded by {requested_by!r}")
     return send_file(archive, mimetype='application/zip', as_attachment=True, download_name=download_name)
@@ -902,7 +907,7 @@ def export_my_data():
 
 @auth_bp.route('/api/users/<user_id>/export', methods=['GET'])
 @admin_required
-def admin_export_user_data(user_id):
+def admin_export_user_data(user_id: str):
     """Same ZIP for any user, so an administrator can answer an access or portability request."""
     try:
         user = user_manager.get_user_by_id(user_id)

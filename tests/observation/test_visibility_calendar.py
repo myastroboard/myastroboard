@@ -8,8 +8,8 @@ import pytest
 if 'psutil' not in sys.modules:
     sys.modules['psutil'] = types.ModuleType('psutil')
 
-from observation import visibility_calendar  # type: ignore[import-not-found]
-from skytonight.skytonight_models import SkyTonightCoordinates, SkyTonightTarget  # type: ignore[import-not-found]
+from observation import visibility_calendar
+from skytonight.skytonight_models import SkyTonightCoordinates, SkyTonightTarget
 
 _YEAR = 2026
 _PARIS = {

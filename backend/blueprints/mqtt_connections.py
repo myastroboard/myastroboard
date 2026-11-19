@@ -57,7 +57,7 @@ def create_mqtt_connection_api():
 
 @mqtt_connections_bp.route('/api/mqtt-connections/<connection_id>', methods=['PUT'])
 @admin_required
-def update_mqtt_connection_api(connection_id):
+def update_mqtt_connection_api(connection_id: str):
     """Edit a connection. A blank or still-masked password keeps the stored one."""
     try:
         config = load_config()
@@ -76,7 +76,7 @@ def update_mqtt_connection_api(connection_id):
 
 @mqtt_connections_bp.route('/api/mqtt-connections/<connection_id>', methods=['DELETE'])
 @admin_required
-def delete_mqtt_connection_api(connection_id):
+def delete_mqtt_connection_api(connection_id: str):
     """Delete a connection; 409 with ``used_by`` (connector names) while a connector uses it."""
     try:
         config = load_config()

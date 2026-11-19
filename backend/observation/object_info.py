@@ -46,7 +46,7 @@ CONNECT_TIMEOUT = 3  # seconds
 UPSTREAM_TIMEOUT: tuple[float, float] = (CONNECT_TIMEOUT, REQUEST_TIMEOUT)
 
 # Whitelist of Wikipedia language codes that the endpoint accepts.
-_ALLOWED_LANGS: frozenset = frozenset(
+_ALLOWED_LANGS: frozenset[Any] = frozenset(
     [
         'en',
         'fr',
@@ -274,7 +274,7 @@ def _sanitize_lang(lang: str) -> str:
 # ──────────────────────────────────────────────
 
 
-def _simbad_query(adql: str) -> dict | None:
+def _simbad_query(adql: str) -> dict[str, Any] | None:
     """Execute an ADQL query against SIMBAD TAP and return the JSON payload.
 
     The endpoints of ``SIMBAD_TAP_ENDPOINTS`` are tried in turn, each with its own
@@ -356,7 +356,7 @@ def _sort_aliases(aliases: list[str]) -> list[str]:
         ('SMC', 3),
     )
 
-    def _priority(alias: str) -> tuple:
+    def _priority(alias: str) -> tuple[Any, ...]:
         up = alias.upper()
         if up.startswith('NAME '):
             return (-1, alias.lower())
@@ -442,7 +442,7 @@ def _resolve_via_simbad(identifier: str) -> dict[str, Any] | None:
 
 # Recognized catalog patterns for building catalogue_names dicts from SIMBAD aliases.
 # Order matters: higher-priority catalogs are matched first.
-_CATALOGUE_ALIAS_PATTERNS: list[tuple] = [
+_CATALOGUE_ALIAS_PATTERNS: list[tuple[Any, ...]] = [
     (re.compile(r'^M\s+\d+$', re.I), 'Messier'),
     (re.compile(r'^NGC\s+\w+$', re.I), 'OpenNGC'),
     (re.compile(r'^IC\s+\w+$', re.I), 'OpenIC'),
@@ -585,7 +585,7 @@ def get_object_image_proxy_url(ra: float, dec: float) -> str:
     return f'/api/object-image/{_object_image_filename(ra, dec)}'
 
 
-def parse_object_image_filename(filename: str) -> tuple | None:
+def parse_object_image_filename(filename: str) -> tuple[Any, ...] | None:
     """Validate an /api/object-image/<filename> path segment and recover (ra, dec).
 
     Returns None if the filename doesn't match the expected pattern or the
@@ -945,7 +945,7 @@ def get_object_info(identifier: str, lang: str = 'en') -> dict[str, Any]:
             _local_type = str(_local_entry.get('object_type') or '').strip()
             _preferred = str(_local_entry.get('preferred_name') or identifier).strip()
             _image = {'url': get_object_image_proxy_url(_ra, _dec), 'credit': DSS2_IMAGE_CREDIT}
-            _seen: set = set()
+            _seen: set[Any] = set()
             _search_terms: list[str] = []
             for _t in [identifier, _preferred]:
                 _norm = _normalize_wikipedia_term(_t)
@@ -1004,7 +1004,7 @@ def get_object_info(identifier: str, lang: str = 'en') -> dict[str, Any]:
     # resolves to SIMBAD main name 'M  82' which Wikipedia rejects with a space),
     # then SIMBAD main name, then recognisable aliases.
     # Also add compact (no-space) variant for Messier-style names like 'M 82' → 'M82'.
-    _seen: set = set()
+    _seen: set[Any] = set()
     search_terms: list[str] = []
     for _t in [identifier, resolved['name']] + resolved.get('aliases', [])[:8]:
         _norm = _normalize_wikipedia_term(_t)

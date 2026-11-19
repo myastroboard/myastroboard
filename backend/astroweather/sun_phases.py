@@ -30,6 +30,7 @@ Example output (on API call):
 
 import datetime
 from dataclasses import dataclass
+from typing import Any
 from zoneinfo import ZoneInfo
 
 import astropy.units as u
@@ -71,7 +72,7 @@ class SunAstroInfo:
 
 
 class SunService:
-    def __init__(self, latitude, longitude, timezone):
+    def __init__(self, latitude: float, longitude: float, timezone: str):
         self.latitude = latitude
         self.longitude = longitude
         self.timezone = ZoneInfo(timezone)
@@ -95,7 +96,7 @@ class SunService:
     # Core calculation
     # -----------------------------
 
-    def _compute_day(self, date):
+    def _compute_day(self, date: datetime.date):
 
         # Build a single array covering noon → next noon (5-min steps)
         # and run one vectorized Astropy call instead of 2304 individual ones.
@@ -109,9 +110,10 @@ class SunService:
         utc_times = [start_utc + datetime.timedelta(minutes=i * step_minutes) for i in range(n_steps)]
         t_arr = AstroTime(utc_times)
         frame = AltAz(obstime=t_arr, location=self.location)
-        sun_alts = np.asarray(get_sun(t_arr).transform_to(frame).alt.deg)  # type: ignore[union-attr]
+        # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+        sun_alts = np.asarray(get_sun(t_arr).transform_to(frame).alt.deg)  # pyright: ignore[reportOptionalMemberAccess]
 
-        def find_crossing(target_alt, direction):
+        def find_crossing(target_alt: float, direction: str):
             if direction == "down":
                 mask = (sun_alts[:-1] > target_alt) & (sun_alts[1:] <= target_alt)
             else:
@@ -159,18 +161,19 @@ class SunService:
             true_night_hours=round(night_hours, 2),
         )
 
-    def _sun_altitude(self, dt_local):
+    def _sun_altitude(self, dt_local: datetime.datetime):
         """Return sun altitude in degrees at a single local datetime (used by tests)."""
         utc = dt_local.astimezone(datetime.UTC)
         t = AstroTime(utc)
         frame = AltAz(obstime=t, location=self.location)
-        return float(get_sun(t).transform_to(frame).alt.deg)  # type: ignore[union-attr, arg-type]
+        # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+        return float(get_sun(t).transform_to(frame).alt.deg)  # pyright: ignore[reportArgumentType, reportOptionalMemberAccess]
 
     # -----------------------------
     # Formatting
     # -----------------------------
 
-    def _fmt(self, dt):
+    def _fmt(self, dt: datetime.datetime | None) -> str:
 
         if dt is None:
             return "Not found"
@@ -192,7 +195,7 @@ SKY_PERIODS = (
 )
 
 
-def determine_sky_period(sun_data, timezone_str: str) -> tuple:
+def determine_sky_period(sun_data: dict[str, Any] | None, timezone_str: str) -> tuple[Any, ...]:
     """
     Determine the current sky period from a ``sun_report`` cache payload.
 
@@ -210,7 +213,7 @@ def determine_sky_period(sun_data, timezone_str: str) -> tuple:
         tz = datetime.UTC
     now = datetime.datetime.now(tz=tz)
 
-    def parse_dt(s):
+    def parse_dt(s: str):
         if not s or s == "Not found":
             return None
         try:
@@ -218,7 +221,7 @@ def determine_sky_period(sun_data, timezone_str: str) -> tuple:
         except ValueError:
             return None
 
-    def secs(dt_end):
+    def secs(dt_end: datetime.datetime):
         return max(0, int((dt_end - now).total_seconds()))
 
     sunset = parse_dt(sun.get("sunset"))

@@ -370,7 +370,8 @@ def test_enrich_with_jpl_fallback_caps_at_50_requests(monkeypatch):
 
 def test_enrich_with_jpl_fallback_skips_non_dict_rows(monkeypatch):
     monkeypatch.setattr('skytonight.skytonight_comets._fetch_jpl_comet_snapshot', lambda *a, **kw: {})
-    result = enrich_with_jpl_fallback(['not-a-dict', None])  # type: ignore[list-item]
+    # the test passes a deliberately invalid value
+    result = enrich_with_jpl_fallback(['not-a-dict', None])  # pyright: ignore[reportArgumentType]
     assert result == []
 
 
@@ -475,7 +476,8 @@ def test_response_preview_long_text_truncated():
 
 def test_response_preview_none_input():
     # None should not crash; str(None or '') â†’ ''
-    result = _response_preview(None)  # type: ignore[arg-type]
+    # the test passes a deliberately invalid value
+    result = _response_preview(None)  # pyright: ignore[reportArgumentType]
     assert result == ''
 
 

@@ -300,7 +300,7 @@ def build_summary(
     types: dict[str, dict[str, Any]] = {}
     constellations: dict[str, dict[str, Any]] = {}
     equipment: dict[str, dict[str, Any]] = {}
-    equipment_sessions: dict[str, set] = {}
+    equipment_sessions: dict[str, set[Any]] = {}
     targets: dict[str, dict[str, Any]] = {}
 
     for session, night, entry in iter_entries(sessions):

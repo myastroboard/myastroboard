@@ -5,11 +5,14 @@ https://open-meteo.com/en/docs
 
 import threading
 import time
-from typing import cast
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
 import requests
+from numpy.typing import NDArray
+from openmeteo_sdk.VariablesWithTime import VariablesWithTime
+from openmeteo_sdk.WeatherApiResponse import WeatherApiResponse
 
 from utils import save_json_file
 from utils.constants import CONDITIONS_FILE, SKYTONIGHT_LIVE_CONDITIONS_DEBOUNCE_SECONDS, URL_OPENMETEO
@@ -76,7 +79,14 @@ def clear_openmeteo_rate_limit() -> None:
     _GLOBAL_CONCURRENCY_TS = 0.0
 
 
-def fetch_weather(latitude, longitude, timezone, hourly_vars, forecast_hours=12, use_cache=True):
+def fetch_weather(
+    latitude: float,
+    longitude: float,
+    timezone: str,
+    hourly_vars: list[str],
+    forecast_hours: int = 12,
+    use_cache: bool = True,
+):
     """
     Call Open-Meteo API and return raw response
 
@@ -109,16 +119,28 @@ def fetch_weather(latitude, longitude, timezone, hourly_vars, forecast_hours=12,
     return response
 
 
-def parse_hourly(response, hourly_vars, timezone_str: str | None = "UTC"):
+def hourly_values(hourly: VariablesWithTime, index: int) -> NDArray[Any]:
+    """Values of one hourly variable; raises ValueError when the response does not carry it."""
+    variable = hourly.Variables(index)
+    if variable is None:
+        raise ValueError(f"Open-Meteo hourly variable #{index} is missing from the response")
+    return variable.ValuesAsNumpy()
+
+
+def parse_hourly(
+    response: WeatherApiResponse, hourly_vars: list[str], timezone_str: str | None = "UTC"
+) -> pd.DataFrame:
     """Transform raw response into pandas DataFrame, apply timezone"""
 
     hourly = response.Hourly()
+    if hourly is None:
+        raise ValueError("Unable to decode any hourly weather variable from Open-Meteo response")
 
     # Dates in UTC
     expected_len = None
     for i, name in enumerate(hourly_vars):
         try:
-            first_values = np.asarray(hourly.Variables(i).ValuesAsNumpy()).reshape(-1)
+            first_values = np.asarray(hourly_values(hourly, i)).reshape(-1)
             expected_len = len(first_values)
             break
         except Exception as e:
@@ -137,7 +159,7 @@ def parse_hourly(response, hourly_vars, timezone_str: str | None = "UTC"):
 
     for i, name in enumerate(hourly_vars):
         try:
-            values = np.asarray(hourly.Variables(i).ValuesAsNumpy()).reshape(-1)
+            values = np.asarray(hourly_values(hourly, i)).reshape(-1)
         except Exception as e:
             logger.warning(f"Hourly field '{name}' decode failed, substituting defaults - {str(e)[:120]}")
             values = np.full(expected_len, np.nan)
@@ -261,7 +283,9 @@ def _enrich_hourly_dataframe(df: pd.DataFrame, timezone_str: str | None = "UTC")
     return df
 
 
-def fetch_weather_json(latitude, longitude, timezone, hourly_vars, forecast_hours=12):
+def fetch_weather_json(
+    latitude: float, longitude: float, timezone: str, hourly_vars: list[str], forecast_hours: int = 12
+) -> dict[str, Any]:
     """Fetch Open-Meteo forecast via plain JSON HTTP as a fallback to SDK decoding."""
     params = {
         "latitude": latitude,
@@ -278,7 +302,7 @@ def fetch_weather_json(latitude, longitude, timezone, hourly_vars, forecast_hour
     return payload
 
 
-def parse_hourly_json(payload, hourly_vars, timezone_str: str | None = "UTC"):
+def parse_hourly_json(payload: dict[str, Any], hourly_vars: list[str], timezone_str: str | None = "UTC"):
     """Transform raw JSON fallback response into pandas DataFrame and derived metrics."""
     hourly = payload.get("hourly") or {}
     time_values = hourly.get("time")
@@ -325,7 +349,7 @@ def parse_hourly_json(payload, hourly_vars, timezone_str: str | None = "UTC"):
     return _enrich_hourly_dataframe(df, timezone_str=timezone_str)
 
 
-def get_hourly_forecast(location=None):
+def get_hourly_forecast(location: dict[str, Any] | None = None) -> dict[str, Any] | None:
     """Return location info + DataFrame of the next 12 hours of weather data.
 
     ``location`` is a v1.2 location preset dict; falls back to the install
@@ -387,7 +411,9 @@ def get_hourly_forecast(location=None):
             "is_day",
         ]
 
-        def _build_forecast_from_sdk_response(response, used_hourly_vars):
+        def _build_forecast_from_sdk_response(
+            response: WeatherApiResponse, used_hourly_vars: list[str]
+        ) -> dict[str, Any]:
             # Some transient SDK decode issues affect scalar accessors even when hourly
             # data is still readable. Fall back to configured location metadata.
             try:
@@ -510,11 +536,11 @@ def get_hourly_forecast(location=None):
 # Server-side debounce for the live-conditions fetch: per-location result kept
 # for SKYTONIGHT_LIVE_CONDITIONS_DEBOUNCE_SECONDS so a hammered tab cannot
 # multiply uncached Open-Meteo calls (see docs/LOCATIONS.md rate-limit analysis).
-_SKYTONIGHT_CONDITIONS_DEBOUNCE: dict = {}
+_SKYTONIGHT_CONDITIONS_DEBOUNCE: dict[str, Any] = {}
 _SKYTONIGHT_CONDITIONS_DEBOUNCE_LOCK = threading.Lock()
 
 
-def get_skytonight_conditions(location=None):
+def get_skytonight_conditions(location: dict[str, Any] | None = None):
     """
     Return current SkyTonight conditions summary (1h forecast).
     Fetches fresh data (no client cache), debounced server-side per location.

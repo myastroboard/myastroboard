@@ -162,7 +162,7 @@ class MoonService:
 
         return name
 
-    def _fmt(self, astro_time_obj) -> str:
+    def _fmt(self, astro_time_obj: Time | None) -> str:
         """
         Convert an astronomy.Time (or equivalent result) to local string.
         Uses Time.Utc() as defined in Astronomy Engine.
@@ -253,4 +253,4 @@ class MoonService:
         if value is None:
             return None
 
-        return float(cast(Any, value))
+        return float(value)

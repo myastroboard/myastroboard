@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import Connection, select
 from sqlalchemy.dialects.sqlite import insert
 
 from db import schema
@@ -171,7 +171,7 @@ def resolve_legacy_file(path: str) -> str | None:
     return None
 
 
-def _known_user_ids(records: list[Record]) -> set:
+def _known_user_ids(records: list[Record]) -> set[Any]:
     ids = {record.user['user_id'] for record in records if isinstance(record, UserRecord)}
     with read() as conn:
         ids.update(conn.execute(select(schema.users.c.user_id)).scalars())
@@ -218,7 +218,7 @@ def _expected(record: Record) -> Any:
     return record.value
 
 
-def _record_status(conn, rel_path: str, sha: str | None, status: str, detail: str | None = None) -> None:
+def _record_status(conn: Connection, rel_path: str, sha: str | None, status: str, detail: str | None = None) -> None:
     now = _now()
     values: dict[str, Any] = {'path': rel_path, 'sha256': sha, 'status': status, 'detail': detail}
     if status == 'deleted':
@@ -308,7 +308,7 @@ def _run(root: str, found: dict[str, LegacySource], report: ImportReport) -> Non
     hashes: dict[str, str] = {}
     unreadable: list[str] = []
     # Imported by an earlier start that crashed before deleting them: verified again, not rewritten.
-    already_imported: set = set()
+    already_imported: set[Any] = set()
     for path in files:
         source = found[path]
         source_file = resolve_legacy_file(path)

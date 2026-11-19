@@ -77,7 +77,7 @@ def save_secrets(name: str, values: dict[str, Any]) -> bool:
     routinely write at once.
     """
 
-    def _merge(current):
+    def _merge(current: dict[str, Any] | None):
         data = _clean(current)
         merged = dict(data.get(name, {}))
         for key, value in values.items():

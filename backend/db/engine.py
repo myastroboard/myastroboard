@@ -9,13 +9,15 @@ files.
 
 import json
 import os
+import sqlite3
 import threading
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from typing import Any
 
 from sqlalchemy import event, select
 from sqlalchemy.engine import Connection, Engine, create_engine
+from sqlalchemy.pool import ConnectionPoolEntry
 
 from db import schema
 from utils.logging_config import get_logger
@@ -60,14 +62,18 @@ def _json_serializer(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, default=_json_default)
 
 
-def _connect_listener(enforce_foreign_keys: bool):
-    def _listener(dbapi_connection, connection_record) -> None:
+def _connect_listener(enforce_foreign_keys: bool) -> Callable[[sqlite3.Connection, ConnectionPoolEntry], None]:
+    def _listener(dbapi_connection: sqlite3.Connection, connection_record: ConnectionPoolEntry) -> None:
         _on_connect(dbapi_connection, connection_record, enforce_foreign_keys)
 
     return _listener
 
 
-def _on_connect(dbapi_connection, _connection_record, enforce_foreign_keys: bool = True) -> None:
+def _on_connect(
+    dbapi_connection: sqlite3.Connection,
+    _connection_record: ConnectionPoolEntry | None,
+    enforce_foreign_keys: bool = True,
+) -> None:
     """Per-connection SQLite setup."""
     # Let SQLAlchemy's "begin" event below emit BEGIN itself (the sqlite3 module's own
     # implicit transactions cannot do BEGIN IMMEDIATE).

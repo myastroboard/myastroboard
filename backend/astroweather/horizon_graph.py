@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from zoneinfo import ZoneInfo
 
 import astropy.units as u
-from astropy.coordinates import AltAz, EarthLocation, get_body, get_sun
+from astropy.coordinates import AltAz, EarthLocation, SkyCoord, get_body, get_sun
 from astropy.time import Time as AstroTime
 
 # =============================
@@ -138,7 +138,7 @@ class HorizonGraphService:
 
         return points
 
-    def _coord_attribute(self, coord, attr_name: str) -> float | None:
+    def _coord_attribute(self, coord: SkyCoord, attr_name: str) -> float | None:
         """Safely extract altitude or azimuth from transformed coordinate"""
         attr = getattr(coord, attr_name, None)
         if attr is None:

@@ -1723,12 +1723,14 @@ class TestMeridianTransitExceptionPaths:
     def test_meridian_transit_fast_exception(self):
         """Covers exception in _meridian_transit_fast."""
         # Pass bad data that will cause an exception inside numpy operations
-        result = _meridian_transit_fast(5.0, None, [])  # type: ignore
+        # the test passes a deliberately invalid value
+        result = _meridian_transit_fast(5.0, None, [])  # pyright: ignore[reportArgumentType]
         assert result is None
 
     def test_antimeridian_transit_fast_exception(self):
         """Covers exception in _antimeridian_transit_fast."""
-        result = _antimeridian_transit_fast(5.0, None, [])  # type: ignore
+        # the test passes a deliberately invalid value
+        result = _antimeridian_transit_fast(5.0, None, [])  # pyright: ignore[reportArgumentType]
         assert result is None
 
     @patch('skytonight.skytonight_calculator.EarthLocation')

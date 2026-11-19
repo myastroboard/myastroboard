@@ -22,7 +22,7 @@ Wire conventions (see docs/HOME_ASSISTANT.md):
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, tzinfo
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -87,7 +87,7 @@ def _tz(name: str | None):
         return UTC
 
 
-def to_iso(value: Any, tz=None) -> str | None:
+def to_iso(value: Any, tz: tzinfo | None = None) -> str | None:
     """Any of the timestamp shapes found in the caches -> ISO 8601 with offset, or None.
 
     Accepts datetimes, ``YYYY-MM-DD HH:MM[:SS]`` naive local strings (localised with *tz*),
@@ -147,7 +147,7 @@ def text(value: Any) -> str | None:
     return cleaned[:MAX_STATE_LEN]
 
 
-def _parse_dt(value: Any, tz=None) -> datetime | None:
+def _parse_dt(value: Any, tz: tzinfo | None = None) -> datetime | None:
     iso = to_iso(value, tz)
     if not iso:
         return None
@@ -1033,7 +1033,7 @@ def _equipment_state(user_id: str, combination_id: str | None, state: dict[str, 
         own, shared_items = equipment_profiles.index_owned_and_shared_equipment(user_id)
         by_id = {**shared_items, **own}
 
-        def _name(item_id):
+        def _name(item_id: str | None):
             item = by_id.get(item_id) if item_id else None
             return text(item.get("name")) if item else None
 

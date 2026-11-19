@@ -7,6 +7,7 @@ import datetime
 import json
 import math
 import time as _time
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from flask import Blueprint, jsonify, request
@@ -26,7 +27,7 @@ logger = get_logger(__name__)
 weather_bp = Blueprint('weather', __name__)
 
 
-def _local_condition_score(record):
+def _local_condition_score(record: dict[str, Any]):
     """Self-contained 0-100 fallback score from a weather record's own component series
     (``cloudless`` / ``seeing`` / ``transparency``), for hours the jet-stream-aware
     ``astro_weather`` score cannot cover.
@@ -48,7 +49,7 @@ def _local_condition_score(record):
     return round(min(100.0, max(0.0, blended)), 1)
 
 
-def _forecast_with_observation_score(payload, location_id):
+def _forecast_with_observation_score(payload: dict[str, Any], location_id: str) -> dict[str, Any]:
     """Return a copy of a weather-forecast payload with each hourly record's ``condition``
     set to the app-wide observation score for that hour (weather_astro's
     ``observation_score`` x10, 0-100), read from the warm astro_weather cache.
@@ -89,7 +90,7 @@ def _forecast_with_observation_score(payload, location_id):
     return {**(payload or {}), "hourly": hourly}
 
 
-def _cached_astro_analysis_if_default(hours, language, location_id):
+def _cached_astro_analysis_if_default(hours: int, language: str, location_id: str | None) -> dict[str, str] | None:
     """Return the warm ``astro_weather`` cache payload when it can answer this request
     verbatim - the 24h analysis in the install's configured language, which is what the
     Astrophotography tab always asks for. Returns ``None`` for any other hours/language so
@@ -330,21 +331,26 @@ def get_next_7_nights_api():
         return jsonify({'error': 'Internal server error'}), 500
 
 
-_moon_phase_calendar_cache: dict = {}  # "<tz>:<yyyy-mm>" -> {"timestamp", "data"}
+_moon_phase_calendar_cache: dict[str, Any] = {}  # "<tz>:<yyyy-mm>" -> {"timestamp", "data"}
 _MOON_PHASE_CALENDAR_TTL = 21600  # 6 hours - the per-day phase data is deterministic
 _MOON_PHASE_CALENDAR_CACHE_MAX = 32  # ~2 reachable months x a handful of timezones; evict the oldest beyond this
 
 
-def _clamp_calendar_month(req_year, req_month, cur_year: int, cur_month: int) -> tuple[int, int]:
+def _clamp_calendar_month(
+    req_year: str | None, req_month: str | None, cur_year: int, cur_month: int
+) -> tuple[int, int]:
     """Clamp a requested (year, month) to the allowed window [current month, current month + 1].
 
     Missing or malformed values fall back to the current month.
     """
     cur_index = cur_year * 12 + (cur_month - 1)
-    try:
-        req_index = int(req_year) * 12 + (int(req_month) - 1)
-    except TypeError, ValueError:
+    if req_year is None or req_month is None:
         req_index = cur_index
+    else:
+        try:
+            req_index = int(req_year) * 12 + (int(req_month) - 1)
+        except ValueError:
+            req_index = cur_index
     req_index = max(cur_index, min(req_index, cur_index + 1))
     clamped_year, month_zero_based = divmod(req_index, 12)
     return clamped_year, month_zero_based + 1
