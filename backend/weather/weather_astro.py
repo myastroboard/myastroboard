@@ -19,6 +19,7 @@ from typing import Any, cast
 
 import numpy as np
 import pandas as pd
+from openmeteo_sdk.WeatherApiResponse import WeatherApiResponse
 
 from utils.constants import (
     ASTRO_BEST_PERIOD_MIN_DURATION_HOURS,
@@ -29,6 +30,7 @@ from utils.logging_config import get_logger
 from utils.repo_config import load_config
 from weather.weather_openmeteo import (
     _is_openmeteo_transient_error,
+    hourly_values,
     is_openmeteo_rate_limited,
     record_openmeteo_rate_limit,
 )
@@ -91,7 +93,7 @@ class AstroWeatherAnalyzer:
             self.location = get_install_default_location(self.config)
         self.language = language
 
-    def fetch_extended_weather_data(self, forecast_hours: int = 24) -> dict | None:
+    def fetch_extended_weather_data(self, forecast_hours: int = 24) -> dict[str, Any] | None:
         """
         Fetch extended weather data with additional atmospheric variables
         for astrophotography analysis
@@ -210,14 +212,16 @@ class AstroWeatherAnalyzer:
                 logger.debug("Full traceback:", exc_info=True)
             return None
 
-    def _parse_extended_data(self, response, hourly_vars: list[str]) -> dict:
+    def _parse_extended_data(self, response: WeatherApiResponse, hourly_vars: list[str]) -> dict[str, Any]:
         """Parse the extended weather response into organized data structure"""
         hourly = response.Hourly()
+        if hourly is None:
+            raise ValueError("Open-Meteo response has no hourly block")
 
         # Create time series
         dates = pd.date_range(
             start=pd.to_datetime(hourly.Time(), unit="s", utc=True),
-            periods=len(hourly.Variables(0).ValuesAsNumpy()),
+            periods=len(hourly_values(hourly, 0)),
             freq=pd.Timedelta(seconds=hourly.Interval()),
         )
 
@@ -227,9 +231,9 @@ class AstroWeatherAnalyzer:
             timezone_str = timezone_str.decode("utf-8")
 
         # Build data dictionary
-        data = {"datetime": dates.tz_convert(timezone_str)}
+        data: dict[str, Any] = {"datetime": dates.tz_convert(timezone_str)}
         for i, var_name in enumerate(hourly_vars):
-            data[var_name] = hourly.Variables(i).ValuesAsNumpy()
+            data[var_name] = hourly_values(hourly, i)
 
         df = pd.DataFrame(data)
 
@@ -579,7 +583,7 @@ class AstroWeatherAnalyzer:
 
         return result
 
-    def generate_comprehensive_analysis(self, forecast_hours: int = 24) -> dict | None:
+    def generate_comprehensive_analysis(self, forecast_hours: int = 24) -> dict[str, Any] | None:
         """
         Generate comprehensive astrophotography weather analysis
         combining all advanced metrics
@@ -604,7 +608,7 @@ class AstroWeatherAnalyzer:
 
             # Convert datetime for JSON serialization
             df_json = df.copy()
-            dt_series = cast(pd.Series, pd.to_datetime(df_json["datetime"], errors="coerce"))
+            dt_series = pd.to_datetime(df_json["datetime"], errors="coerce")
             df_json["datetime"] = dt_series.map(lambda x: x.strftime("%Y-%m-%dT%H:%M:%S%z") if pd.notna(x) else None)
             df_json["observation_score"] = (
                 (
@@ -651,7 +655,7 @@ class AstroWeatherAnalyzer:
         """
         return (((seeing * 10 + transparency + cloud + tracking) / 4) / 10) * precipitation_factor
 
-    def _generate_current_summary(self, current_row: pd.Series | None) -> dict:
+    def _generate_current_summary(self, current_row: pd.Series | None) -> dict[str, Any]:
         """Generate summary of current conditions"""
         if current_row is None:
             return {"status": "No current data available"}
@@ -704,7 +708,7 @@ class AstroWeatherAnalyzer:
 
     def _infer_forecast_slot_hours(self, datetimes: pd.Series) -> float:
         """Infer sampling interval from forecast points (typically 1h)."""
-        dt_series = cast(pd.Series, pd.to_datetime(datetimes, errors="coerce")).dropna().sort_values()
+        dt_series = pd.to_datetime(datetimes, errors="coerce").dropna().sort_values()
         if len(dt_series) < 2:
             return 1.0
 
@@ -720,7 +724,7 @@ class AstroWeatherAnalyzer:
         # Clamp to a sane range to avoid outliers creating unrealistic durations.
         return max(0.25, min(slot_hours, 3.0))
 
-    def _find_best_observation_periods(self, df: pd.DataFrame) -> list[dict]:
+    def _find_best_observation_periods(self, df: pd.DataFrame) -> list[dict[str, Any]]:
         """Find the best periods for astrophotography within the forecast"""
         if len(df) == 0:
             return []
@@ -828,7 +832,7 @@ class AstroWeatherAnalyzer:
         periods.sort(key=lambda x: (x["average_quality"], x["duration_hours"]), reverse=True)
         return periods[:5]
 
-    def _generate_weather_alerts(self, df: pd.DataFrame) -> list[dict]:
+    def _generate_weather_alerts(self, df: pd.DataFrame) -> list[dict[str, Any]]:
         """Generate weather alerts for astrophotography conditions"""
         alerts = []
 
@@ -891,7 +895,7 @@ class AstroWeatherAnalyzer:
 
 def get_astro_weather_analysis(
     hours: int = 24, language: str = "en", location: dict[str, Any] | None = None
-) -> dict | None:
+) -> dict[str, Any] | None:
     """
     Main function to get comprehensive astrophotography weather analysis.
     ``location`` is a v1.2 location preset; falls back to the install default.
@@ -970,7 +974,7 @@ def get_astro_weather_analysis(
         _ASTRO_ANALYSIS_LOCK.release()
 
 
-def get_current_astro_conditions(location: dict[str, Any] | None = None) -> dict | None:
+def get_current_astro_conditions(location: dict[str, Any] | None = None) -> dict[str, Any] | None:
     """
     Get current astrophotography conditions summary for a location preset
     """

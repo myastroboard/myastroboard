@@ -220,7 +220,7 @@ class AllSkyConnector(BaseConnector):
         return None
 
     @classmethod
-    def validate_config(cls, block: dict) -> str | None:
+    def validate_config(cls, block: dict[str, Any]) -> str | None:
         return cls.topic_error(str(block.get("mqtt_topic") or "").strip() or cls.CONFIG_FIELDS["mqtt_topic"])
 
     def mqtt_subscriptions(self) -> list[str]:
@@ -301,7 +301,7 @@ class AllSkyConnector(BaseConnector):
         except Exception:
             return False, -2
 
-    def health_check(self) -> dict:
+    def health_check(self) -> dict[str, Any]:
         if not self.base_url:
             return {"reachable": False, "modules": {}}
 
@@ -342,7 +342,7 @@ class AllSkyConnector(BaseConnector):
         module_results["sensor_data"] = self._sensor_health()
         return {"reachable": reachable, "modules": module_results}
 
-    def get_module_urls(self, date_str: str | None = None) -> dict:
+    def get_module_urls(self, date_str: str | None = None) -> dict[str, Any]:
         # End-of-night files are named after the date the night started (previous day).
         last_night = (datetime.now(UTC) - timedelta(days=1)).strftime("%Y%m%d")
         today = date_str or last_night

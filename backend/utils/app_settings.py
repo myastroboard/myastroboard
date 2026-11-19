@@ -11,6 +11,7 @@ This replaces the following environment variables that were previously required 
 
 import os
 import secrets
+from typing import Any
 from urllib.parse import urlsplit
 
 from db import settings_store
@@ -22,7 +23,7 @@ logger = get_logger(__name__)
 APP_SETTINGS_KEY = 'app_settings'
 SECRET_KEY_KEY = 'secret_key'
 
-_DEFAULTS: dict = {
+_DEFAULTS: dict[str, Any] = {
     "vapid_contact_email": "",
     "trust_proxy_headers": False,
     "session_cookie_secure": False,
@@ -45,7 +46,7 @@ PRIVACY_NOTICE_TEXT_MAX_LENGTH = 20000
 
 LOG_RETENTION_MAX_DAYS = 3650
 
-_cache: dict | None = None
+_cache: dict[str, Any] | None = None
 _cache_revision: int | None = None
 
 
@@ -68,7 +69,7 @@ def load_or_generate_secret_key() -> str:
             logger.debug("SECRET_KEY loaded from the database")
             return key
 
-        def _generate(current):
+        def _generate(current: str | None):
             if isinstance(current, str) and current.strip():
                 return None, current.strip()
             fresh = secrets.token_hex(32)
@@ -82,7 +83,7 @@ def load_or_generate_secret_key() -> str:
         return secrets.token_hex(32)
 
 
-def load_app_settings() -> dict:
+def load_app_settings() -> dict[str, Any]:
     """Load settings from the database and merge with defaults. Updates the module cache."""
     global _cache, _cache_revision
     revision = get_settings_revision(APP_SETTINGS_KEY)
@@ -92,7 +93,7 @@ def load_app_settings() -> dict:
     return settings
 
 
-def save_app_settings(settings: dict) -> None:
+def save_app_settings(settings: dict[str, Any]) -> None:
     """Persist settings and update the module cache."""
     global _cache, _cache_revision
     merged = save_json_settings(APP_SETTINGS_KEY, _DEFAULTS, settings, 'App settings')
@@ -100,7 +101,7 @@ def save_app_settings(settings: dict) -> None:
     _cache_revision = get_settings_revision(APP_SETTINGS_KEY)
 
 
-def get_app_settings() -> dict:
+def get_app_settings() -> dict[str, Any]:
     """Return cached settings, reloading when cold or when another worker saved.
 
     The revision check keeps a long-lived worker process (`gunicorn -w N`) from serving a
@@ -112,9 +113,9 @@ def get_app_settings() -> dict:
     return _cache
 
 
-def normalize_log_retention_days(value, fallback: int = _DEFAULTS["log_retention_days"]) -> int:
+def normalize_log_retention_days(value: int | str | None, fallback: int = _DEFAULTS["log_retention_days"]) -> int:
     """Coerce ``value`` to a whole number of days in [0, LOG_RETENTION_MAX_DAYS], or ``fallback``."""
-    if isinstance(value, bool):
+    if value is None or isinstance(value, bool):
         return fallback
     try:
         days = int(value)
@@ -128,13 +129,13 @@ def get_log_retention_days() -> int:
     return normalize_log_retention_days(get_app_settings().get("log_retention_days"))
 
 
-def normalize_log_level(value, fallback: str) -> str:
+def normalize_log_level(value: int | str | None, fallback: str) -> str:
     """Upper-cased log level name when valid (DEBUG ... CRITICAL), else ``fallback``."""
     name = str(value).strip().upper() if isinstance(value, str) else ''
     return name if name in VALID_LOG_LEVELS else fallback
 
 
-def get_log_levels() -> tuple:
+def get_log_levels() -> tuple[Any, ...]:
     """``(file_level, console_level)`` chosen in the UI; registered as the logging level provider."""
     settings = get_app_settings()
     return (
@@ -143,7 +144,7 @@ def get_log_levels() -> tuple:
     )
 
 
-def normalize_external_base_url(value) -> str | None:
+def normalize_external_base_url(value: str | None) -> str | None:
     """``http(s)://host[:port][/path]`` without trailing slash, ``""`` when blank, None when invalid."""
     text = value.strip() if isinstance(value, str) else ''
     if not text:
@@ -165,7 +166,7 @@ def get_external_base_url() -> str:
     return normalize_external_base_url(get_app_settings().get("external_base_url")) or ''
 
 
-def normalize_privacy_notice_url(value) -> str | None:
+def normalize_privacy_notice_url(value: str | None) -> str | None:
     """An ``http(s)://`` address (path, query and anchor allowed), ``""`` when blank, None when invalid."""
     text = value.strip() if isinstance(value, str) else ''
     if not text:
@@ -182,7 +183,7 @@ def normalize_privacy_notice_url(value) -> str | None:
     return text
 
 
-def normalize_privacy_notice_text(value) -> str | None:
+def normalize_privacy_notice_text(value: str | None) -> str | None:
     """The notice text with line breaks kept and other control characters removed; None when too long."""
     text = value if isinstance(value, str) else ''
     text = text.replace('\r\n', '\n').replace('\r', '\n')
@@ -190,7 +191,7 @@ def normalize_privacy_notice_text(value) -> str | None:
     return text if len(text) <= PRIVACY_NOTICE_TEXT_MAX_LENGTH else None
 
 
-def get_privacy_notice() -> dict:
+def get_privacy_notice() -> dict[str, Any]:
     """``{'url', 'text'}`` as saved (validated; an invalid stored value counts as unset)."""
     settings = get_app_settings()
     return {
@@ -209,7 +210,7 @@ def privacy_notice_link(base: str = '') -> str | None:
     return None
 
 
-def reload_app_settings() -> dict:
+def reload_app_settings() -> dict[str, Any]:
     """Force a reload from the database (call after a restore)."""
     global _cache
     _cache = None

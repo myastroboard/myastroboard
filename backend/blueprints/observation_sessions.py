@@ -14,9 +14,9 @@ import os
 import re
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from flask import Blueprint, jsonify, request, send_file, send_from_directory
+from flask import Blueprint, Response, jsonify, request, send_file, send_from_directory
 from werkzeug.utils import secure_filename
 
 from astroweather.moon_planner import moon_illumination_percent
@@ -28,6 +28,9 @@ from utils.i18n_utils import I18nManager
 from utils.image_privacy import strip_image_metadata
 from utils.logging_config import get_logger
 from utils.repo_config import get_location_by_id, get_locations_for_user, load_config
+
+if TYPE_CHECKING:
+    from utils.auth import User
 
 logger = get_logger(__name__)
 
@@ -42,7 +45,7 @@ _EMPTY_SESSION_LOCATION = {
 }
 
 
-def _safe_session_coordinate(value, min_value, max_value):
+def _safe_session_coordinate(value: float | str | None, min_value: int, max_value: int):
     """Best-effort float parse for a manually-typed coordinate. Returns None for
     anything empty, unparseable, or out of range - a bad value is simply dropped (same
     low-stakes trust level as notes), not a 400."""
@@ -57,7 +60,7 @@ def _safe_session_coordinate(value, min_value, max_value):
     return parsed
 
 
-def _validate_and_coerce_rating(entry_data: dict) -> Any:
+def _validate_and_coerce_rating(entry_data: dict[str, Any]) -> Any:
     """Validate entry_data['rating'] in place (0.0-5.0 in 0.5 steps) and coerce it to a
     clean float, or None if left blank. Returns an error message string on failure, else
     None.
@@ -80,7 +83,7 @@ def _validate_and_coerce_rating(entry_data: dict) -> Any:
     return None
 
 
-def _validate_and_coerce_picture_capture(picture_data: dict) -> Any:
+def _validate_and_coerce_picture_capture(picture_data: dict[str, Any]) -> Any:
     """Validate/coerce picture_data['exposition_time'], ['frames'] and
     ['integration_minutes'] in place, mirroring Astrodex's own picture capture validator
     (``blueprints/astrodex.py``'s ``_validate_and_coerce_picture_capture``, duplicated
@@ -133,7 +136,7 @@ def _validate_and_coerce_picture_capture(picture_data: dict) -> Any:
     return None
 
 
-def _resolve_session_combination_reference(combination_id, user_id) -> str | None:
+def _resolve_session_combination_reference(combination_id: str | None, user_id: str) -> str | None:
     """Return combination_id if it resolves to an accessible (own or shared) combination
     for this user, else None - so a session (or, via the same check, one of its entries -
     see _apply_resolved_entry_combination below) can never be tagged with a combination
@@ -148,7 +151,7 @@ def _resolve_session_combination_reference(combination_id, user_id) -> str | Non
     return None
 
 
-def _apply_resolved_entry_combination(payload: dict, user) -> None:
+def _apply_resolved_entry_combination(payload: dict[str, Any], user: User) -> None:
     """Resolve an entry's optional per-target equipment override server-side, in place.
 
     Same contract as the combination half of _apply_resolved_session_fields (only
@@ -179,8 +182,12 @@ def _apply_resolved_entry_combination(payload: dict, user) -> None:
 
 
 def _resolve_session_location_snapshot(
-    location_id, user, custom_name=None, custom_latitude=None, custom_longitude=None
-):
+    location_id: str | None,
+    user: User,
+    custom_name: str | None = None,
+    custom_latitude: float | str | None = None,
+    custom_longitude: float | str | None = None,
+) -> dict[str, Any]:
     """Resolve a session's location into a frozen snapshot: either a preset (looked up +
     access-checked server-side) or a free-text "somewhere else" label the user typed.
 
@@ -218,7 +225,7 @@ def _resolve_session_location_snapshot(
     return dict(_EMPTY_SESSION_LOCATION)
 
 
-def _location_preset_sqm(location_id) -> float | None:
+def _location_preset_sqm(location_id: str | None) -> float | None:
     """Return a location preset's own configured SQM, used to pre-fill a new session."""
     if not location_id:
         return None
@@ -256,7 +263,7 @@ def _compute_moon_illumination_for_date(date_str: str | None) -> float | None:
         return None
 
 
-def _apply_resolved_session_fields(payload: dict, user) -> None:
+def _apply_resolved_session_fields(payload: dict[str, Any], user: User) -> None:
     """Resolve the client-supplied combination/location of a create/update payload
     server-side, in place.
 
@@ -293,7 +300,7 @@ def _apply_resolved_session_fields(payload: dict, user) -> None:
         )
 
 
-def _validate_night_id(session: dict, night_id: str | None) -> Any:
+def _validate_night_id(session: dict[str, Any], night_id: str | None) -> Any:
     """Validate that *night_id* (if given) resolves to one of *session*'s nights.
     Returns an error message string on failure, else None (a blank night_id is valid -
     the caller defaults it, see _default_night_id())."""
@@ -304,7 +311,7 @@ def _validate_night_id(session: dict, night_id: str | None) -> Any:
     return 'night_id does not resolve to a night in this session'
 
 
-def _default_night_id(session: dict) -> str | None:
+def _default_night_id(session: dict[str, Any]) -> str | None:
     """Which night a new entry defaults to when the client doesn't specify one: the
     most recently added night, so adding a target right after "Add night" lands it on
     that new night rather than always the first one."""
@@ -312,7 +319,7 @@ def _default_night_id(session: dict) -> str | None:
     return nights[-1]['id'] if nights else None
 
 
-def _ensure_astrodex_item_for_entry(user, entry: dict) -> str | None:
+def _ensure_astrodex_item_for_entry(user: User, entry: dict[str, Any]) -> str | None:
     """Find-or-create the Astrodex item for this entry's target, idempotently.
 
     Returns the astrodex_item_id (existing or newly created), or None when the target
@@ -351,7 +358,7 @@ def _ensure_astrodex_item_for_entry(user, entry: dict) -> str | None:
     return fallback.get('id') if fallback else None
 
 
-def _auto_link_astrodex_item(user, session_id: str, entry: dict) -> dict:
+def _auto_link_astrodex_item(user: User, session_id: str, entry: dict[str, Any]) -> dict[str, Any]:
     """Register the entry's target in Astrodex as soon as it has real capture evidence.
 
     "Catch them all" is a keypoint of this app, so item-level catalogue membership is
@@ -401,7 +408,7 @@ def list_observation_sessions():
 
 @observation_sessions_bp.route('/api/observation-sessions/<session_id>', methods=['GET'])
 @login_required
-def get_observation_session(session_id):
+def get_observation_session(session_id: str):
     """Get one session with its entries."""
     try:
         user = get_current_user()
@@ -451,7 +458,7 @@ def create_observation_session():
 
 @observation_sessions_bp.route('/api/observation-sessions/<session_id>', methods=['PUT'])
 @user_required
-def update_observation_session(session_id):
+def update_observation_session(session_id: str):
     """Update session-level fields."""
     try:
         user = get_current_user()
@@ -473,7 +480,7 @@ def update_observation_session(session_id):
 
 @observation_sessions_bp.route('/api/observation-sessions/<session_id>', methods=['DELETE'])
 @user_required
-def delete_observation_session(session_id):
+def delete_observation_session(session_id: str):
     """Delete a session and all of its entries (Astrodex is never touched)."""
     try:
         user = get_current_user()
@@ -491,7 +498,7 @@ def delete_observation_session(session_id):
 
 @observation_sessions_bp.route('/api/observation-sessions/<session_id>/nights', methods=['POST'])
 @user_required
-def add_observation_session_night(session_id):
+def add_observation_session_night(session_id: str):
     """Add another night to a multi-night session. ``date`` is required."""
     try:
         user = get_current_user()
@@ -524,7 +531,7 @@ def add_observation_session_night(session_id):
 
 @observation_sessions_bp.route('/api/observation-sessions/<session_id>/nights/<night_id>', methods=['PUT'])
 @user_required
-def update_observation_session_night(session_id, night_id):
+def update_observation_session_night(session_id: str, night_id: str):
     """Update one night's conditions/notes."""
     try:
         user = get_current_user()
@@ -547,7 +554,7 @@ def update_observation_session_night(session_id, night_id):
 
 @observation_sessions_bp.route('/api/observation-sessions/<session_id>/nights/<night_id>', methods=['DELETE'])
 @user_required
-def delete_observation_session_night(session_id, night_id):
+def delete_observation_session_night(session_id: str, night_id: str):
     """Remove one night.
 
     Refused (400) while it's the session's last remaining night, or while any entry
@@ -614,7 +621,7 @@ def create_observation_session_from_plan():
 
 @observation_sessions_bp.route('/api/observation-sessions/<session_id>/entries', methods=['POST'])
 @user_required
-def add_observation_session_entry(session_id):
+def add_observation_session_entry(session_id: str):
     """Add one target entry to a session.
 
     Side effect: registers the target in Astrodex when ``frame_count > 0`` (see
@@ -658,7 +665,7 @@ def add_observation_session_entry(session_id):
 
 @observation_sessions_bp.route('/api/observation-sessions/<session_id>/entries/<entry_id>', methods=['PUT'])
 @user_required
-def update_observation_session_entry(session_id, entry_id):
+def update_observation_session_entry(session_id: str, entry_id: str) -> Response | tuple[Response, int]:
     """Update one entry's actual-capture fields.
 
     Side effect: same automatic Astrodex item registration as the add route, whenever
@@ -698,7 +705,7 @@ def update_observation_session_entry(session_id, entry_id):
 
 @observation_sessions_bp.route('/api/observation-sessions/<session_id>/entries/<entry_id>', methods=['DELETE'])
 @user_required
-def delete_observation_session_entry(session_id, entry_id):
+def delete_observation_session_entry(session_id: str, entry_id: str):
     """Remove one entry (its linked Astrodex item/picture is a soft reference, kept)."""
     try:
         user = get_current_user()
@@ -718,7 +725,7 @@ def delete_observation_session_entry(session_id, entry_id):
     '/api/observation-sessions/<session_id>/entries/<entry_id>/astrodex-picture', methods=['POST']
 )
 @user_required
-def attach_astrodex_picture_to_entry(session_id, entry_id):
+def attach_astrodex_picture_to_entry(session_id: str, entry_id: str) -> Response | tuple[Response, int]:
     """Attach an already-uploaded image to this entry's Astrodex item.
 
     The image itself must have been uploaded through the existing, unchanged
@@ -827,7 +834,7 @@ ATTACHMENT_IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png', 'webp'}
 
 @observation_sessions_bp.route('/api/observation-sessions/<session_id>/attachments', methods=['POST'])
 @user_required
-def upload_observation_session_attachment(session_id):
+def upload_observation_session_attachment(session_id: str):
     """Upload a file and record it against a session, in one step (unlike Astrodex's
     two-step upload-then-attach, an attachment only ever belongs to one session)."""
     try:
@@ -895,7 +902,7 @@ def upload_observation_session_attachment(session_id):
         return jsonify({'error': 'Internal server error'}), 500
 
 
-def _attachment_download_name(attachment: dict) -> str:
+def _attachment_download_name(attachment: dict[str, Any]) -> str:
     """The filename a browser should save this attachment as: the custom display name
     (if the user set one) with the real extension re-attached when missing, else the
     original upload filename - never the regenerated on-disk `{uuid}.{ext}` name."""
@@ -912,7 +919,7 @@ def _attachment_download_name(attachment: dict) -> str:
 
 @observation_sessions_bp.route('/api/observation-sessions/attachments/<filename>', methods=['GET'])
 @login_required
-def get_observation_session_attachment(filename):
+def get_observation_session_attachment(filename: str):
     """Serve an attachment file - ownership-checked (does this filename belong to one
     of the caller's own sessions), mirroring astrodex.py's can_user_view_image() but
     simplified to plain ownership since sessions (unlike Astrodex) are never shared."""
@@ -945,7 +952,7 @@ def get_observation_session_attachment(filename):
 
 @observation_sessions_bp.route('/api/observation-sessions/<session_id>/attachments/<attachment_id>', methods=['PUT'])
 @user_required
-def rename_observation_session_attachment(session_id, attachment_id):
+def rename_observation_session_attachment(session_id: str, attachment_id: str):
     """Set or clear an attachment's custom display name - never touches the file itself
     or its storage filename, only what the UI shows and what a download is named."""
     try:
@@ -968,7 +975,7 @@ def rename_observation_session_attachment(session_id, attachment_id):
 
 @observation_sessions_bp.route('/api/observation-sessions/<session_id>/attachments/<attachment_id>', methods=['DELETE'])
 @user_required
-def delete_observation_session_attachment(session_id, attachment_id):
+def delete_observation_session_attachment(session_id: str, attachment_id: str):
     try:
         user = get_current_user()
         if not user:  # pragma: no cover
@@ -988,7 +995,7 @@ def delete_observation_session_attachment(session_id, attachment_id):
 # ---------------------------------------------------------------------------
 
 
-def _resolve_entry_image_path(user, entry: dict) -> str | None:
+def _resolve_entry_image_path(user: User, entry: dict[str, Any]) -> str | None:
     """Absolute path to an entry's attached Astrodex photo, or None when it has no photo,
     the linked item/picture no longer resolves, or the file is missing on disk.
 
@@ -1018,7 +1025,7 @@ def _resolve_entry_image_path(user, entry: dict) -> str | None:
     return file_path
 
 
-def _collect_image_paths(user, sessions: list[dict]) -> dict[str, str]:
+def _collect_image_paths(user: User, sessions: list[dict[str, Any]]) -> dict[str, str]:
     """entry id -> resolved image path, across every entry of every given session."""
     image_paths: dict[str, str] = {}
     for session in sessions:
@@ -1034,7 +1041,7 @@ def _collect_image_paths(user, sessions: list[dict]) -> dict[str, str]:
     return image_paths
 
 
-def _session_overlaps_date_range(session: dict, from_date: str | None, to_date: str | None) -> bool:
+def _session_overlaps_date_range(session: dict[str, Any], from_date: str | None, to_date: str | None) -> bool:
     """True when *any* of the session's nights falls within [from_date, to_date]
     (either bound omitted = open-ended). A multi-night trip straddling a filter
     boundary still matches - the PDF renders every one of its nights regardless, this
@@ -1053,7 +1060,7 @@ def _session_overlaps_date_range(session: dict, from_date: str | None, to_date: 
 
 @observation_sessions_bp.route('/api/observation-sessions/<session_id>/export.pdf', methods=['GET'])
 @login_required
-def export_observation_session_pdf(session_id):
+def export_observation_session_pdf(session_id: str):
     """Export one session as a print-friendly PDF (common info + every logged target,
     with its attached photo when there is one)."""
     try:

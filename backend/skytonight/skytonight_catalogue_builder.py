@@ -32,7 +32,7 @@ IDENTIFIER_PATTERN = re.compile(r'\b(M\s*\d+|NGC\s*\d+|IC\s*\d+)\b', re.IGNORECA
 
 # ── Herschel 400 - Astronomical League program (NGC objects only) ─────────────
 # Source: https://www.astroleague.org/herschel-400-observing-program/
-_HERSCHEL400_NGC: frozenset = frozenset(
+_HERSCHEL400_NGC: frozenset[Any] = frozenset(
     {
         40,
         129,
@@ -815,7 +815,7 @@ def build_targets_from_rows(
 def _load_pyongc_rows() -> list[PyOngcRow]:
     """Load deep-sky objects from PyOngc when available."""
     try:
-        from pyongc import ongc  # type: ignore[import-not-found]
+        from pyongc import ongc
     except ImportError as error:
         raise RuntimeError('PyOngc is required to build the SkyTonight deep-sky dataset') from error
 
@@ -909,7 +909,7 @@ def _build_standalone_targets_from_json(filename: str, catalogue_key: str) -> li
         return []
 
     # Phase 1 - parse all valid entries into intermediate dicts
-    parsed: list[dict] = []
+    parsed: list[dict[str, Any]] = []
     skipped = 0
     for entry in data:
         if not isinstance(entry, dict):

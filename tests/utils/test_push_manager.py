@@ -198,28 +198,42 @@ def test_send_push_serializes_payload_as_json(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_pem_to_raw_b64_converts_key(monkeypatch):
-    """convert PEM EC key to raw base64url scalar."""
-    from unittest.mock import MagicMock
+def test_pem_to_raw_b64_converts_key():
+    """A PEM EC private key becomes its raw 32-byte scalar, base64url-encoded without padding."""
+    import base64
+
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
 
     from utils import push_manager
 
-    fake_key = MagicMock()
-    fake_key.private_numbers.return_value.private_value = 12345678901234567890123456789012
+    key = ec.generate_private_key(ec.SECP256R1())
+    pem = key.private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
+    ).decode('utf-8')
 
-    fake_loader = MagicMock(return_value=fake_key)
-    fake_serialization = MagicMock()
-    fake_serialization.load_pem_private_key = fake_loader
+    result = push_manager._pem_to_raw_b64(pem)
 
-    fake_crypto_mod = types.ModuleType('cryptography.hazmat.primitives.serialization')
-    fake_crypto_mod.load_pem_private_key = fake_loader
+    assert '=' not in result
+    raw = base64.urlsafe_b64decode(result + '=' * (-len(result) % 4))
+    assert raw == key.private_numbers().private_value.to_bytes(32, 'big')
 
-    monkeypatch.setitem(sys.modules, 'cryptography.hazmat.primitives.serialization', fake_crypto_mod)
 
-    result = push_manager._pem_to_raw_b64("-----BEGIN EC PRIVATE KEY-----\nFAKE\n-----END EC PRIVATE KEY-----")
+def test_pem_to_raw_b64_rejects_non_ec_key():
+    """A PEM key that is not an EC key (VAPID needs P-256) is refused with a TypeError."""
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ed25519
 
-    assert isinstance(result, str)
-    assert len(result) > 0
+    from utils import push_manager
+
+    pem = (
+        ed25519.Ed25519PrivateKey.generate()
+        .private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())
+        .decode('utf-8')
+    )
+
+    with pytest.raises(TypeError, match='EC key'):
+        push_manager._pem_to_raw_b64(pem)
 
 
 # ---------------------------------------------------------------------------

@@ -298,7 +298,8 @@ class TestResolveScheduleEdgeCases:
         """Covers non-dict config path."""
         # Intentionally pass invalid config to verify fallback behavior.
         schedule = resolve_schedule(
-            None,  # type: ignore[arg-type]
+            # the test passes a deliberately invalid value
+            None,  # pyright: ignore[reportArgumentType]
             now=datetime(2026, 4, 17, 12, 0, tzinfo=ZoneInfo('UTC')),
         )
         assert schedule.mode == 'fallback-6h'

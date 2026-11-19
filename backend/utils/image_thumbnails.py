@@ -15,6 +15,7 @@ import io
 import os
 import threading
 from collections import OrderedDict
+from typing import Any
 
 from PIL import Image, ImageOps
 
@@ -34,12 +35,12 @@ THUMBNAIL_MIMETYPE = 'image/webp'
 # preview about 50-200 KB).
 _CACHE_MAX_BYTES = 16 * 1024 * 1024
 
-_cache: OrderedDict[tuple, bytes] = OrderedDict()
+_cache: OrderedDict[tuple[Any, ...], bytes] = OrderedDict()
 _cache_bytes = 0
 _lock = threading.Lock()
 
 
-def _cache_key(path: str, max_side: int) -> tuple | None:
+def _cache_key(path: str, max_side: int) -> tuple[Any, ...] | None:
     try:
         stat = os.stat(path)
     except OSError:
@@ -60,7 +61,7 @@ def _render(path: str, max_side: int) -> bytes:
         return output.getvalue()
 
 
-def _remember(key: tuple, data: bytes) -> None:
+def _remember(key: tuple[Any, ...], data: bytes) -> None:
     global _cache_bytes
     with _lock:
         if key in _cache:

@@ -16,7 +16,7 @@ class BaseConnector(ABC):
     homepage: str = ""
 
     # Ordered list of module definitions: {slug, label, description, default_enabled}
-    MODULES: list[dict] = []
+    MODULES: list[dict[str, Any]] = []
 
     # App areas (navbar tabs) where this connector's data surfaces, e.g. ["observatory"].
     # Purely declarative — it drives the badges on the connector card so users know where to
@@ -55,7 +55,7 @@ class BaseConnector(ABC):
     # connection cannot be deleted while this connector points at it.
     CONNECTION_FIELD: str = ""
 
-    def __init__(self, config: dict, connection: dict | None = None):
+    def __init__(self, config: dict[str, Any], connection: dict[str, Any] | None = None):
         """
         Args:
             config: The connector's config dict from config["connectors"][name]
@@ -67,7 +67,7 @@ class BaseConnector(ABC):
         self.base_url = config.get("url", "").rstrip("/")
 
     @classmethod
-    def validate_config(cls, block: dict) -> str | None:
+    def validate_config(cls, block: dict[str, Any]) -> str | None:
         """Why a config block about to be saved is refused, or None.
 
         Called by the shared save after the typed coercion of CONFIG_FIELDS, for checks the
@@ -92,13 +92,13 @@ class BaseConnector(ABC):
         return bool(modules.get(module_slug, {}).get("enabled", False))
 
     @abstractmethod
-    def health_check(self) -> dict:
+    def health_check(self) -> dict[str, Any]:
         """
         Returns per-module health status.
         Shape: {"reachable": bool, "modules": {"slug": {"ok": bool, "detail": str}}}
         """
 
-    def get_module_urls(self, date_str: str | None = None) -> dict:
+    def get_module_urls(self, date_str: str | None = None) -> dict[str, Any]:
         """
         Returns resolved URLs for all enabled modules.
         Shape: {"module_slug": "http://..."}

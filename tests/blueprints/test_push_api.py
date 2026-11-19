@@ -8,8 +8,8 @@ import pytest
 if 'psutil' not in sys.modules:
     sys.modules['psutil'] = types.ModuleType('psutil')
 
-from app import app  # type: ignore[import-not-found]
-from utils import auth  # type: ignore[import-not-found]
+from app import app
+from utils import auth
 
 User = auth.User
 user_manager = auth.user_manager

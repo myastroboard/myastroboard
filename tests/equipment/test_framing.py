@@ -10,7 +10,7 @@ import pytest
 if 'psutil' not in sys.modules:
     sys.modules['psutil'] = types.ModuleType('psutil')
 
-from equipment import framing  # type: ignore[import-not-found]
+from equipment import framing
 
 # A 1000 mm telescope with a 20 x 10 mm sensor: 1.146 x 0.573 degrees, 68.76 x 34.38 arcmin.
 _TELESCOPE = {'id': 'tel-1', 'name': 'Newton 200/1000', 'focal_length_mm': 1000, 'effective_focal_length': 1000}

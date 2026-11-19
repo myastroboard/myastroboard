@@ -11,6 +11,7 @@ import os
 import sys
 
 from alembic import context
+from sqlalchemy import Connection
 
 _BACKEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 if _BACKEND_DIR not in sys.path:  # pragma: no cover - only when started from the Alembic CLI
@@ -23,7 +24,7 @@ config = context.config
 target_metadata = schema.metadata
 
 
-def _configure_and_run(connection) -> None:
+def _configure_and_run(connection: Connection) -> None:
     context.configure(
         connection=connection,
         target_metadata=target_metadata,

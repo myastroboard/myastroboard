@@ -174,7 +174,7 @@ def item_key(item: dict[str, Any]) -> str:
     return _clean_text(item.get('catalogue_group_id'), 120) or _normalize_key(item.get('name'))
 
 
-def _target_keys(name: Any, group_id: Any, aliases: Any) -> set:
+def _target_keys(name: Any, group_id: Any, aliases: Any) -> set[Any]:
     """Every normalized identifier a target is known by, for duplicate detection."""
     keys = {_normalize_key(name)}
     group = _clean_text(group_id, 120)
@@ -185,14 +185,14 @@ def _target_keys(name: Any, group_id: Any, aliases: Any) -> set:
     return {key for key in keys if key}
 
 
-def _existing_keys(items: Sequence[dict[str, Any]]) -> set:
+def _existing_keys(items: Sequence[dict[str, Any]]) -> set[Any]:
     keys = set()
     for item in items:
         keys.update(_target_keys(item.get('name'), item.get('catalogue_group_id'), item.get('catalogue_aliases')))
     return keys
 
 
-def build_wishlist_index(items: Sequence[dict[str, Any]]) -> set:
+def build_wishlist_index(items: Sequence[dict[str, Any]]) -> set[Any]:
     """Every identifier the user's wishlist covers, as one flat set.
 
     Built once per request so annotating a large SkyTonight result set stays a set
@@ -203,7 +203,7 @@ def build_wishlist_index(items: Sequence[dict[str, Any]]) -> set:
 
 
 def is_target_in_index(
-    index: set,
+    index: set[Any],
     name: Any,
     catalogue_group_id: Any = '',
     aliases: Any = None,
@@ -388,7 +388,7 @@ def remove_items(user_id: str, item_ids: Iterable[str]) -> int:
 def build_captured_index(
     captured_keys: Iterable[str],
     captured_names: Iterable[str] = (),
-) -> set:
+) -> set[Any]:
     """Normalize the identifiers of everything the user has already captured.
 
     The caller supplies them: the blueprint layer derives the keys from the Observation
@@ -399,7 +399,7 @@ def build_captured_index(
     return index
 
 
-def annotate_captured(items: Sequence[dict[str, Any]], captured_index: set) -> list[dict[str, Any]]:
+def annotate_captured(items: Sequence[dict[str, Any]], captured_index: set[Any]) -> list[dict[str, Any]]:
     """Return copies of *items* carrying a freshly-derived ``captured`` flag.
 
     Never persisted - recomputed on every read, so editing an entry or deleting a session

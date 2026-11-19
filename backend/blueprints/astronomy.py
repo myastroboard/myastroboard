@@ -173,7 +173,7 @@ def get_upcoming_events_api():
         supported_languages = I18nManager.get_supported_languages()
         language = requested_language if requested_language in supported_languages else "en"
 
-        def _valid_location_data(name, ttl):
+        def _valid_location_data(name: str, ttl: int) -> dict[str, Any] | None:
             entry = cache_store.load_location_cache(name, location_id)
             return entry.get("data") if cache_store.is_cache_valid(entry, ttl) else None
 

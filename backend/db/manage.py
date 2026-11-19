@@ -43,7 +43,7 @@ def _find_user(username: str):
     return user_manager, user
 
 
-def cmd_status(_args) -> int:
+def cmd_status(_args: argparse.Namespace) -> int:
     from sqlalchemy import func, select
 
     from db import migrate, schema
@@ -63,7 +63,7 @@ def cmd_status(_args) -> int:
     return 0
 
 
-def cmd_list_users(_args) -> int:
+def cmd_list_users(_args: argparse.Namespace) -> int:
     from utils.auth import user_manager
 
     for user in sorted(user_manager.list_users(), key=lambda entry: entry['username']):
@@ -72,7 +72,7 @@ def cmd_list_users(_args) -> int:
     return 0
 
 
-def cmd_reset_password(args) -> int:
+def cmd_reset_password(args: argparse.Namespace) -> int:
     manager, user = _find_user(args.username)
     password = args.password or secrets.token_urlsafe(12)
     if len(password) < 6:
@@ -85,14 +85,14 @@ def cmd_reset_password(args) -> int:
     return 0
 
 
-def cmd_disable_2fa(args) -> int:
+def cmd_disable_2fa(args: argparse.Namespace) -> int:
     manager, user = _find_user(args.username)
     manager.disable_totp(user.user_id)
     _out(f'Two-factor authentication disabled for {user.username}.')
     return 0
 
 
-def cmd_strip_picture_metadata(args) -> int:
+def cmd_strip_picture_metadata(args: argparse.Namespace) -> int:
     """Remove GPS and camera metadata from pictures stored before uploads were stripped (1.6.4)."""
     from utils.image_privacy import strip_stored_pictures
     from utils.user_data import user_data_dirs

@@ -25,6 +25,7 @@ import json
 import os
 import re
 import sys
+from typing import Any
 
 import requests
 
@@ -57,14 +58,14 @@ LABEL_MINZOOM = {'label-place-town': 8, 'label-place-village': 10}
 _COLOR_RE = re.compile(r'^(rgba?|hsla?)\(([^)]*)\)$|^#([0-9a-fA-F]{3,8})$')
 
 
-def fetch_style(name: str) -> dict:
+def fetch_style(name: str) -> dict[str, Any]:
     """Download one published style."""
     resp = requests.get(f'{STYLE_BASE_URL}/{name}.json', headers={'User-Agent': USER_AGENT}, timeout=30)
     resp.raise_for_status()
     return resp.json()
 
 
-def localize(style: dict, name: str) -> dict:
+def localize(style: dict[str, Any], name: str) -> dict[str, Any]:
     """Point every external URL of a style at the server's proxy and apply LABEL_MINZOOM."""
     if set(style['sources']) != {'versatiles-shortbread'}:
         raise ValueError(f'Unexpected sources in the {name} style: {sorted(style["sources"])}')
@@ -115,7 +116,7 @@ def to_red(value: str) -> str:
     return f'rgba({round(red)},{round(red * RED_GREEN_RATIO)},{round(red * RED_BLUE_RATIO)},{round(a, 3)})'
 
 
-def _recolor(node):
+def _recolor(node: Any) -> Any:
     if isinstance(node, str):
         return to_red(node)
     if isinstance(node, list):
@@ -125,7 +126,7 @@ def _recolor(node):
     return node
 
 
-def make_red(style: dict) -> dict:
+def make_red(style: dict[str, Any]) -> dict[str, Any]:
     """Recolor every paint color of a style to reds; drop the colored (non-SDF) fill patterns."""
     red = json.loads(json.dumps(style))
     for layer in red['layers']:
@@ -140,7 +141,7 @@ def make_red(style: dict) -> dict:
     return red
 
 
-def write_style(variant: str, style: dict) -> str:
+def write_style(variant: str, style: dict[str, Any]) -> str:
     path = os.path.join(OUTPUT_DIR, f'{variant}.json')
     with open(path, 'w', encoding='utf-8', newline='\n') as fh:
         json.dump(style, fh, ensure_ascii=True, separators=(',', ':'))

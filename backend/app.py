@@ -7,6 +7,8 @@ import atexit
 import os
 import sys
 from datetime import timedelta
+from types import FrameType
+from typing import TYPE_CHECKING, Any
 
 from flask import (
     Flask,
@@ -51,7 +53,9 @@ try:
 
     if os.path.exists(_IERS_CACHE_FILE):  # pragma: no branch
         _table = _IERS_A.open(_IERS_CACHE_FILE)
-        _IERS_Auto.iers_table = _table  # type: ignore[assignment]
+        # astropy annotates IERS_Auto.iers_table as IERS_Auto | None; this atomic swap installs the downloaded IERS_A
+        # table and never passes through None
+        _IERS_Auto.iers_table = _table  # pyright: ignore[reportAttributeAccessIssue]
         # IERS_Auto.open() with auto_download=False always overwrites iers_table with the
         # bundled (old) table, bypassing our downloaded one. Setting earth_orientation_table
         # directly ensures coordinate transforms (get_polar_motion) use the fresh data.
@@ -100,6 +104,9 @@ __all__ = [
 ]
 
 # Initialize logger for this module
+if TYPE_CHECKING:
+    from cache.cache_scheduler import CacheScheduler
+
 logger = get_logger(__name__)
 
 STATIC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static'))
@@ -111,7 +118,7 @@ app = Flask(__name__, template_folder=TEMPLATE_DIR, static_folder=STATIC_DIR)
 # everything; see utils/request_activity.py).
 from utils.request_activity import RequestActivityMiddleware
 
-app.wsgi_app = RequestActivityMiddleware(app.wsgi_app)  # type: ignore[method-assign]
+app.wsgi_app = RequestActivityMiddleware(app.wsgi_app)
 
 # Load persistent app settings (replaces SECRET_KEY / TRUST_PROXY_HEADERS /
 # SESSION_COOKIE_SECURE / VAPID_CONTACT_EMAIL environment variables).
@@ -143,7 +150,7 @@ if _startup_settings['trust_proxy_headers']:  # pragma: no cover
 from utils import ingress as _ingress
 
 if _ingress.ingress_enabled():  # pragma: no cover - env flag set by the HA app only
-    app.wsgi_app = _ingress.IngressMiddleware(app.wsgi_app)  # type: ignore[method-assign]
+    app.wsgi_app = _ingress.IngressMiddleware(app.wsgi_app)
     logger.info("Home Assistant ingress enabled")
 app.session_interface = _ingress.IngressAwareSessionInterface()
 
@@ -272,7 +279,7 @@ def log_session_restoration():
 
 
 @app.context_processor
-def inject_base_path():
+def inject_base_path() -> dict[str, Any]:
     """``base``: the URL prefix the app is served under ('' at the root, the HA ingress path otherwise).
 
     Templates write ``{{ base }}/static/...`` instead of ``/static/...`` and expose it in
@@ -292,7 +299,7 @@ def inject_base_path():
 
 
 @app.after_request
-def set_cache_headers(response):
+def set_cache_headers(response: Response) -> Response:
     """Set long-term cache headers for versioned static assets."""
     if request.endpoint == 'static' or request.path.startswith('/static/'):
         # In development/debug, always bypass browser cache so frontend changes are visible immediately.
@@ -396,7 +403,7 @@ def web_manifest():
 
 
 @app.route('/manifest.<lang>.webmanifest')
-def web_manifest_localized(lang):
+def web_manifest_localized(lang: str):
     """Serve localized PWA web manifest"""
     allowed = {'fr', 'es', 'de', 'it', 'pt'}
     if lang not in allowed:
@@ -456,7 +463,7 @@ def robots_txt():
 # ============================================================
 
 
-def get_or_create_cache_scheduler():
+def get_or_create_cache_scheduler() -> CacheScheduler | None:
     """Get the cache scheduler instance, creating it if necessary"""
     if 'cache_scheduler' not in app.config:
         logger.debug("Creating cache scheduler instance...")
@@ -674,7 +681,7 @@ atexit.register(_stop_schedulers_on_exit)
 try:
     import signal as _signal
 
-    def _sigterm_handler(signum, frame):  # pragma: no cover
+    def _sigterm_handler(signum: int, frame: FrameType | None):  # pragma: no cover
         _stop_schedulers_on_exit()
         # Restore default handler and re-raise so gunicorn can complete its shutdown.
         _signal.signal(_signal.SIGTERM, _signal.SIG_DFL)

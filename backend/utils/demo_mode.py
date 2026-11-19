@@ -13,10 +13,14 @@ behaves normally; see docs/DEMO_MODE.md for the recommended account setup.
 
 import os
 import secrets
+from typing import TYPE_CHECKING, Any
 
 from flask import jsonify, session
 
 from utils.logging_config import get_logger
+
+if TYPE_CHECKING:
+    from utils.auth import User, UserManager
 
 logger = get_logger(__name__)
 
@@ -64,7 +68,7 @@ def demo_username() -> str:
     return os.environ.get(DEMO_USERNAME_ENV, '').strip() or DEFAULT_DEMO_USERNAME
 
 
-def is_demo_username(username) -> bool:
+def is_demo_username(username: str | None) -> bool:
     """True when ``username`` names the demo account (case-insensitive, like sign-in)."""
     return bool(username) and str(username).strip().lower() == demo_username().lower()
 
@@ -74,7 +78,7 @@ def is_demo_session() -> bool:
     return is_demo_mode() and is_demo_username(session.get('username'))
 
 
-def get_or_create_demo_user(user_manager):
+def get_or_create_demo_user(user_manager: UserManager) -> User | None:
     """Return the demo account, creating it on first use.
 
     The account gets the ``user`` role so the visitor sees the full interface (the
@@ -102,7 +106,7 @@ def get_or_create_demo_user(user_manager):
     return user
 
 
-def sign_in_demo_visitor(user_manager):
+def sign_in_demo_visitor(user_manager: UserManager) -> User | None:
     """Sign the current visitor in on the demo account. Returns the user, or None.
 
     Writes the session directly instead of going through the login route: a visit is
@@ -135,20 +139,20 @@ def demo_read_only_response():
     )
 
 
-def blocked_demo_write(method, endpoint) -> bool:
+def blocked_demo_write(method: str, endpoint: str | None) -> bool:
     """True when a request must be refused because it would write from the demo session."""
     if method in SAFE_METHODS or endpoint in DEMO_ALLOWED_WRITE_ENDPOINTS:
         return False
     return is_demo_session()
 
 
-def session_preferences() -> dict:
+def session_preferences() -> dict[str, Any]:
     """The visitor's own preference overrides, kept in their session cookie."""
     stored = session.get(DEMO_PREFERENCES_SESSION_KEY)
     return dict(stored) if isinstance(stored, dict) else {}
 
 
-def visitor_preferences(account_preferences: dict) -> dict:
+def visitor_preferences(account_preferences: dict[str, Any]) -> dict[str, Any]:
     """What a demo visitor sees: the demo account's preferences, overlaid with their own.
 
     The account's language is dropped: a shared account must not impose its language,
@@ -160,7 +164,7 @@ def visitor_preferences(account_preferences: dict) -> dict:
     return merged
 
 
-def store_session_preferences(preferences: dict) -> dict:
+def store_session_preferences(preferences: dict[str, Any]) -> dict[str, Any]:
     """Merge ``preferences`` (already validated) into the session overrides and return them."""
     overrides = session_preferences()
     overrides.update({k: v for k, v in preferences.items() if k not in DEMO_LOCKED_PREFERENCE_KEYS})

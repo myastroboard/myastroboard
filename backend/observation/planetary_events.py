@@ -212,15 +212,16 @@ class PlanetaryEventsService:
                 for s, e in self._find_runs(seps < threshold_deg):
                     min_idx = int(s) + int(np.argmin(seps[s:e]))
                     peak_time, min_sep = self._parabolic_min(seps, min_idx, t_arr, step_days)
-                    visible = self._is_event_visible('moon', planet, peak_time)  # type: ignore[arg-type]
+                    visible = self._is_event_visible('moon', planet, peak_time)
                     events.append(
                         {
                             'event_type': 'Moon Conjunction',
                             'title': f'Moon - {planet} Conjunction',
                             'description': (f'The Moon passes within {min_sep:.1f}° of {planet}'),
-                            'peak_time': self._to_local_iso(peak_time),  # type: ignore[arg-type]
-                            'start_time': self._to_local_iso(t_arr[s]),  # type: ignore[arg-type]
-                            'end_time': self._to_local_iso(t_arr[min(e, n - 1)]),  # type: ignore[arg-type]
+                            'peak_time': self._to_local_iso(peak_time),
+                            # astropy Time accessors and arithmetic are untyped (inferred as Masked | ndarray | None)
+                            'start_time': self._to_local_iso(t_arr[s]),  # pyright: ignore[reportArgumentType]
+                            'end_time': self._to_local_iso(t_arr[min(e, n - 1)]),  # pyright: ignore[reportArgumentType]
                             'min_separation_degrees': min_sep,
                             'visibility': visible,
                             'importance': 'high' if visible else 'low',
@@ -377,7 +378,7 @@ class PlanetaryEventsService:
             elif isinstance(sep_val, complex):
                 return float(np.real(sep_val))
             else:
-                return float(np.real(sep_val))  # type: ignore
+                return float(np.real(sep_val))
         except Exception as e:
             logger.debug(f"Error calculating separation {planet1}-{planet2}: {e}")
             return float('inf')
@@ -396,7 +397,7 @@ class PlanetaryEventsService:
             elif isinstance(elong_val, complex):
                 return float(np.real(elong_val))
             else:
-                return float(np.real(elong_val))  # type: ignore
+                return float(np.real(elong_val))
         except Exception as e:
             logger.debug(f"Error calculating elongation for {planet}: {e}")
             return 0.0
@@ -417,22 +418,25 @@ class PlanetaryEventsService:
                 return False
 
             # Both planets must be above horizon for conjunction to be visible
-            alt1_val = altaz_p1.alt.degree  # type: ignore
-            alt2_val = altaz_p2.alt.degree  # type: ignore
+            # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+            alt1_val = altaz_p1.alt.degree  # pyright: ignore[reportOptionalMemberAccess]
+            alt2_val = altaz_p2.alt.degree  # pyright: ignore[reportOptionalMemberAccess]
 
             if isinstance(alt1_val, np.ndarray):
                 alt1 = float(np.real(alt1_val.flat[0]))
             elif isinstance(alt1_val, complex):
                 alt1 = float(np.real(alt1_val))
             else:
-                alt1 = float(np.real(alt1_val))  # type: ignore
+                # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+                alt1 = float(np.real(alt1_val))  # pyright: ignore[reportArgumentType, reportCallIssue]
 
             if isinstance(alt2_val, np.ndarray):
                 alt2 = float(np.real(alt2_val.flat[0]))
             elif isinstance(alt2_val, complex):
                 alt2 = float(np.real(alt2_val))
             else:
-                alt2 = float(np.real(alt2_val))  # type: ignore
+                # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+                alt2 = float(np.real(alt2_val))  # pyright: ignore[reportArgumentType, reportCallIssue]
 
             return alt1 > 5 and alt2 > 5
         except Exception:
@@ -461,15 +465,17 @@ class PlanetaryEventsService:
             elif isinstance(elong_val, complex):
                 elongation = float(np.real(elong_val))
             else:
-                elongation = float(np.real(elong_val))  # type: ignore
+                elongation = float(np.real(elong_val))
 
-            alt_val = altaz.alt.degree  # type: ignore
+            # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+            alt_val = altaz.alt.degree  # pyright: ignore[reportOptionalMemberAccess]
             if isinstance(alt_val, np.ndarray):
                 altitude = float(np.real(alt_val.flat[0]))
             elif isinstance(alt_val, complex):
                 altitude = float(np.real(alt_val))
             else:
-                altitude = float(np.real(alt_val))  # type: ignore
+                # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+                altitude = float(np.real(alt_val))  # pyright: ignore[reportArgumentType, reportCallIssue]
 
             return altitude > 5 and elongation > 10
         except Exception:

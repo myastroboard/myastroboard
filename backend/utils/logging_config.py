@@ -11,6 +11,7 @@ import weakref
 from collections.abc import Callable
 from datetime import UTC, datetime
 from logging.handlers import RotatingFileHandler
+from typing import Any
 
 from utils.constants import LOG_BACKUP_COUNT, LOG_FILE, LOG_MAX_BYTES
 from utils.file_lock import interprocess_lock
@@ -19,7 +20,7 @@ from utils.file_lock import interprocess_lock
 _loggers = {}
 
 # The single file handler shared by every logger of this process (created lazily)
-_file_handler: logging.Handler | None = None
+_file_handler: MultiProcessRotatingFileHandler | None = None
 
 # Console handlers following CONSOLE_LOG_LEVEL (those created without an explicit level)
 _console_handlers: weakref.WeakSet[logging.Handler] = weakref.WeakSet()
@@ -37,7 +38,7 @@ CONSOLE_LOG_LEVEL = os.environ.get('CONSOLE_LOG_LEVEL', 'WARNING').upper()
 # Each gunicorn worker is its own process: one that did not save the new levels picks
 # them up on its next refresh (at most this often, from request handling).
 LOG_LEVEL_REFRESH_INTERVAL_SECONDS = 5
-_level_provider: Callable[[], tuple] | None = None
+_level_provider: Callable[[], tuple[Any, ...]] | None = None
 _next_level_refresh = 0.0
 
 # Time-based retention on top of the size-based rotation: log lines contain usernames
@@ -81,7 +82,7 @@ class _ConfiguredTzFormatter(logging.Formatter):
             cls._cached_tz = UTC
         return cls._cached_tz
 
-    def formatTime(self, record, datefmt=None):
+    def formatTime(self, record: logging.LogRecord, datefmt: str | None = None):
         dt = datetime.fromtimestamp(record.created, tz=self._get_tz())
         if datefmt:
             return dt.strftime(datefmt)
@@ -127,13 +128,13 @@ class MultiProcessRotatingFileHandler(RotatingFileHandler):
         stream = self.stream
         if stream is None:
             return
-        self.stream = None  # type: ignore[assignment]
+        self.stream = None
         try:
             stream.close()
         except OSError:
             pass  # Best-effort close; the stream is being abandoned anyway
 
-    def shouldRollover(self, record):
+    def shouldRollover(self, record: logging.LogRecord):
         """Rotate based on the real file size, not this process's stream position.
 
         Another process may have written to, rotated or truncated the file
@@ -162,7 +163,7 @@ class MultiProcessRotatingFileHandler(RotatingFileHandler):
         self.next_retention_check = now + LOG_RETENTION_CHECK_INTERVAL_SECONDS
         return _current_retention_days()
 
-    def emit(self, record):
+    def emit(self, record: logging.LogRecord):
         try:
             retention_days = self._due_retention_days()
             with interprocess_lock(self.lock_path):
@@ -277,7 +278,7 @@ def set_log_retention_provider(provider: Callable[[], int] | None) -> None:
     global _retention_days_provider
     _retention_days_provider = provider
     if _file_handler is not None:
-        _file_handler.next_retention_check = 0.0  # type: ignore[attr-defined]
+        _file_handler.next_retention_check = 0.0
 
 
 def apply_log_retention(days: int | None = None) -> int:
@@ -435,7 +436,7 @@ def env_log_level(variable: str) -> str | None:
     return value if value in VALID_LOG_LEVELS else None
 
 
-def set_log_level_provider(provider: Callable[[], tuple] | None) -> None:
+def set_log_level_provider(provider: Callable[[], tuple[Any, ...]] | None) -> None:
     """Register the callable returning the UI-chosen ``(file_level, console_level)``, and apply it."""
     global _level_provider, _next_level_refresh
     _level_provider = provider

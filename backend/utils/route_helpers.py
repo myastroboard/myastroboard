@@ -1,11 +1,13 @@
 """Shared helpers used by multiple route Blueprints."""
 
+from typing import Any
+
 from cache import cache_store
 from utils.auth import get_current_user
 from utils.repo_config import get_active_location, load_config
 
 
-def _resolve_active_location():
+def _resolve_active_location() -> dict[str, Any]:
     """Resolve the request's active location preset (per-user, v1.2).
 
     Outside a request context (background threads, direct helper calls) the
@@ -20,7 +22,7 @@ def _resolve_active_location():
     return get_active_location(config, user)
 
 
-def _active_location_cache(name):
+def _active_location_cache(name: str) -> tuple[Any, ...]:
     """Return (active_location, synced cache entry) for the calling user."""
     location = _resolve_active_location()
     entry = cache_store.load_location_cache(name, location.get("id"))

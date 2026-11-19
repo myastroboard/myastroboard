@@ -113,7 +113,9 @@ def _skytonight_request_location_override(location_id: str | None) -> dict[str, 
     return get_active_location(config, user)
 
 
-def _target_attr(target: object, key: str, default=None):
+def _target_attr(
+    target: object, key: str, default: dict[str, Any] | int | str | None = None
+) -> float | list[str] | str | dict[str, Any] | None:
     if isinstance(target, dict):
         return target.get(key, default)
     return getattr(target, key, default)
@@ -124,7 +126,7 @@ def _target_catalogue_names(target: object) -> dict[str, str]:
     return value if isinstance(value, dict) else {}
 
 
-def _get_catalogue_alias_payload(catalogue: str, item_name: str) -> tuple:
+def _get_catalogue_alias_payload(catalogue: str, item_name: str) -> tuple[Any, ...]:
     """Return alias group metadata for a catalogue item."""
     if not catalogue or not item_name:
         return '', {}
@@ -141,16 +143,16 @@ def _get_catalogue_alias_payload(catalogue: str, item_name: str) -> tuple:
     return group_id, aliases
 
 
-def _preload_wishlist_index(user_id: str, username: str) -> set:
+def _preload_wishlist_index(user_id: str, username: str) -> set[Any]:
     """Every identifier the user's wishlist covers, as one set for batch annotation."""
     data = wishlist.load_user_wishlist(user_id, username)
     return wishlist.build_wishlist_index(data.get('items', []))
 
 
-def _preload_all_current_plan_entries(user_id: str, username: str) -> list:
+def _preload_all_current_plan_entries(user_id: str, username: str) -> list[Any]:
     """Aggregate entries from all current (non-previous) plans for a user across all combinations."""
-    all_entries: list = []
-    seen_ids: set = set()
+    all_entries: list[Any] = []
+    seen_ids: set[Any] = set()
     for cid in plan_my_night.list_user_plan_combination_ids(user_id):
         try:
             payload = plan_my_night.load_user_plan(user_id, username, combination_id=cid)
@@ -190,8 +192,8 @@ def _annotate_skytonight_item(
     source_catalogue: str,
     plan_state: str,
     _preloaded_astrodex: dict[str, Any] | None = None,
-    _preloaded_plan_entries: list | None = None,
-    _preloaded_wishlist: set | None = None,
+    _preloaded_plan_entries: list[Any] | None = None,
+    _preloaded_wishlist: set[Any] | None = None,
 ) -> None:
     """Annotate a single item with astrodex / plan-my-night / wishlist presence flags.
 
@@ -494,8 +496,8 @@ def _build_bodies_section_payload(user_id: str, username: str) -> dict[str, Any]
 
     # Pre-load user data once to avoid N×file-reads inside the per-item annotation loop.
     _preloaded_astrodex = astrodex.load_user_astrodex(user_id)
-    _preloaded_plan_entries: list = _preload_all_current_plan_entries(user_id, username)
-    _preloaded_wishlist: set = _preload_wishlist_index(user_id, username)
+    _preloaded_plan_entries: list[Any] = _preload_all_current_plan_entries(user_id, username)
+    _preloaded_wishlist: set[Any] = _preload_wishlist_index(user_id, username)
 
     if has_bodies_results(location_id):
         data = load_json_file(get_bodies_results_file(location_id), default={})
@@ -586,8 +588,8 @@ def _build_comets_section_payload(user_id: str, username: str) -> dict[str, Any]
 
     # Pre-load user data once to avoid N×file-reads inside the per-item annotation loop.
     _preloaded_astrodex = astrodex.load_user_astrodex(user_id)
-    _preloaded_plan_entries: list = _preload_all_current_plan_entries(user_id, username)
-    _preloaded_wishlist: set = _preload_wishlist_index(user_id, username)
+    _preloaded_plan_entries: list[Any] = _preload_all_current_plan_entries(user_id, username)
+    _preloaded_wishlist: set[Any] = _preload_wishlist_index(user_id, username)
 
     if has_comets_results(location_id):
         data = load_json_file(get_comets_results_file(location_id), default={})
@@ -920,8 +922,8 @@ def _build_dso_section_payload(
 
     # Pre-load user data once to avoid N×file-reads inside the per-item annotation loop.
     _preloaded_astrodex = astrodex.load_user_astrodex(user_id)
-    _preloaded_plan_entries: list = _preload_all_current_plan_entries(user_id, username)
-    _preloaded_wishlist: set = _preload_wishlist_index(user_id, username)
+    _preloaded_plan_entries: list[Any] = _preload_all_current_plan_entries(user_id, username)
+    _preloaded_wishlist: set[Any] = _preload_wishlist_index(user_id, username)
 
     if has_dso_results(location_id):
         # Shared, read-only copy: rows below are new dicts (see utils.json_file_cache).
@@ -1492,7 +1494,7 @@ def get_skytonight_reports_api():
 
 @skytonight_bp.route('/api/skytonight/reports/<catalogue>', methods=['GET'])
 @login_required
-def get_skytonight_catalogue_reports_api(catalogue):
+def get_skytonight_catalogue_reports_api(catalogue: str):
     """Return SkyTonight report payload filtered by a deep-sky catalogue alias."""
     try:
         user = get_current_user()
@@ -1512,7 +1514,7 @@ def get_skytonight_catalogue_reports_api(catalogue):
 
 @skytonight_bp.route('/api/skytonight/alttime/<target_id>', methods=['GET'])
 @login_required
-def get_skytonight_alttime_api(target_id):
+def get_skytonight_alttime_api(target_id: str):
     """Return altitude-time JSON data for a single target's graph popup.
 
     Accepts an optional ``?location_id=`` query param so a caller can pin the lookup
@@ -1670,7 +1672,7 @@ def get_skytonight_framing_api():
 
 @skytonight_bp.route('/api/skytonight/framing/image/<filename>', methods=['GET'])
 @login_required
-def get_skytonight_framing_image_api(filename):
+def get_skytonight_framing_image_api(filename: str):
     """Serve a locally cached DSS2 background image, e.g. "10.684708_41.268750_4.00.jpg".
 
     The filename encodes right ascension, declination and field of view (degrees); the
@@ -1859,14 +1861,14 @@ def get_skytonight_data_dso_api():
 
 
 # Difficulty tiers a given experience_level preference is allowed to see.
-_EXPERIENCE_LEVEL_ALLOWED_DIFFICULTIES: dict[str, set] = {
+_EXPERIENCE_LEVEL_ALLOWED_DIFFICULTIES: dict[str, set[Any]] = {
     'beginner': {'beginner'},
     'intermediate': {'beginner', 'intermediate'},
     'advanced': {'beginner', 'intermediate', 'advanced'},
 }
 
 
-def _experience_level_allowed_difficulties(experience_level: str) -> set:
+def _experience_level_allowed_difficulties(experience_level: str) -> set[Any]:
     """Return the difficulty tiers a given experience_level preference is allowed to see."""
     return _EXPERIENCE_LEVEL_ALLOWED_DIFFICULTIES.get(
         experience_level, _EXPERIENCE_LEVEL_ALLOWED_DIFFICULTIES['advanced']
@@ -2014,7 +2016,7 @@ def get_skytonight_recommendations_api():
 
 @skytonight_bp.route('/api/skytonight/logs/<catalogue>', methods=['GET'])
 @login_required
-def get_catalogue_log(catalogue):
+def get_catalogue_log(catalogue: str):
     """Legacy-compatible log endpoint returning SkyTonight calculation log."""
     if not re.match(r'^[a-zA-Z0-9_-]+$', catalogue):
         logger.warning(f"Invalid catalogue name: {catalogue}")
@@ -2048,7 +2050,7 @@ def get_catalogue_log(catalogue):
 
 @skytonight_bp.route('/api/skytonight/logs/<catalogue>/exists', methods=['GET'])
 @login_required
-def check_catalogue_log_exists(catalogue):
+def check_catalogue_log_exists(catalogue: str):
     """Legacy-compatible log existence endpoint for SkyTonight log."""
     if not re.match(r'^[a-zA-Z0-9_-]+$', catalogue):
         logger.warning(f"Invalid catalogue name: {catalogue}")

@@ -92,7 +92,7 @@ def _build_dso_lookup(dso_results: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return lookup
 
 
-def _build_name_key_set(items: list[dict[str, Any]], name_fields: list[str]) -> set:
+def _build_name_key_set(items: list[dict[str, Any]], name_fields: list[str]) -> set[Any]:
     """Build a set of normalized keys from a list of item dicts, over multiple possible field names."""
     keys = set()
     for item in items:
@@ -111,7 +111,7 @@ def enrich_with_skytonight(
     user_astrodex_items: list[dict[str, Any]],
     user_plan_entries: list[dict[str, Any]],
     location_id: Any = None,
-    wishlist_index: set | None = None,
+    wishlist_index: set[Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Add ``visible_tonight``, ``astro_score``, ``in_astrodex``, ``in_plan`` and
     ``in_wishlist`` to each catalog entry.

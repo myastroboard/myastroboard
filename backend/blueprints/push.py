@@ -1,23 +1,28 @@
 """Web Push notifications Blueprint. Routes: /api/push/*"""
 
+from typing import TYPE_CHECKING, Any
+
 from flask import Blueprint, jsonify, request
 
 from utils.auth import get_current_user, login_required, user_manager
 from utils.logging_config import get_logger
+
+if TYPE_CHECKING:
+    from utils.auth import User
 
 logger = get_logger(__name__)
 
 push_bp = Blueprint('push', __name__)
 
 
-def _remove_endpoints(user, endpoints):
+def _remove_endpoints(user: User, endpoints: list[str]):
     """Drop the given subscription endpoints from the stored user and from ``user`` itself.
 
     Goes through ``modify_user`` so the change is applied to the freshest copy
     of the user and never reverts a save another worker made meanwhile.
     """
 
-    def _drop(stored):
+    def _drop(stored: User):
         stored.push_subscriptions = [s for s in stored.push_subscriptions if s.get('endpoint') not in endpoints]
 
     user_manager.modify_user(user.user_id, _drop)
@@ -65,7 +70,7 @@ def push_subscribe():
 
         endpoint = subscription['endpoint']
 
-        def _add(user):
+        def _add(user: User):
             if any(s.get('endpoint') == endpoint for s in user.push_subscriptions):
                 return False
             from datetime import datetime as _dt
@@ -98,7 +103,7 @@ def push_list_subscriptions():
         if not current_user:  # pragma: no cover
             return jsonify({'error': 'Authentication required'}), 401
 
-        def _provider(endpoint):
+        def _provider(endpoint: str):
             from urllib.parse import urlparse
 
             try:
@@ -147,7 +152,7 @@ def push_delete_all_subscriptions():
 
         if index is None:
 
-            def _clear(user):
+            def _clear(user: User):
                 count = len(user.push_subscriptions)
                 user.push_subscriptions = []
                 return count
@@ -163,7 +168,7 @@ def push_delete_all_subscriptions():
         # subscription by endpoint in case the stored list has shifted since.
         target_endpoint = current_user.push_subscriptions[index].get('endpoint')
 
-        def _remove(user):
+        def _remove(user: User):
             user.push_subscriptions = [s for s in user.push_subscriptions if s.get('endpoint') != target_endpoint]
 
         user_manager.modify_user(current_user.user_id, _remove)
@@ -176,7 +181,7 @@ def push_delete_all_subscriptions():
 
 @push_bp.route('/api/push/test/<trigger_id>', methods=['POST'])
 @login_required
-def push_test_trigger(trigger_id):
+def push_test_trigger(trigger_id: str):
     """Fire a realistic test push for a specific trigger (N1–N9), bypassing condition checks."""
     _TRIGGER_PAYLOADS = {
         'N1': ('push_n1_title', 'push_n1_body', {'minutes': 14}, '/#astrodex/plan-my-night', 'normal'),
@@ -215,7 +220,7 @@ def push_test_trigger(trigger_id):
 
         lang = current_user.preferences.get('language', 'en')
 
-        def t(key, **params):
+        def t(key: str, **params: Any):
             return get_translated_message(f'settings.{key}', language=lang, **params)
 
         title_key, body_key, body_params, url, urgency = _TRIGGER_PAYLOADS[trigger_id]

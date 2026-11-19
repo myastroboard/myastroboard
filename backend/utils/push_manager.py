@@ -11,6 +11,7 @@ Storage format:
 
 import base64
 import json
+from typing import Any
 from urllib.parse import urlparse
 
 from db import settings_store
@@ -33,7 +34,7 @@ def get_vapid_claims_email() -> str:
     return raw if raw.startswith(('mailto:', 'https://')) else f'mailto:{raw}'
 
 
-_vapid_keys: dict = {}
+_vapid_keys: dict[str, Any] = {}
 
 
 def _pem_to_raw_b64(pem_str: str) -> str:
@@ -42,16 +43,19 @@ def _pem_to_raw_b64(pem_str: str) -> str:
     py_vapid 1.9.4's from_string() expects the raw 32-byte EC private scalar
     encoded as base64url - it does NOT parse PEM.
     """
-    from cryptography.hazmat.primitives.serialization import load_pem_private_key  # type: ignore[import]
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
     key = load_pem_private_key(pem_str.encode('utf-8'), password=None)
-    raw_bytes = key.private_numbers().private_value.to_bytes(32, 'big')  # type: ignore[union-attr]
+    if not isinstance(key, ec.EllipticCurvePrivateKey):
+        raise TypeError(f'VAPID private key must be an EC key, not {type(key).__name__}')
+    raw_bytes = key.private_numbers().private_value.to_bytes(32, 'big')
     return base64.urlsafe_b64encode(raw_bytes).rstrip(b'=').decode('utf-8')
 
 
-def _generate_keys() -> dict:
+def _generate_keys() -> dict[str, Any]:
     """Generate a new VAPID EC key pair using py_vapid (bundled with pywebpush)."""
-    from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat  # type: ignore[import]
+    from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
     from py_vapid import Vapid
 
     vapid = Vapid()
@@ -68,7 +72,7 @@ def _generate_keys() -> dict:
     return {'private_key': private_key_b64, 'public_key': public_key_b64}
 
 
-def load_or_generate_vapid_keys() -> dict:
+def load_or_generate_vapid_keys() -> dict[str, Any]:
     """Return VAPID key dict, generating and persisting on first call."""
     global _vapid_keys, _VAPID_CONTACT_WARNING_EMITTED
     if not _VAPID_CONTACT_WARNING_EMITTED:
@@ -89,7 +93,7 @@ def load_or_generate_vapid_keys() -> dict:
     # happen in one write transaction so all workers end up with the same key pair: a
     # worker holding a different pair in memory would hand browsers a public key that the
     # push sender's private key cannot match.
-    def _load_or_create(stored):
+    def _load_or_create(stored: Any) -> tuple[dict[str, Any] | None, dict[str, Any]]:
         if isinstance(stored, dict) and stored.get('private_key') and stored.get('public_key'):
             keys = dict(stored)
             # Migrate PEM format (old storage) to raw base64url scalar.
@@ -122,7 +126,7 @@ def get_vapid_public_key() -> str:
     return load_or_generate_vapid_keys()['public_key']
 
 
-def get_vapid_contact_status() -> dict:
+def get_vapid_contact_status() -> dict[str, Any]:
     """Return whether the VAPID contact email is properly configured for push delivery."""
     from utils.app_settings import get_app_settings
 
@@ -137,7 +141,9 @@ def get_vapid_contact_status() -> dict:
     return {'ok': True}
 
 
-def send_push(subscription_info: dict, payload: dict, ttl: int = 0, urgency: str = 'normal') -> bool:
+def send_push(
+    subscription_info: dict[str, Any], payload: dict[str, Any], ttl: int = 0, urgency: str = 'normal'
+) -> bool:
     """
     Send a single Web Push notification.
 

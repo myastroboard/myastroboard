@@ -1,12 +1,16 @@
 {
-  "venvPath": ".",
-  "venv": "venv",
-  "extraPaths": ["backend"],
+  "extends": ".github/org/pyright.base.json",
+  "include": ["backend", "scripts"],
   "exclude": [
     "**/node_modules",
     "**/__pycache__",
     "**/.*",
     "venv",
-    "data"
-  ]
+    "data",
+    "tests"
+  ],
+  "venvPath": ".",
+  "venv": "venv",
+  "extraPaths": ["backend"],
+  "pythonVersion": "3.15"
 }

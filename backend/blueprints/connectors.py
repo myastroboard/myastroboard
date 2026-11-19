@@ -5,6 +5,8 @@ routes live in a sibling module named after it - blueprints/connectors_allsky.py
 blueprints/connectors_myastroshine.py.
 """
 
+from typing import Any
+
 from flask import Blueprint, jsonify, request
 
 from utils.auth import admin_required, login_required
@@ -19,7 +21,7 @@ logger = get_logger(__name__)
 connectors_bp = Blueprint('connectors', __name__)
 
 
-def _public_config(cls, cfg: dict) -> dict:
+def _public_config(cls: type[Any], cfg: dict[str, Any]) -> dict[str, Any]:
     """The connector's config block as the browser may see it.
 
     Every key the card needs to render, with each of the connector's SECRET_FIELDS
@@ -72,7 +74,7 @@ def list_connectors_api():
 
 @connectors_bp.route('/api/connectors/<name>/config', methods=['POST'])
 @admin_required
-def save_connector_config_api(name):
+def save_connector_config_api(name: str):
     """Persist one connector's config block.
 
     The merge happens here rather than in the browser: the client sends only the fields it
@@ -95,7 +97,7 @@ def save_connector_config_api(name):
     migrate_legacy_secrets(name, cls.SECRET_FIELDS, config)
     current = dict(connectors_cfg.get(name, {}) or {})
     stored_secrets = merge_secrets(name, {}, cls.SECRET_FIELDS)
-    new_secrets: dict = {}
+    new_secrets: dict[str, Any] = {}
 
     if "label" in payload:
         current["label"] = str(payload.get("label") or "").strip()
@@ -165,7 +167,7 @@ def save_connector_config_api(name):
     return jsonify({"status": "success", "enabled": connector.is_enabled(), "installed": connector.is_configured()})
 
 
-def _coerce_int(raw, default: int) -> int:
+def _coerce_int(raw: bool | float | str | None, default: int) -> int:
     """An integer config value as submitted, or the field's default when blank or malformed."""
     if isinstance(raw, bool):
         return default

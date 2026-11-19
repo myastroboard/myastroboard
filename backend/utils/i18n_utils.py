@@ -37,7 +37,7 @@ _TRANSLATION_FILENAMES = {
 SUPPORTED_LANGUAGES = list(_TRANSLATION_FILENAMES.keys())
 
 # Cache for loaded translations
-_translation_cache: dict[str, dict] = {}
+_translation_cache: dict[str, dict[str, Any]] = {}
 
 
 def _is_safe_path(base_dir: str, candidate_path: str) -> bool:
@@ -52,7 +52,7 @@ def _is_safe_path(base_dir: str, candidate_path: str) -> bool:
     return candidate_real.startswith(base_real + os.sep)
 
 
-def _load_translation_file(language: str) -> dict:
+def _load_translation_file(language: str) -> dict[str, Any]:
     """
     Load translation file for a specific language
 
@@ -129,7 +129,7 @@ class I18nManager:
         else:
             self.fallback_translations = self.translations
 
-    def t(self, key: str, **params) -> str:
+    def t(self, key: str, **params: Any) -> str:
         """
         Get translated string by key path with optional placeholder replacement
 
@@ -189,7 +189,7 @@ class I18nManager:
         """Get current language code"""
         return self.language
 
-    def get_namespace(self, namespace: str) -> dict:
+    def get_namespace(self, namespace: str) -> dict[str, Any]:
         """
         Get all translations for a specific namespace
 
@@ -204,7 +204,7 @@ class I18nManager:
         return {}
 
     @staticmethod
-    def get_supported_languages() -> list:
+    def get_supported_languages() -> list[Any]:
         """Get list of supported languages"""
         return SUPPORTED_LANGUAGES
 
@@ -213,7 +213,7 @@ class I18nManager:
 _default_manager = I18nManager()
 
 
-def get_translated_message(key: str, language: str = DEFAULT_LANGUAGE, **params) -> str:
+def get_translated_message(key: str, language: str = DEFAULT_LANGUAGE, **params: Any) -> str:
     """
     Convenience function to get a translated message
 

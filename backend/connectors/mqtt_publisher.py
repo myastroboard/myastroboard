@@ -31,9 +31,10 @@ import threading
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from connectors.mqtt_connector import MqttConnector
+from connectors.mqtt_payloads import Device
 from utils.constants import DATA_DIR_CACHE
 from utils.logging_config import get_logger
 from utils.mqtt_connections import connection_for, connection_password
@@ -43,6 +44,11 @@ if sys.platform == "win32":
     import msvcrt
 else:  # pragma: no cover - import-time platform choice; the flock calls are tested
     import fcntl
+
+if TYPE_CHECKING:
+    from paho.mqtt.client import Client, ConnectFlags, DisconnectFlags, MQTTMessage
+    from paho.mqtt.properties import Properties
+    from paho.mqtt.reasoncodes import ReasonCode
 
 logger = get_logger(__name__)
 
@@ -425,7 +431,14 @@ class MqttPublisher:
         self._connected = False
 
     # paho callbacks - run on paho's network thread
-    def _on_connect(self, client, _userdata, _flags, reason_code, _properties=None):
+    def _on_connect(
+        self,
+        client: Client,
+        _userdata: Any,
+        _flags: ConnectFlags,
+        reason_code: ReasonCode,
+        _properties: Properties | None = None,
+    ) -> None:
         failed = getattr(reason_code, "is_failure", False) or (isinstance(reason_code, int) and reason_code != 0)
         if failed:
             self._connected = False
@@ -444,11 +457,18 @@ class MqttPublisher:
         self._last_error = None
         logger.info("MQTT publisher: connected to the broker")
 
-    def _on_disconnect(self, _client, _userdata, _flags, reason_code, _properties=None):
+    def _on_disconnect(
+        self,
+        _client: Client,
+        _userdata: Any,
+        _flags: DisconnectFlags,
+        reason_code: ReasonCode,
+        _properties: Properties | None = None,
+    ) -> None:
         self._connected = False
         logger.info("MQTT publisher: disconnected from the broker (%s)", reason_code)
 
-    def _on_message(self, _client, _userdata, message):
+    def _on_message(self, _client: Client, _userdata: Any, message: MQTTMessage) -> None:
         connector = self._connector
         if connector is None:
             return
@@ -499,7 +519,7 @@ class MqttPublisher:
         info = {"last_publish": now}
         devices = mqtt_payloads.collect(connector, self._config, info, now)
 
-        desired: dict[str, set] = {"discovery": set(), "state": set(), "image": set()}
+        desired: dict[str, set[Any]] = {"discovery": set(), "state": set(), "image": set()}
         discovery_on = connector.discovery_enabled()
         summary: list[dict[str, Any]] = []
         for device in devices:
@@ -523,9 +543,9 @@ class MqttPublisher:
         self._last_publish = now
         logger.debug("MQTT publisher: cycle done, %d device(s), full=%s", len(devices), force_full)
 
-    def _publish_image(self, device, desired: dict[str, set], force_full: bool) -> None:
+    def _publish_image(self, device: Device, desired: dict[str, set[Any]], force_full: bool) -> None:
         topic = device.image_topic
-        if not device.image_id or device.image_loader is None:
+        if topic is None or not device.image_id or device.image_loader is None:
             return  # no picture: the topic is not desired, cleanup clears a previous one
         previously = self._image_ids.get(topic)
         if not force_full and previously == device.image_id:
@@ -539,7 +559,7 @@ class MqttPublisher:
         elif previously:
             desired["image"].add(topic)  # keep the last good picture rather than clearing it
 
-    def _cleanup(self, desired: dict[str, set]) -> None:
+    def _cleanup(self, desired: dict[str, set[Any]]) -> None:
         for kind, topics in self._manifest.items():
             for topic in topics:
                 if topic in desired.get(kind, set()):

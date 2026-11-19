@@ -36,15 +36,15 @@ class AstrodexStreamConnector(BaseConnector):
     target_modules = ["astrodex"]
 
     # No independently-toggleable features: the slideshow is the whole connector.
-    MODULES: list[dict] = []
-    SECRET_FIELDS: tuple = ()
+    MODULES: list[dict[str, Any]] = []
+    SECRET_FIELDS: tuple[Any, ...] = ()
 
     CONFIG_FIELDS: dict[str, Any] = {
         "display_seconds": 20,
         "aspect_ratio": "16:9",
     }
 
-    ENUM_FIELDS: dict[str, tuple] = {
+    ENUM_FIELDS: dict[str, tuple[Any, ...]] = {
         "aspect_ratio": ("16:9", "9:16", "4:3", "3:4", "1:1"),
     }
 
@@ -52,5 +52,5 @@ class AstrodexStreamConnector(BaseConnector):
         # Nothing external to install - the connector is usable as soon as it's enabled.
         return True
 
-    def health_check(self) -> dict:
+    def health_check(self) -> dict[str, Any]:
         return {"reachable": True, "modules": {}}

@@ -6,7 +6,7 @@ These used to load every user's JSON file and walk it in Python (delete guards, 
 
 from typing import Any
 
-from sqlalchemy import and_, distinct, func, or_, select
+from sqlalchemy import Select, and_, distinct, func, or_, select
 
 from db import schema
 from db.engine import read
@@ -20,7 +20,7 @@ _combinations = schema.equipment_combinations
 _combination_equipment = schema.combination_equipment
 
 
-def _count(query) -> int:
+def _count(query: Select[Any]) -> int:
     with read() as conn:
         return int(conn.execute(query).scalar_one())
 

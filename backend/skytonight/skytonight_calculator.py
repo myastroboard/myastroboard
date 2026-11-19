@@ -111,10 +111,7 @@ def _save_alttime_json(
         if precomputed_times_iso is not None:
             times_iso = precomputed_times_iso
         else:
-            times_iso = [
-                t.strftime('%Y-%m-%dT%H:%M:%S')  # type: ignore[attr-defined]
-                for t in times.to_datetime(timezone=UTC)
-            ]
+            times_iso = [t.strftime('%Y-%m-%dT%H:%M:%S') for t in times.to_datetime(timezone=UTC)]
         payload: dict[str, Any] = {
             'target_id': target_id,
             'name': name,
@@ -409,7 +406,7 @@ def _sample_times(night_start: datetime, night_end: datetime) -> Time:
     # Astropy isot format requires bare UTC strings without timezone offset (e.g.
     # "2026-04-01T20:00:00.000"), so strip the "+00:00" suffix produced by isoformat().
     iso_strings = [t.astimezone(UTC).strftime('%Y-%m-%dT%H:%M:%S.000') for t in times_utc]
-    return Time(iso_strings, format='isot', scale='utc')  # type: ignore[call-overload]
+    return Time(iso_strings, format='isot', scale='utc')
 
 
 def _compute_altaz_series(
@@ -422,7 +419,8 @@ def _compute_altaz_series(
     coord = SkyCoord(ra=ra_hours * u.hourangle, dec=dec_degrees * u.deg, frame='icrs')
     frame = AltAz(obstime=times, location=location)
     altaz = coord.transform_to(frame)
-    return altaz.alt.deg, altaz.az.deg  # type: ignore[return-value]
+    # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+    return altaz.alt.deg, altaz.az.deg  # pyright: ignore[reportOptionalMemberAccess, reportReturnType]
 
 
 def _compute_body_altaz_series(
@@ -438,14 +436,16 @@ def _compute_body_altaz_series(
     frame = AltAz(obstime=times, location=location)
     body_coord = get_body(body_name.lower(), times, location)
     altaz = body_coord.transform_to(frame)
-    alt_deg: np.ndarray = altaz.alt.deg  # type: ignore[assignment]
-    az_deg: np.ndarray = altaz.az.deg  # type: ignore[assignment]
+    # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+    alt_deg: np.ndarray = altaz.alt.deg  # pyright: ignore[reportAssignmentType, reportOptionalMemberAccess]
+    az_deg: np.ndarray = altaz.az.deg  # pyright: ignore[reportAssignmentType, reportOptionalMemberAccess]
 
     # RA/Dec at night midpoint for display
     mid_idx = len(times) // 2
     mid_coord = get_body(body_name.lower(), times[mid_idx], location)
-    ra_hours_mid = float(mid_coord.ra.hour)  # type: ignore[attr-defined]
-    dec_degrees_mid = float(mid_coord.dec.deg)  # type: ignore[attr-defined]
+    # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+    ra_hours_mid = float(mid_coord.ra.hour)  # pyright: ignore[reportArgumentType, reportOptionalMemberAccess]
+    dec_degrees_mid = float(mid_coord.dec.deg)  # pyright: ignore[reportArgumentType, reportOptionalMemberAccess]
 
     return alt_deg, az_deg, ra_hours_mid, dec_degrees_mid
 
@@ -473,7 +473,8 @@ def _meridian_transit_time(
         while current <= night_end:
             utc_moment = current.astimezone(UTC)
             t = Time(utc_moment.strftime('%Y-%m-%dT%H:%M:%S.000'), format='isot', scale='utc')
-            lst_hours = float(t.sidereal_time('apparent', longitude=location.lon).hour)  # type: ignore[attr-defined]
+            # astropy Time accessors and arithmetic are untyped (inferred as Masked | ndarray | None)
+            lst_hours = float(t.sidereal_time('apparent', longitude=location.lon).hour)  # pyright: ignore[reportArgumentType]
             ha = ((lst_hours - ra_hours + 12.0) % 24.0) - 12.0  # [-12, +12]
 
             if prev_hour_angle is not None and prev_hour_angle < 0.0 <= ha:
@@ -506,7 +507,8 @@ def _antimeridian_transit_time(
         while current <= night_end:
             utc_moment = current.astimezone(UTC)
             t = Time(utc_moment.strftime('%Y-%m-%dT%H:%M:%S.000'), format='isot', scale='utc')
-            lst_hours = float(t.sidereal_time('apparent', longitude=location.lon).hour)  # type: ignore[attr-defined]
+            # astropy Time accessors and arithmetic are untyped (inferred as Masked | ndarray | None)
+            lst_hours = float(t.sidereal_time('apparent', longitude=location.lon).hour)  # pyright: ignore[reportArgumentType]
             ha = ((lst_hours - anti_ra + 12.0) % 24.0) - 12.0
 
             if prev_hour_angle is not None and prev_hour_angle < 0.0 <= ha:
@@ -573,7 +575,8 @@ def _local_sidereal_time_hours(moment: datetime, lon_deg: float) -> float | None
         location = EarthLocation(lat=0.0 * u.deg, lon=lon_deg * u.deg)
         utc_moment = moment.astimezone(UTC)
         t = Time(utc_moment.strftime('%Y-%m-%dT%H:%M:%S.000'), format='isot', scale='utc')
-        return float(t.sidereal_time('apparent', longitude=location.lon).hour) % 24.0  # type: ignore[attr-defined]
+        # astropy Time accessors and arithmetic are untyped (inferred as Masked | ndarray | None)
+        return float(t.sidereal_time('apparent', longitude=location.lon).hour) % 24.0  # pyright: ignore[reportArgumentType]
     except Exception as exc:
         logger.debug(f'Local sidereal time computation failed: {exc}')
         return None
@@ -621,8 +624,9 @@ class _MoonInfo:
             self.phase = float(illum)
 
             moon_coord = get_body('moon', mid_time, location)
-            self.ra_deg = float(moon_coord.ra.deg)  # type: ignore[attr-defined]
-            self.dec_deg = float(moon_coord.dec.deg)  # type: ignore[attr-defined]
+            # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+            self.ra_deg = float(moon_coord.ra.deg)  # pyright: ignore[reportArgumentType, reportOptionalMemberAccess]
+            self.dec_deg = float(moon_coord.dec.deg)  # pyright: ignore[reportArgumentType, reportOptionalMemberAccess]
         except Exception as exc:
             logger.debug(f'Moon info computation failed: {exc}')
 
@@ -942,7 +946,8 @@ def _compute_target_result(
             coord = SkyCoord(ra=ra_hours * u.hourangle, dec=dec_degrees * u.deg, frame='icrs')
             frame = AltAz(obstime=peak_time, location=location)
             peak_altaz = coord.transform_to(frame)
-            az_cw = float(peak_altaz.az.deg[0])  # type: ignore[index]
+            # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+            az_cw = float(peak_altaz.az.deg[0])  # pyright: ignore[reportArgumentType, reportOptionalMemberAccess, reportOptionalSubscript]
         peak_az_deg = round((360.0 - az_cw) % 360.0 if north_to_east_ccw else az_cw, 1)
     except Exception:
         pass  # astropy AltAz transform failed — peak_az_deg stays None
@@ -1201,8 +1206,9 @@ def _compute_body_result(
             _angular_separation_deg(
                 ra_hours * 15.0,
                 dec_degrees,
-                float(sun_coord.ra.deg),  # type: ignore[attr-defined]
-                float(sun_coord.dec.deg),  # type: ignore[attr-defined]
+                # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+                float(sun_coord.ra.deg),  # pyright: ignore[reportArgumentType, reportOptionalMemberAccess]
+                float(sun_coord.dec.deg),  # pyright: ignore[reportArgumentType, reportOptionalMemberAccess]
             ),
             1,
         )
@@ -1692,9 +1698,11 @@ def run_calculations(
         times_iso_list = [t.strftime('%Y-%m-%dT%H:%M:%S') for t in times.to_datetime(timezone=UTC)]
 
         # Build a single SkyCoord array for all DSO targets
-        # coordinates is guaranteed non-None by the dso_targets_with_coords filter above
-        all_ra_h = np.array([t.coordinates.ra_hours for t in dso_targets_with_coords])  # type: ignore[union-attr]
-        all_dec_d = np.array([t.coordinates.dec_degrees for t in dso_targets_with_coords])  # type: ignore[union-attr]
+        # coordinates is guaranteed non-None by the dso_targets_with_coords filter above; the
+        # `is not None` guard only narrows the type and keeps every target, in order.
+        dso_coords = [t.coordinates for t in dso_targets_with_coords if t.coordinates is not None]
+        all_ra_h = np.array([c.ra_hours for c in dso_coords])
+        all_dec_d = np.array([c.dec_degrees for c in dso_coords])
         all_dso_coords = SkyCoord(ra=all_ra_h * u.hourangle, dec=all_dec_d * u.deg, frame='icrs')
 
         # Batch AltAz: n_steps vectorised calls instead of n_dso_batch individual calls.
@@ -1707,9 +1715,10 @@ def run_calculations(
         for step_i in range(n_steps):
             yield_to_requests()
             frame = AltAz(obstime=times[step_i], location=location_obj)
-            altaz_batch: SkyCoord = all_dso_coords.transform_to(frame)  # type: ignore[assignment]
-            alt_matrix[:, step_i] = altaz_batch.alt.deg  # type: ignore[index]
-            az_matrix[:, step_i] = altaz_batch.az.deg  # type: ignore[index]
+            altaz_batch: SkyCoord = all_dso_coords.transform_to(frame)
+            # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+            alt_matrix[:, step_i] = altaz_batch.alt.deg  # pyright: ignore[reportOptionalMemberAccess]
+            az_matrix[:, step_i] = altaz_batch.az.deg  # pyright: ignore[reportOptionalMemberAccess]
             _set_progress('deep_sky_altaz', step_i + 1, n_steps)
         logger.info('Batch AltAz computation complete.')
 

@@ -120,14 +120,16 @@ class SpecialPhenomenaService:
         These are the four points of the Earth's orbit where declination of the Sun is extremal.
         """
         events = []
-        current_year = start_date.to_datetime(timezone=ZoneInfo(self.timezone)).year  # type: ignore
+        # astropy Time accessors and arithmetic are untyped (inferred as Masked | ndarray | None)
+        current_year = start_date.to_datetime(timezone=ZoneInfo(self.timezone)).year  # pyright: ignore[reportAttributeAccessIssue]
         years_to_check = [current_year, current_year + 1]
 
         for year in years_to_check:
             try:
                 # Spring Equinox (March ~20-21)
                 spring_eq = self._approximate_equinox(year, 'spring')
-                if float(start_date.jd) <= float(spring_eq.jd) < float(end_date.jd):  # type: ignore
+                # astropy Time accessors and arithmetic are untyped (inferred as Masked | ndarray | None)
+                if float(start_date.jd) <= float(spring_eq.jd) < float(end_date.jd):  # pyright: ignore[reportArgumentType]
                     spring_eq_refined = self._refine_equinox_time(spring_eq, 'spring')
                     events.append(
                         {
@@ -155,7 +157,8 @@ class SpecialPhenomenaService:
 
                 # Summer Solstice (June ~20-21)
                 summer_sol = self._approximate_solstice(year, 'summer')
-                if float(start_date.jd) <= float(summer_sol.jd) < float(end_date.jd):  # type: ignore
+                # astropy Time accessors and arithmetic are untyped (inferred as Masked | ndarray | None)
+                if float(start_date.jd) <= float(summer_sol.jd) < float(end_date.jd):  # pyright: ignore[reportArgumentType]
                     summer_sol_refined = self._refine_solstice_time(summer_sol, 'summer')
                     events.append(
                         {
@@ -181,7 +184,8 @@ class SpecialPhenomenaService:
 
                 # Autumn Equinox (September ~22-23)
                 autumn_eq = self._approximate_equinox(year, 'autumn')
-                if float(start_date.jd) <= float(autumn_eq.jd) < float(end_date.jd):  # type: ignore
+                # astropy Time accessors and arithmetic are untyped (inferred as Masked | ndarray | None)
+                if float(start_date.jd) <= float(autumn_eq.jd) < float(end_date.jd):  # pyright: ignore[reportArgumentType]
                     autumn_eq_refined = self._refine_equinox_time(autumn_eq, 'autumn')
                     events.append(
                         {
@@ -209,7 +213,8 @@ class SpecialPhenomenaService:
 
                 # Winter Solstice (December ~21-22)
                 winter_sol = self._approximate_solstice(year, 'winter')
-                if float(start_date.jd) <= float(winter_sol.jd) < float(end_date.jd):  # type: ignore
+                # astropy Time accessors and arithmetic are untyped (inferred as Masked | ndarray | None)
+                if float(start_date.jd) <= float(winter_sol.jd) < float(end_date.jd):  # pyright: ignore[reportArgumentType]
                     winter_sol_refined = self._refine_solstice_time(winter_sol, 'winter')
                     events.append(
                         {
@@ -274,7 +279,8 @@ class SpecialPhenomenaService:
         if sun is None:
             return np.empty(0, dtype=float)
         ecliptic = sun.transform_to(GeocentricTrueEcliptic(obstime=times, equinox=times))
-        return np.atleast_1d(np.asarray(np.real(ecliptic.lon.degree), dtype=float))  # type: ignore[union-attr]
+        # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+        return np.atleast_1d(np.asarray(np.real(ecliptic.lon.degree), dtype=float))  # pyright: ignore[reportArgumentType, reportCallIssue, reportOptionalMemberAccess]
 
     def _best_solar_longitude_time(self, times: Time, target_longitude: float, fallback: Time) -> Time:
         """Return the instant in ``times`` where the Sun is nearest ``target_longitude``."""
@@ -339,7 +345,8 @@ class SpecialPhenomenaService:
         while current_time < end_date:
             try:
                 dt = current_time.to_datetime(timezone=ZoneInfo(self.timezone))
-                month = dt.month  # type: ignore
+                # astropy Time accessors and arithmetic are untyped (inferred as Masked | ndarray | None)
+                month = dt.month  # pyright: ignore[reportAttributeAccessIssue]
 
                 # Check if we're in zodiacal light season
                 is_spring = spring_start_month <= month <= spring_end_month
@@ -358,11 +365,13 @@ class SpecialPhenomenaService:
                         continue
 
                     # Sun must be below horizon (twilight or night)
-                    alt_val = sun_altaz.alt.degree  # type: ignore
+                    # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+                    alt_val = sun_altaz.alt.degree  # pyright: ignore[reportOptionalMemberAccess]
                     if isinstance(alt_val, (np.ndarray, complex)):
                         sun_alt = float(np.real(np.atleast_1d(alt_val).flat[0]))
                     else:
-                        sun_alt = float(alt_val)  # type: ignore
+                        # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+                        sun_alt = float(alt_val)  # pyright: ignore[reportArgumentType]
 
                     if sun_alt < -6:  # End of twilight
                         # Check if ecliptic is positioned well
@@ -382,11 +391,13 @@ class SpecialPhenomenaService:
                                 continue
 
                             # Moon either below horizon or in new moon phase
-                            moon_alt_val = moon_altaz.alt.degree  # type: ignore
+                            # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+                            moon_alt_val = moon_altaz.alt.degree  # pyright: ignore[reportOptionalMemberAccess]
                             if isinstance(moon_alt_val, (np.ndarray, complex)):
                                 moon_alt = float(np.real(np.atleast_1d(moon_alt_val).flat[0]))
                             else:
-                                moon_alt = float(moon_alt_val)  # type: ignore
+                                # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+                                moon_alt = float(moon_alt_val)  # pyright: ignore[reportArgumentType]
 
                             is_moon_ok = moon_alt < 5  # Moon below horizon
 
@@ -464,8 +475,9 @@ class SpecialPhenomenaService:
         # The GC barely clears the horizon from high latitudes; use a permissive threshold
         gc_min_altitude = 5.0  # degrees
 
-        start_dt: datetime = start_date.to_datetime(timezone=tz)  # type: ignore[assignment]
-        end_dt: datetime = end_date.to_datetime(timezone=tz)  # type: ignore[assignment]
+        # astropy Time accessors and arithmetic are untyped (inferred as Masked | ndarray | None)
+        start_dt: datetime = start_date.to_datetime(timezone=tz)  # pyright: ignore[reportAssignmentType]
+        end_dt: datetime = end_date.to_datetime(timezone=tz)  # pyright: ignore[reportAssignmentType]
 
         current_date: date_type = start_dt.date()
         end_local_date: date_type = end_dt.date()
@@ -489,11 +501,13 @@ class SpecialPhenomenaService:
                     continue
 
                 sun_altaz = sun.transform_to(AltAz(obstime=check_time, location=self.location))
-                sun_alt_val = sun_altaz.alt.degree  # type: ignore
+                # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+                sun_alt_val = sun_altaz.alt.degree  # pyright: ignore[reportOptionalMemberAccess]
                 if isinstance(sun_alt_val, (np.ndarray, complex)):
                     sun_alt = float(np.real(np.atleast_1d(sun_alt_val).flat[0]))
                 else:
-                    sun_alt = float(sun_alt_val)  # type: ignore
+                    # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+                    sun_alt = float(sun_alt_val)  # pyright: ignore[reportArgumentType]
 
                 if sun_alt >= -12.0:
                     current_date += timedelta(days=1)
@@ -501,11 +515,13 @@ class SpecialPhenomenaService:
 
                 # --- Galactic center must be above the minimum altitude ---
                 gc_altaz = _galactic_center.transform_to(AltAz(obstime=check_time, location=self.location))
-                gc_alt_val = gc_altaz.alt.degree  # type: ignore
+                # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+                gc_alt_val = gc_altaz.alt.degree  # pyright: ignore[reportOptionalMemberAccess]
                 if isinstance(gc_alt_val, (np.ndarray, complex)):
                     gc_altitude = float(np.real(np.atleast_1d(gc_alt_val).flat[0]))
                 else:
-                    gc_altitude = float(gc_alt_val)  # type: ignore
+                    # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+                    gc_altitude = float(gc_alt_val)  # pyright: ignore[reportArgumentType]
 
                 if gc_altitude < gc_min_altitude:
                     current_date += timedelta(days=1)
@@ -518,11 +534,13 @@ class SpecialPhenomenaService:
                     continue
 
                 moon_altaz = moon.transform_to(AltAz(obstime=check_time, location=self.location))
-                moon_alt_val = moon_altaz.alt.degree  # type: ignore
+                # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+                moon_alt_val = moon_altaz.alt.degree  # pyright: ignore[reportOptionalMemberAccess]
                 if isinstance(moon_alt_val, (np.ndarray, complex)):
                     moon_alt = float(np.real(np.atleast_1d(moon_alt_val).flat[0]))
                 else:
-                    moon_alt = float(moon_alt_val)  # type: ignore
+                    # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+                    moon_alt = float(moon_alt_val)  # pyright: ignore[reportArgumentType]
 
                 if moon_alt >= 5.0:
                     current_date += timedelta(days=1)
@@ -604,7 +622,8 @@ class SpecialPhenomenaService:
             )
 
             altaz = ecliptic_points.transform_to(AltAz(obstime=time, location=self.location))
-            altitudes = np.atleast_1d(np.asarray(altaz.alt.degree, dtype=float))  # type: ignore[union-attr]
+            # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+            altitudes = np.atleast_1d(np.asarray(altaz.alt.degree, dtype=float))  # pyright: ignore[reportOptionalMemberAccess]
 
             # Move the Sun into the sampling frame before measuring elongation.
             # Separating across GCRS -> GeocentricTrueEcliptic is not a pure
@@ -627,11 +646,13 @@ class SpecialPhenomenaService:
             gc = SkyCoord(ra=266.41 * u.deg, dec=-29.00 * u.deg, frame=ICRS)
             gc_altaz = gc.transform_to(AltAz(obstime=time, location=self.location))
 
-            alt_val = gc_altaz.alt.degree  # type: ignore
+            # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+            alt_val = gc_altaz.alt.degree  # pyright: ignore[reportOptionalMemberAccess]
             if isinstance(alt_val, (np.ndarray, complex)):
                 return float(np.real(np.atleast_1d(alt_val).flat[0]))
             else:
-                return float(alt_val)  # type: ignore
+                # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+                return float(alt_val)  # pyright: ignore[reportArgumentType]
         except Exception:
             return 0.0
 

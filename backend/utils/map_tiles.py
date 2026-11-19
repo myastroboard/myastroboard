@@ -25,6 +25,7 @@ import re
 import threading
 import time
 from dataclasses import dataclass
+from typing import Any
 
 import requests
 
@@ -155,7 +156,7 @@ def sprite_content_type(sprite_name: str) -> str | None:
     return SPRITE_FILES.get(sprite_name)
 
 
-def cache_path(kind: MapResourceKind, *parts) -> str:
+def cache_path(kind: MapResourceKind, *parts: Any) -> str:
     """Cache file of a resource; ``parts`` are only ever validated integers or whitelisted names."""
     *dirs, filename = (str(part) for part in parts)
     return os.path.join(MAP_TILES_CACHE_DIR, kind.name, *dirs, filename + ('.gz' if kind.gzip else ''))
@@ -289,7 +290,9 @@ def prune_cache(max_bytes: int = CACHE_MAX_BYTES) -> int:
     return removed
 
 
-def get_resource(kind: MapResourceKind, url_params: dict, path_parts: tuple, user_key: str) -> bytes:
+def get_resource(
+    kind: MapResourceKind, url_params: dict[str, Any], path_parts: tuple[Any, ...], user_key: str
+) -> bytes:
     """Return a resource from the cache when fresh, else from OpenStreetMap.
 
     The bytes are gzip-encoded when ``kind.gzip`` is set. ``url_params`` fill the upstream URL and

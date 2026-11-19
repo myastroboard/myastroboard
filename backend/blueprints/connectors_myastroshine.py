@@ -17,6 +17,7 @@ import json
 import time
 from collections import deque
 from threading import Lock
+from typing import Any
 
 from flask import Blueprint, jsonify, request, send_file
 
@@ -33,7 +34,7 @@ connectors_myastroshine_bp = Blueprint('connectors_myastroshine', __name__)
 
 # In-process sliding-window rate limit for the three cookieless endpoints.
 _rate_lock = Lock()
-_rate_hits: dict[str, deque] = {}
+_rate_hits: dict[str, deque[Any]] = {}
 
 
 def _rate_limited(client_key: str) -> bool:

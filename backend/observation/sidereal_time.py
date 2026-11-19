@@ -197,7 +197,7 @@ class SiderealTimeService:
             if isinstance(gst_hour_val, (np.ndarray, complex)):
                 gst_hours = float(np.real(np.atleast_1d(gst_hour_val).flat[0]))
             else:
-                gst_hours = float(gst_hour_val)  # type: ignore
+                gst_hours = float(gst_hour_val)
             gst_hms = self._decimal_hours_to_hms(gst_hours)
 
             # Local Sidereal Time (corrected for observer longitude)
@@ -227,11 +227,12 @@ class SiderealTimeService:
             meridian_ra_degrees = (meridian_ra_hours / 24.0) * 360.0
 
             # UTC time
-            utc_time_dt = time_obj.to_datetime(timezone=ZoneInfo('UTC'))  # type: ignore
+            utc_time_dt = time_obj.to_datetime(timezone=ZoneInfo('UTC'))
 
             return {
                 'datetime_utc': utc_time_dt.isoformat() if isinstance(utc_time_dt, datetime) else str(utc_time_dt),
-                'julian_date': float(time_obj.jd),  # type: ignore[arg-type]
+                # astropy Time accessors and arithmetic are untyped (inferred as Masked | ndarray | None)
+                'julian_date': float(time_obj.jd),  # pyright: ignore[reportArgumentType]
                 'greenwich_sidereal_time_hours': round(float(gst_hours), 6),
                 'greenwich_sidereal_time_hms': gst_hms,
                 'local_sidereal_time_hours': round(float(lst_hours), 6),
@@ -296,11 +297,13 @@ class SiderealTimeService:
                     continue
 
                 # Extract altitude value from Quantity
-                alt_val = altaz.alt.degree  # type: ignore
+                # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+                alt_val = altaz.alt.degree  # pyright: ignore[reportOptionalMemberAccess]
                 if isinstance(alt_val, (np.ndarray, complex)):
                     alt = float(np.real(np.atleast_1d(alt_val).flat[0]))
                 else:
-                    alt = float(alt_val)  # type: ignore
+                    # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+                    alt = float(alt_val)  # pyright: ignore[reportArgumentType]
 
                 # Track best (highest) altitude
                 if alt > best_altitude:

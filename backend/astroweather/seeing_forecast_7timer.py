@@ -392,7 +392,7 @@ class SeeingForecastService:
         return round(max(0.0, min(10.0, score)), 1)
 
     def _find_best_window(
-        self, forecast_list: list[dict], metric_key: str, threshold: float, higher_is_better: bool
+        self, forecast_list: list[dict[str, Any]], metric_key: str, threshold: float, higher_is_better: bool
     ) -> dict[str, Any] | None:
         """
         Find the longest consecutive period where ``metric_key`` meets ``threshold``.

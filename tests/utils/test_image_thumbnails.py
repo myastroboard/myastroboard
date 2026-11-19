@@ -6,7 +6,7 @@ import os
 import pytest
 from PIL import Image
 
-from utils import image_thumbnails  # type: ignore[import-not-found]
+from utils import image_thumbnails
 
 
 @pytest.fixture(autouse=True)

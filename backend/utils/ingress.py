@@ -20,7 +20,7 @@ from collections.abc import Callable, Iterable
 from typing import Any
 from urllib.parse import urlsplit
 
-from flask import has_request_context, request
+from flask import Flask, has_request_context, request
 from flask.sessions import SecureCookieSessionInterface
 
 from utils import app_settings
@@ -103,7 +103,7 @@ class IngressMiddleware:
         self.wsgi_app = wsgi_app
         self.proxy_ip = _parse_ip(proxy_ip or trusted_proxy_ip())
 
-    def __call__(self, environ: dict, start_response: Callable[..., Any]) -> Iterable[bytes]:
+    def __call__(self, environ: dict[str, Any], start_response: Callable[..., Any]) -> Iterable[bytes]:
         raw_prefix = environ.pop('HTTP_X_INGRESS_PATH', None)
         if raw_prefix is None:
             return self.wsgi_app(environ, start_response)
@@ -172,7 +172,7 @@ class IngressAwareSessionInterface(SecureCookieSessionInterface):
     Direct-port requests keep Flask's defaults, so existing sessions survive the upgrade.
     """
 
-    def get_cookie_secure(self, app) -> bool:
+    def get_cookie_secure(self, app: Flask) -> bool:
         """The HTTPS-only setting, on the pages where the browser can keep such a cookie.
 
         A browser drops a ``Secure`` cookie sent from a plain-HTTP page, so the setting would
@@ -185,12 +185,12 @@ class IngressAwareSessionInterface(SecureCookieSessionInterface):
             return browser_keeps_secure_cookies()
         return secure
 
-    def get_cookie_name(self, app) -> str:
+    def get_cookie_name(self, app: Flask) -> str:
         if is_ingress_request():
             return INGRESS_SESSION_COOKIE_NAME
         return super().get_cookie_name(app)
 
-    def get_cookie_path(self, app) -> str:
+    def get_cookie_path(self, app: Flask) -> str:
         if is_ingress_request():
             return request.script_root or '/'
         return super().get_cookie_path(app)

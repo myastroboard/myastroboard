@@ -3,6 +3,7 @@
 import json
 import os
 import re
+from typing import Any
 
 from skytonight import skytonight_targets
 from utils.logging_config import get_logger
@@ -11,7 +12,7 @@ logger = get_logger(__name__)
 
 ALIASES_FILE = os.path.join(os.path.dirname(__file__), '..', 'catalogue_aliases.json')
 
-_aliases_cache: dict = {}
+_aliases_cache: dict[str, Any] = {}
 _aliases_mtime: float | None = None
 
 
@@ -28,7 +29,7 @@ def make_lookup_key(catalogue: str, object_name: str) -> str:
     return f"{str(catalogue or '').strip().lower()}::{normalize_object_name(object_name)}"
 
 
-def load_aliases_table(force_reload: bool = False) -> dict:
+def load_aliases_table(force_reload: bool = False) -> dict[str, Any]:
     """Load aliases table from backend/catalogue_aliases.json with cache."""
     global _aliases_cache, _aliases_mtime
 
@@ -52,7 +53,7 @@ def load_aliases_table(force_reload: bool = False) -> dict:
         return {}
 
 
-def get_alias_entry(catalogue: str, object_name: str) -> dict:
+def get_alias_entry(catalogue: str, object_name: str) -> dict[str, Any]:
     """Get aliases entry for a given catalogue/object pair."""
     if not catalogue or not object_name:
         return {}
@@ -67,7 +68,7 @@ def get_alias_entry(catalogue: str, object_name: str) -> dict:
     return lookup.get(key, {}) if isinstance(lookup, dict) else {}
 
 
-def merge_item_with_alias_entry(item: dict) -> dict:
+def merge_item_with_alias_entry(item: dict[str, Any]) -> dict[str, Any]:
     """Attach runtime aliases metadata from current aliases table."""
     if not isinstance(item, dict):
         return item

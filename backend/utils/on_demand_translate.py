@@ -10,6 +10,7 @@ from __future__ import annotations
 import html
 import re
 import time
+from typing import Any
 
 import requests
 
@@ -160,7 +161,7 @@ def _translate_with_mymemory_chunked(text: str, source_lang: str, target_lang: s
     return "\n".join(translated_chunks)
 
 
-def translate_text_on_demand(text: str, source_lang: str, target_lang: str) -> dict:
+def translate_text_on_demand(text: str, source_lang: str, target_lang: str) -> dict[str, Any]:
     """
     Translate dynamic text for UI on-demand.
 

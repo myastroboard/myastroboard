@@ -13,6 +13,7 @@ import json
 import os
 import threading
 import time
+from collections.abc import Callable, Iterator
 from datetime import UTC, datetime, timedelta
 from math import acos, asin, cos, degrees, radians, sin
 from typing import Any, cast
@@ -24,7 +25,13 @@ import numpy as np
 import requests
 from astropy.coordinates import AltAz, Angle, EarthLocation, get_sun
 from astropy.time import Time as AstroTime
+from numpy.typing import NDArray
 from skyfield.api import EarthSatellite, Loader, wgs84
+from skyfield.jpllib import SpiceKernel
+from skyfield.positionlib import Apparent
+from skyfield.timelib import Time as SkyfieldTime
+from skyfield.timelib import Timescale
+from skyfield.toposlib import GeographicPosition
 
 from utils import load_json_file, save_json_file
 from utils.constants import CACHE_TTL, DATA_DIR_CACHE
@@ -45,14 +52,14 @@ _EPHEMERIS: Any = _EPHEMERIS_UNSET
 _EPHEMERIS_LOCK = threading.Lock()
 
 
-def _get_ephemeris():
+def _get_ephemeris() -> SpiceKernel | None:
     """Return the shared de421 ephemeris, loading it once (None if unavailable)."""
     global _EPHEMERIS
     if _EPHEMERIS is _EPHEMERIS_UNSET:
         with _EPHEMERIS_LOCK:
             if _EPHEMERIS is _EPHEMERIS_UNSET:
                 try:
-                    _EPHEMERIS = SKYFIELD_LOADER('de421.bsp')
+                    _EPHEMERIS = cast(SpiceKernel, SKYFIELD_LOADER('de421.bsp'))
                 except Exception as exc:
                     logger.warning(f"Could not load ephemeris file de421.bsp: {exc}")
                     _EPHEMERIS = None
@@ -128,7 +135,7 @@ _CSS_TLE_CACHE_LOCK = threading.Lock()
 _CSS_TLE_FETCH_LOCK = threading.Lock()
 
 
-def _update_css_tle_cache(mutator) -> None:
+def _update_css_tle_cache(mutator: Callable[..., Any]) -> None:
     """Apply ``mutator(payload)`` to the on-disk CSS TLE cache atomically."""
     with _CSS_TLE_CACHE_LOCK:
         payload = _read_css_tle_cache()
@@ -393,9 +400,9 @@ class CSSPassService:
             },
         }
 
-    def _load_ephemeris(self):
+    def _load_ephemeris(self) -> SpiceKernel | None:
         try:
-            return SKYFIELD_LOADER('de421.bsp')
+            return cast(SpiceKernel, SKYFIELD_LOADER('de421.bsp'))
         except Exception as exc:
             logger.warning(f"Could not load ephemeris file de421.bsp: {exc}")
             return None
@@ -547,12 +554,19 @@ class CSSPassService:
         raise ValueError("Could not parse CSS TLE from response payload")
 
     def _build_passes(
-        self, event_times, event_types, satellite: EarthSatellite, observer, ts, eph
+        self,
+        event_times: SkyfieldTime,
+        event_types: NDArray[Any],
+        satellite: EarthSatellite,
+        observer: GeographicPosition,
+        ts: Timescale,
+        eph: SpiceKernel | None,
     ) -> list[dict[str, Any]]:
         passes: list[dict[str, Any]] = []
         current: dict[str, Any] = {}
 
-        for event_time, event_type in zip(event_times, event_types, strict=False):
+        # skyfield Time iterates through __getitem__, which pyright does not count as Iterable
+        for event_time, event_type in zip(event_times, event_types, strict=False):  # pyright: ignore[reportArgumentType]
             dt_utc = event_time.utc_datetime().replace(tzinfo=UTC)
 
             if event_type == 0:
@@ -593,9 +607,9 @@ class CSSPassService:
         start_utc: datetime,
         end_utc: datetime,
         satellite: EarthSatellite,
-        observer,
-        ts,
-        eph,
+        observer: GeographicPosition,
+        ts: Timescale,
+        eph: SpiceKernel | None,
     ) -> dict[str, Any] | None:
         if end_utc <= start_utc:
             return None
@@ -665,10 +679,13 @@ class CSSPassService:
     # -----------------------------------------------------------------------
 
     @staticmethod
-    def _iter_geometric_passes(event_times, event_types):
+    def _iter_geometric_passes(
+        event_times: SkyfieldTime, event_types: NDArray[Any]
+    ) -> Iterator[tuple[datetime, datetime]]:
         """Yield (start_utc, end_utc) for each rise->set geometric pass from Skyfield events."""
         current_start: datetime | None = None
-        for event_time, event_type in zip(event_times, event_types, strict=False):
+        # skyfield Time iterates through __getitem__, which pyright does not count as Iterable
+        for event_time, event_type in zip(event_times, event_types, strict=False):  # pyright: ignore[reportArgumentType]
             dt_utc = event_time.utc_datetime().replace(tzinfo=UTC)
             if event_type == 0:
                 current_start = dt_utc
@@ -693,7 +710,9 @@ class CSSPassService:
         return times
 
     @staticmethod
-    def _angular_separation_array(alt1, az1, alt2, az2) -> np.ndarray:
+    def _angular_separation_array(
+        alt1: NDArray[Any], az1: NDArray[Any], alt2: NDArray[Any], az2: NDArray[Any]
+    ) -> np.ndarray:
         """Vectorised angular separation (degrees) between two alt/az arrays."""
         a1 = np.radians(alt1)
         a2 = np.radians(alt2)
@@ -701,7 +720,9 @@ class CSSPassService:
         cos_sep = np.sin(a1) * np.sin(a2) + np.cos(a1) * np.cos(a2) * np.cos(delta_az)
         return np.degrees(np.arccos(np.clip(cos_sep, -1.0, 1.0)))
 
-    def _iss_altaz_arrays(self, times_utc, satellite, observer, ts):
+    def _iss_altaz_arrays(
+        self, times_utc: list[Any], satellite: EarthSatellite, observer: GeographicPosition, ts: Timescale
+    ) -> tuple[Any, ...]:
         """Vectorised CSS topocentric altitude/azimuth (degrees) over the given UTC datetimes."""
         t = ts.from_datetimes(times_utc)
         altitude, azimuth, _ = (satellite - observer).at(t).altaz()
@@ -710,11 +731,14 @@ class CSSPassService:
             np.atleast_1d(np.asarray(azimuth.degrees, dtype=float)),
         )
 
-    def _sun_altaz_radius_arrays(self, times_utc, observer, ts, eph):
+    def _sun_altaz_radius_arrays(
+        self, times_utc: list[Any], observer: GeographicPosition, ts: Timescale, eph: SpiceKernel | None
+    ) -> tuple[Any, ...]:
         """Vectorised Sun alt/az (deg) and apparent angular radius (deg) over the given times."""
         if eph is not None:
             t = ts.from_datetimes(times_utc)
-            sun_apparent = (eph["earth"] + observer).at(t).observe(eph["sun"]).apparent()
+            # skyfield is untyped: VectorSum.at() returns a Barycentric position (with observe()) at runtime
+            sun_apparent = (eph["earth"] + observer).at(t).observe(eph["sun"]).apparent()  # pyright: ignore[reportAttributeAccessIssue]
             altitude, azimuth, _ = sun_apparent.altaz()
             distance_km = np.atleast_1d(np.asarray(sun_apparent.distance().km, dtype=float))
             radius = np.degrees(np.arcsin(np.clip(SOLAR_RADIUS_KM / distance_km, -1.0, 1.0)))
@@ -726,7 +750,7 @@ class CSSPassService:
         sun_alt, sun_az = self._sun_altaz_arrays_astropy(times_utc)
         return sun_alt, sun_az, np.full(len(times_utc), SOLAR_ANGULAR_RADIUS_FALLBACK_DEG)
 
-    def _sun_altaz_arrays_astropy(self, times_utc):
+    def _sun_altaz_arrays_astropy(self, times_utc: list[Any]):
         """Vectorised Sun alt/az (deg) via Astropy - fallback when the ephemeris is unavailable."""
         astro_time = AstroTime([when.astimezone(UTC) for when in times_utc])
         frame = AltAz(obstime=astro_time, location=self.location)
@@ -736,18 +760,22 @@ class CSSPassService:
             np.atleast_1d(np.asarray(cast(Any, altaz.az).to_value(u.deg), dtype=float)),
         )
 
-    def _moon_altaz_radius_illum_arrays(self, times_utc, observer, ts, eph):
+    def _moon_altaz_radius_illum_arrays(
+        self, times_utc: list[Any], observer: GeographicPosition, ts: Timescale, eph: SpiceKernel
+    ) -> tuple[Any, ...]:
         """Vectorised Moon alt/az (deg), apparent radius (deg) and illumination (%) over the times."""
         t = ts.from_datetimes(times_utc)
         observed = (eph["earth"] + observer).at(t)
-        moon_astrometric = observed.observe(eph["moon"])
+        # skyfield is untyped: VectorSum.at() returns a Barycentric position (with observe()) at runtime
+        moon_astrometric = observed.observe(eph["moon"])  # pyright: ignore[reportAttributeAccessIssue]
         moon_apparent = moon_astrometric.apparent()
         altitude, azimuth, _ = moon_apparent.altaz()
         distance_km = np.atleast_1d(np.asarray(moon_apparent.distance().km, dtype=float))
         radius = np.degrees(np.arcsin(np.clip(LUNAR_RADIUS_KM / distance_km, -1.0, 1.0)))
 
         moon_ra, moon_dec, _ = moon_apparent.radec()
-        sun_apparent = observed.observe(eph["sun"]).apparent()
+        # skyfield is untyped: VectorSum.at() returns a Barycentric position (with observe()) at runtime
+        sun_apparent = observed.observe(eph["sun"]).apparent()  # pyright: ignore[reportAttributeAccessIssue]
         sun_ra, sun_dec, _ = sun_apparent.radec()
         elongation = self._angular_separation_array(
             np.atleast_1d(np.asarray(moon_dec.degrees, dtype=float)),
@@ -768,11 +796,11 @@ class CSSPassService:
         start_utc: datetime,
         end_utc: datetime,
         satellite: EarthSatellite,
-        observer,
-        ts,
-        eph,
-        event_times=None,
-        event_types=None,
+        observer: GeographicPosition,
+        ts: Timescale,
+        eph: SpiceKernel | None,
+        event_times: SkyfieldTime | None = None,
+        event_types: NDArray[Any] | None = None,
     ) -> list[dict[str, Any]]:
         """Find CSS solar transits for the observer, sharing the geometric pass events."""
         if event_times is None or event_types is None:
@@ -804,9 +832,9 @@ class CSSPassService:
         start_utc: datetime,
         end_utc: datetime,
         satellite: EarthSatellite,
-        observer,
-        ts,
-        eph,
+        observer: GeographicPosition,
+        ts: Timescale,
+        eph: SpiceKernel | None,
     ) -> dict[str, Any] | None:
         """Find a refined CSS solar transit within a daylight geometric pass (vectorised)."""
         if end_utc <= start_utc:
@@ -864,7 +892,7 @@ class CSSPassService:
         }
 
     def _sample_time_range(
-        self, start_utc: datetime, end_utc: datetime, step_seconds: float, sampler
+        self, start_utc: datetime, end_utc: datetime, step_seconds: float, sampler: Callable[..., Any]
     ) -> list[dict[str, Any]]:
         if end_utc <= start_utc:
             return [sampler(start_utc)]
@@ -876,9 +904,10 @@ class CSSPassService:
             samples.append(sampler(end_utc))
         return samples
 
-    def _solar_angular_radius_deg(self, sun_apparent) -> float:
+    def _solar_angular_radius_deg(self, sun_apparent: Apparent) -> float:
         try:
-            distance_km = float(sun_apparent.distance().km)
+            # skyfield is untyped: Angle.degrees / Distance.km are reify descriptors pyright cannot resolve
+            distance_km = float(sun_apparent.distance().km)  # pyright: ignore[reportArgumentType]
             if distance_km > SOLAR_RADIUS_KM:
                 return degrees(asin(SOLAR_RADIUS_KM / distance_km))
         except Exception as exc:
@@ -890,11 +919,11 @@ class CSSPassService:
         start_utc: datetime,
         end_utc: datetime,
         satellite: EarthSatellite,
-        observer,
-        ts,
-        eph,
-        event_times=None,
-        event_types=None,
+        observer: GeographicPosition,
+        ts: Timescale,
+        eph: SpiceKernel | None,
+        event_times: SkyfieldTime | None = None,
+        event_types: NDArray[Any] | None = None,
     ) -> list[dict[str, Any]]:
         """Find CSS lunar transits for the observer, sharing the geometric pass events."""
         if eph is None:
@@ -930,9 +959,9 @@ class CSSPassService:
         start_utc: datetime,
         end_utc: datetime,
         satellite: EarthSatellite,
-        observer,
-        ts,
-        eph,
+        observer: GeographicPosition,
+        ts: Timescale,
+        eph: SpiceKernel,
     ) -> dict[str, Any] | None:
         """Find a refined CSS lunar transit within a geometric pass where the Moon is up (vectorised)."""
         if end_utc <= start_utc:
@@ -990,9 +1019,10 @@ class CSSPassService:
             "is_visible": True,
         }
 
-    def _lunar_angular_radius_deg(self, moon_apparent) -> float:
+    def _lunar_angular_radius_deg(self, moon_apparent: Apparent) -> float:
         try:
-            distance_km = float(moon_apparent.distance().km)
+            # skyfield is untyped: Angle.degrees / Distance.km are reify descriptors pyright cannot resolve
+            distance_km = float(moon_apparent.distance().km)  # pyright: ignore[reportArgumentType]
             if distance_km > LUNAR_RADIUS_KM:
                 return degrees(asin(LUNAR_RADIUS_KM / distance_km))
         except Exception as exc:
@@ -1009,12 +1039,20 @@ class CSSPassService:
         cos_sep = max(-1.0, min(1.0, cos_sep))
         return degrees(acos(cos_sep))
 
-    def _sample_observation(self, when_utc: datetime, satellite: EarthSatellite, observer, ts, eph) -> dict[str, Any]:
+    def _sample_observation(
+        self,
+        when_utc: datetime,
+        satellite: EarthSatellite,
+        observer: GeographicPosition,
+        ts: Timescale,
+        eph: SpiceKernel | None,
+    ) -> dict[str, Any]:
         event_time = ts.from_datetime(when_utc)
         topocentric = (satellite - observer).at(event_time)
         altitude, azimuth, _ = topocentric.altaz()
-        altitude_deg = float(altitude.degrees)
-        azimuth_deg = float(azimuth.degrees)
+        # skyfield is untyped: Angle.degrees / Distance.km are reify descriptors pyright cannot resolve
+        altitude_deg = float(altitude.degrees)  # pyright: ignore[reportArgumentType]
+        azimuth_deg = float(azimuth.degrees)  # pyright: ignore[reportArgumentType]
 
         if eph is not None:
             sun_altitude_deg = self._sun_altitude_deg_skyfield(observer, eph, event_time)
@@ -1037,12 +1075,16 @@ class CSSPassService:
             "is_visible": is_visible,
         }
 
-    def _sun_altitude_deg_skyfield(self, observer, eph, event_time) -> float:
+    def _sun_altitude_deg_skyfield(
+        self, observer: GeographicPosition, eph: SpiceKernel, event_time: SkyfieldTime
+    ) -> float:
         earth = eph["earth"]
         sun = eph["sun"]
-        astrometric = (earth + observer).at(event_time).observe(sun)
+        # skyfield is untyped: VectorSum.at() returns a Barycentric position (with observe()) at runtime
+        astrometric = (earth + observer).at(event_time).observe(sun)  # pyright: ignore[reportAttributeAccessIssue]
         altitude, _, _ = astrometric.apparent().altaz()
-        return float(altitude.degrees)
+        # skyfield is untyped: Angle.degrees / Distance.km are reify descriptors pyright cannot resolve
+        return float(altitude.degrees)  # pyright: ignore[reportArgumentType]
 
     def _group_consecutive_indices(self, indices: list[int]) -> list[list[int]]:
         if not indices:
@@ -1084,10 +1126,13 @@ class CSSPassService:
         index = int((normalized + 11.25) // 22.5) % 16
         return labels[index]
 
-    def _satellite_altitude_deg(self, satellite: EarthSatellite, observer, event_time) -> float:
+    def _satellite_altitude_deg(
+        self, satellite: EarthSatellite, observer: GeographicPosition, event_time: SkyfieldTime
+    ) -> float:
         topocentric = (satellite - observer).at(event_time)
         altitude, _, _ = topocentric.altaz()
-        return float(altitude.degrees)
+        # skyfield is untyped: Angle.degrees / Distance.km are reify descriptors pyright cannot resolve
+        return float(altitude.degrees)  # pyright: ignore[reportArgumentType]
 
     def _sun_altitude_deg(self, when_utc: datetime) -> float:
         astro_time = AstroTime(when_utc)
@@ -1096,7 +1141,7 @@ class CSSPassService:
         sun_alt = getattr(sun_altaz, "alt", None)
         if sun_alt is None:
             raise ValueError("Could not determine Sun altitude")
-        return float(cast(Any, sun_alt.to_value(u.deg)))
+        return float(sun_alt.to_value(u.deg))
 
     def _sun_alt_az_deg(self, when_utc: datetime) -> tuple[float, float]:
         astro_time = AstroTime(when_utc)
@@ -1107,8 +1152,8 @@ class CSSPassService:
         if sun_alt is None or sun_az is None:
             raise ValueError("Could not determine Sun altitude/azimuth")
         return (
-            float(cast(Any, sun_alt.to_value(u.deg))),
-            float(cast(Any, sun_az.to_value(u.deg))),
+            float(sun_alt.to_value(u.deg)),
+            float(sun_az.to_value(u.deg)),
         )
 
     def _classify_day_night(self, sun_altitude_deg: float) -> str:
@@ -1181,9 +1226,10 @@ def get_css_current_position(
     now_utc = datetime.now(UTC)
     now_t = ts.from_datetime(now_utc)
     subpoint = wgs84.subpoint(satellite.at(now_t))
-    lat = float(subpoint.latitude.degrees)  # type: ignore[arg-type]
-    lon = float(subpoint.longitude.degrees)  # type: ignore[arg-type]
-    alt_km = float(subpoint.elevation.km)  # type: ignore[arg-type]
+    # skyfield is untyped: Angle.degrees / Distance.km are reify descriptors pyright cannot resolve
+    lat = float(subpoint.latitude.degrees)  # pyright: ignore[reportArgumentType]
+    lon = float(subpoint.longitude.degrees)  # pyright: ignore[reportArgumentType]
+    alt_km = float(subpoint.elevation.km)  # pyright: ignore[reportArgumentType]
 
     now_ts = _utc_timestamp()
     with _CSS_TRACK_CACHE_LOCK:
@@ -1196,13 +1242,15 @@ def get_css_current_position(
             for delta_min in range(-50, 0):
                 t = ts.from_datetime(now_utc + timedelta(minutes=delta_min))
                 sp = wgs84.subpoint(satellite.at(t))
-                past_track.append([float(sp.latitude.degrees), float(sp.longitude.degrees)])  # type: ignore[arg-type]
+                # skyfield is untyped: Angle.degrees / Distance.km are reify descriptors pyright cannot resolve
+                past_track.append([float(sp.latitude.degrees), float(sp.longitude.degrees)])  # pyright: ignore[reportArgumentType]
 
             future_track = [[lat, lon]]
             for delta_min in range(1, 51):
                 t = ts.from_datetime(now_utc + timedelta(minutes=delta_min))
                 sp = wgs84.subpoint(satellite.at(t))
-                future_track.append([float(sp.latitude.degrees), float(sp.longitude.degrees)])  # type: ignore[arg-type]
+                # skyfield is untyped: Angle.degrees / Distance.km are reify descriptors pyright cannot resolve
+                future_track.append([float(sp.latitude.degrees), float(sp.longitude.degrees)])  # pyright: ignore[reportArgumentType]
 
             _CSS_TRACK_CACHE["past_track"] = past_track
             _CSS_TRACK_CACHE["future_track"] = future_track
@@ -1222,8 +1270,9 @@ def get_css_current_position(
         observer = wgs84.latlon(latitude, longitude, elevation_m=elevation_m)
         topocentric = (satellite - observer).at(now_t)
         _obs_alt, _obs_az, _ = topocentric.altaz()
-        obs_altitude_deg = float(_obs_alt.degrees)  # type: ignore[arg-type]
-        obs_azimuth_deg = float(_obs_az.degrees)  # type: ignore[arg-type]
+        # skyfield is untyped: Angle.degrees is a reify descriptor pyright cannot resolve
+        obs_altitude_deg = float(_obs_alt.degrees)  # pyright: ignore[reportArgumentType]
+        obs_azimuth_deg = float(_obs_az.degrees)  # pyright: ignore[reportArgumentType]
 
         eph = _get_ephemeris()
 
@@ -1231,15 +1280,18 @@ def get_css_current_position(
             earth = eph["earth"]
             sun_obj = eph["sun"]
             obs_loc_skyfield = wgs84.latlon(latitude, longitude, elevation_m=elevation_m)
-            sun_astrometric = (earth + obs_loc_skyfield).at(now_t).observe(sun_obj)
-            sun_altitude_deg = float(sun_astrometric.apparent().altaz()[0].degrees)
+            # skyfield is untyped: VectorSum.at() returns a Barycentric position (with observe()) at runtime
+            sun_astrometric = (earth + obs_loc_skyfield).at(now_t).observe(sun_obj)  # pyright: ignore[reportAttributeAccessIssue]
+            # skyfield is untyped: Angle.degrees / Distance.km are reify descriptors pyright cannot resolve
+            sun_altitude_deg = float(sun_astrometric.apparent().altaz()[0].degrees)  # pyright: ignore[reportArgumentType]
             is_sunlit = bool(topocentric.is_sunlit(eph))
         else:
             obs_earth_loc = EarthLocation(lat=latitude * u.deg, lon=longitude * u.deg, height=elevation_m * u.m)
             astro_time = AstroTime(now_utc)
             frame = AltAz(obstime=astro_time, location=obs_earth_loc)
             sun_alt = get_sun(astro_time).transform_to(frame).alt
-            sun_altitude_deg = float(cast(Angle, sun_alt).deg)  # type: ignore[arg-type]
+            # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+            sun_altitude_deg = float(cast(Angle, sun_alt).deg)  # pyright: ignore[reportArgumentType]
             is_sunlit = True
 
         is_visible = (

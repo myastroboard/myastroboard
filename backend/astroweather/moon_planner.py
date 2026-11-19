@@ -30,6 +30,7 @@ Example output for a night (on API call):
 """
 
 import datetime
+from typing import Any
 from zoneinfo import ZoneInfo
 
 import astropy.units as u
@@ -64,7 +65,7 @@ def night_body_altitude_grid(
     timezone_name: str,
     night_date: datetime.date,
     step_minutes: int = 10,
-) -> dict:
+) -> dict[str, Any]:
     """Vectorized Sun and Moon altitude over one night (18:00 local -> 06:00 next day).
 
     One Astropy ``AltAz`` transform per body over the whole time grid, matching the
@@ -103,8 +104,9 @@ def night_body_altitude_grid(
 
     t_arr = Time(utc_times)
     frame = AltAz(obstime=t_arr, location=location)
-    sun_alts = np.asarray(get_sun(t_arr).transform_to(frame).alt.deg)  # type: ignore[union-attr]
-    moon_alts = np.asarray(get_body("moon", t_arr).transform_to(frame).alt.deg)  # type: ignore[union-attr]
+    # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+    sun_alts = np.asarray(get_sun(t_arr).transform_to(frame).alt.deg)  # pyright: ignore[reportOptionalMemberAccess]
+    moon_alts = np.asarray(get_body("moon", t_arr).transform_to(frame).alt.deg)  # pyright: ignore[reportOptionalMemberAccess]
 
     return {
         "time": t_arr,
@@ -127,10 +129,10 @@ class MoonPlanner:
     # Public API
     # ============================================================
 
-    def next_7_nights(self):
+    def next_7_nights(self) -> list[dict[str, Any]]:
         return self.next_n_nights(7)
 
-    def next_n_nights(self, n: int):
+    def next_n_nights(self, n: int) -> list[dict[str, Any]]:
 
         today = datetime.datetime.now(self.timezone).date()
         results = []
@@ -161,7 +163,7 @@ class MoonPlanner:
     # Core computation
     # ============================================================
 
-    def _night_data(self, date):
+    def _night_data(self, date: datetime.date) -> dict[str, float]:
         """Compute all 3 darkness modes for one night in a single vectorized pass.
 
         Instead of calling _dark_hours 3 times (3 × 73 individual Astropy calls),
@@ -198,14 +200,14 @@ class MoonPlanner:
     # Moon illumination (official astroplan)
     # ============================================================
 
-    def _moon_illumination(self, dt_local):
+    def _moon_illumination(self, dt_local: datetime.datetime):
         return moon_illumination_percent(dt_local)
 
     # ============================================================
     # Simple astrophotography score
     # ============================================================
 
-    def _score(self, strict_hours):
+    def _score(self, strict_hours: float):
 
         if strict_hours >= 6:
             return 100

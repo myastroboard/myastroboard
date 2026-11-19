@@ -87,7 +87,7 @@ _SUN_ENTRY: dict[str, Any] = {
 }
 
 
-def _natural_sort_key(value: str) -> tuple:
+def _natural_sort_key(value: str) -> tuple[Any, ...]:
     """Return a tuple that orders identifiers the way a human reads them ("M 9" < "M 10")."""
     parts = _NATURAL_CHUNKS.split(str(value or '').strip().casefold())
     # Digit runs become ints; the (0, int) / (1, str) prefix keeps the tuple comparable.
@@ -106,14 +106,14 @@ def _body_image_url(target_id: str) -> str | None:
     return f'/static/img/bodies/{slug}.svg' if re.fullmatch(r'[a-z]+', slug) else None
 
 
-def _target_key_candidates(entry: dict[str, Any]) -> set:
+def _target_key_candidates(entry: dict[str, Any]) -> set[Any]:
     """Return the normalized names an Astrodex item may have been saved under for this object."""
     candidates = {entry.get('catalogue_id'), entry.get('preferred_name')}
     candidates.update(entry.get('aliases') or [])
     return {key for key in (_normalize_key(value) for value in candidates) if key}
 
 
-def _target_all_keys(target: Any) -> set:
+def _target_all_keys(target: Any) -> set[Any]:
     """Same as :func:`_target_key_candidates` but straight off a dataset target.
 
     Used by the counting pass, which needs every identifier of an object at once rather
@@ -256,7 +256,7 @@ def _catalogue_entries(catalogue: str) -> list[dict[str, Any]]:
 def _annotate(
     entry: dict[str, Any],
     astrodex_index: dict[str, dict[str, Any]],
-    wishlist_index: set | None = None,
+    wishlist_index: set[Any] | None = None,
 ) -> dict[str, Any]:
     """Attach caught state, wishlist state and the card image to a normalized entry."""
     candidates = _target_key_candidates(entry)
@@ -376,7 +376,7 @@ def _matches_filters(
 def _sort_cards(cards: list[dict[str, Any]], sort: str, descending: bool) -> list[dict[str, Any]]:
     """Order cards by the requested field, always tie-breaking on the catalogue identifier."""
 
-    def tiebreak(card: dict[str, Any]) -> tuple:
+    def tiebreak(card: dict[str, Any]) -> tuple[Any, ...]:
         return _natural_sort_key(card['catalogue_id'])
 
     # Objects carrying no value for the sorted field have no rank, so they stay grouped at
@@ -416,7 +416,7 @@ def get_collection_page(
     constellation: str = '',
     caught: str = 'all',
     difficulty: str = '',
-    wishlist_index: set | None = None,
+    wishlist_index: set[Any] | None = None,
 ) -> dict[str, Any]:
     """Return one page of a catalogue's cards plus the counters and filter options around it.
 

@@ -67,14 +67,14 @@ class AstroTonightService:
     # Public API
     # ============================================================
 
-    def best_window_tonight(self, mode="strict") -> BestWindow:
+    def best_window_tonight(self, mode: str = "strict") -> BestWindow:
         """
         Returns the best continuous imaging window tonight.
         """
         windows = self.best_windows_all_modes()
         return windows[mode]
 
-    def best_windows_all_modes(self) -> dict:
+    def best_windows_all_modes(self) -> dict[str, Any]:
         """
         Compute best windows for all three modes in a single vectorized Astropy pass.
         All altitudes for the full night grid are computed in one batch call instead
@@ -120,7 +120,7 @@ class AstroTonightService:
         best_duration = {m: datetime.timedelta(0) for m in modes}
         current_start = {m: None for m in modes}
 
-        def is_ok(mode, sun_alt, moon_alt):
+        def is_ok(mode: str, sun_alt: float, moon_alt: float) -> bool:
             if sun_alt >= -18:
                 return False
             if mode == "strict":
@@ -187,7 +187,7 @@ class AstroTonightService:
     # Moon illumination %
     # ============================================================
 
-    def _moon_illumination(self, dt_local):
+    def _moon_illumination(self, dt_local: datetime.datetime):
 
         utc_dt = dt_local.astimezone(datetime.UTC)
         t = Time(utc_dt)
@@ -199,7 +199,7 @@ class AstroTonightService:
     # Score function
     # ============================================================
 
-    def _score(self, hours):
+    def _score(self, hours: float):
 
         if hours >= 6:
             return 100

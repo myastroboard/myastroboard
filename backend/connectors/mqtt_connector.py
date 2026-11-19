@@ -22,11 +22,16 @@ import socket
 import ssl
 import time
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 from connectors.base_connector import BaseConnector
 from utils.logging_config import get_logger
+
+if TYPE_CHECKING:
+    from paho.mqtt.client import Client, ConnectFlags
+    from paho.mqtt.properties import Properties
+    from paho.mqtt.reasoncodes import ReasonCode
 
 logger = get_logger(__name__)
 
@@ -172,7 +177,7 @@ class MqttConnector(BaseConnector):
         },
     ]
 
-    def __init__(self, config: dict, connection: dict | None = None):
+    def __init__(self, config: dict[str, Any], connection: dict[str, Any] | None = None):
         super().__init__(config, connection)
         # The broker is the connection's URL: this connector has no web address of its own.
         self.base_url = str((connection or {}).get("url") or "").rstrip("/")
@@ -273,7 +278,7 @@ class MqttConnector(BaseConnector):
         password: str | None = None,
         tls_insecure: bool | None = None,
         client_factory: Callable[[str], Any] | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """One MQTT CONNECT / DISCONNECT against *url* (default: the configured broker).
 
         Returns ``{"reachable": bool, "error": str | None}``. The username and TLS switch
@@ -297,7 +302,13 @@ class MqttConnector(BaseConnector):
         client = factory(f"myastroboard-probe-{secrets.token_hex(3)}")
         outcome: dict[str, Any] = {}
 
-        def _on_connect(_client, _userdata, _flags, reason_code, _properties=None):
+        def _on_connect(
+            _client: Client,
+            _userdata: Any,
+            _flags: ConnectFlags,
+            reason_code: ReasonCode,
+            _properties: Properties | None = None,
+        ) -> None:
             outcome["reason"] = reason_code
 
         client.on_connect = _on_connect
@@ -336,7 +347,7 @@ class MqttConnector(BaseConnector):
             return {"reachable": False, "error": f"broker refused the connection: {reason}"}
         return {"reachable": True, "error": None}
 
-    def health_check(self, password: str | None = None) -> dict:
+    def health_check(self, password: str | None = None) -> dict[str, Any]:
         """Connection probe against the saved broker plus one line per module.
 
         *password* is the connection's stored password, passed explicitly - see

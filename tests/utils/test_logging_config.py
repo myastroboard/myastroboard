@@ -265,7 +265,8 @@ def test_release_stream_ignores_close_errors(tmp_path):
         def close(self):
             raise OSError("close failed")
 
-    handler.stream = _BrokenStream()  # type: ignore[assignment]
+    # the test swaps in a fake stream object on purpose
+    handler.stream = _BrokenStream()  # pyright: ignore[reportAttributeAccessIssue]
     handler._release_stream()
     assert handler.stream is None
     handler.close()

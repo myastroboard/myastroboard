@@ -31,6 +31,7 @@ import os
 import threading
 import uuid
 from datetime import UTC, date, datetime, timedelta
+from typing import TYPE_CHECKING, Any
 
 from cache import cache_store
 from equipment import equipment_profiles
@@ -46,6 +47,9 @@ from utils.file_lock import interprocess_lock
 from utils.image_privacy import strip_image_metadata
 from utils.logging_config import get_logger
 from utils.repo_config import get_install_default_location, load_config, save_config
+
+if TYPE_CHECKING:
+    from utils.auth import User
 
 logger = get_logger(__name__)
 
@@ -235,15 +239,15 @@ def run_once(today: date | None = None) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _setup_by_key(key: str) -> dict:
+def _setup_by_key(key: str) -> dict[str, Any]:
     return next(setup for setup in DEMO_SETUPS if setup['key'] == key)
 
 
-def _combination_name(setup: dict) -> str:
+def _combination_name(setup: dict[str, Any]) -> str:
     return f"{setup['telescope']['name']} + {setup['camera']['name']}"
 
 
-def _ensure_equipment(user) -> dict[str, dict]:
+def _ensure_equipment(user: User) -> dict[str, dict[str, Any]]:
     """Return the demo combinations by setup key, creating them on an empty account.
 
     An account that already holds combinations (prepared by hand) is used as it is: its
@@ -274,7 +278,7 @@ def _ensure_equipment(user) -> dict[str, dict]:
     return created
 
 
-def field_of_view_deg(setup: dict) -> tuple[float, float]:
+def field_of_view_deg(setup: dict[str, Any]) -> tuple[float, float]:
     """Field of view (width, height) in degrees of a setup."""
     scope = setup['telescope']
     focal = float(scope['focal_length_mm']) * float(scope.get('reducer_barlow_factor') or 1.0)
@@ -285,7 +289,7 @@ def field_of_view_deg(setup: dict) -> tuple[float, float]:
     )
 
 
-def _catalogue_of(names: dict, preferred) -> str:
+def _catalogue_of(names: dict[str, Any], preferred: str | None) -> str:
     """The catalogue whose designation is the preferred name (what the UI sends)."""
     for catalogue, value in (names or {}).items():
         if value == preferred:
@@ -293,7 +297,7 @@ def _catalogue_of(names: dict, preferred) -> str:
     return next(iter(names), '') if names else ''
 
 
-def _seed_astrodex(user, combinations: dict[str, dict], today: date) -> None:
+def _seed_astrodex(user: User, combinations: dict[str, dict[str, Any]], today: date) -> None:
     """Add the classic targets, one picture each, dated over the past months."""
     for index, (name, setup_key) in enumerate(DEMO_ASTRODEX_SEED):
         combination = combinations.get(setup_key)
@@ -322,7 +326,7 @@ def _seed_astrodex(user, combinations: dict[str, dict], today: date) -> None:
         )
 
 
-def _seed_wishlist(user) -> None:
+def _seed_wishlist(user: User) -> None:
     targets = []
     for name in DEMO_WISHLIST_SEED:
         target = skytonight_targets.find_target(name)
@@ -343,7 +347,7 @@ def _seed_wishlist(user) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _load_tonight() -> tuple[dict, list[dict]] | None:
+def _load_tonight() -> tuple[dict[str, Any], list[dict[str, Any]]] | None:
     """Tonight's SkyTonight metadata and deep-sky rows for the install location."""
     location = get_install_default_location(load_config()) or {}
     path = get_dso_results_file(location.get('id'))
@@ -359,7 +363,7 @@ def _load_tonight() -> tuple[dict, list[dict]] | None:
     return metadata, [row for row in rows if isinstance(row, dict)]
 
 
-def refresh_tonight(user, combinations: dict[str, dict]) -> None:
+def refresh_tonight(user: User, combinations: dict[str, dict[str, Any]]) -> None:
     """Log each finished plan, then build tonight's plan for every demo combination."""
     tonight = _load_tonight()
     if tonight is None:
@@ -394,7 +398,7 @@ def refresh_tonight(user, combinations: dict[str, dict]) -> None:
         taken_tonight.update(_normalize(row.get('preferred_name')) for row in picks)
 
 
-def pick_targets(rows: list[dict], setup: dict, exclude: set[str]) -> list[dict]:
+def pick_targets(rows: list[dict[str, Any]], setup: dict[str, Any], exclude: set[str]) -> list[dict[str, Any]]:
     """Tonight's best-scoring deep-sky targets that suit this setup's field of view.
 
     A target fits when it fills between a tenth and nine tenths of the field's short
@@ -419,7 +423,13 @@ def pick_targets(rows: list[dict], setup: dict, exclude: set[str]) -> list[dict]
     return candidates[: setup['targets_per_night']]
 
 
-def _build_plan(user, metadata: dict, setup: dict, combination: dict, picks: list[dict]) -> None:
+def _build_plan(
+    user: User,
+    metadata: dict[str, Any],
+    setup: dict[str, Any],
+    combination: dict[str, Any],
+    picks: list[dict[str, Any]],
+) -> None:
     start = metadata['night_start']
     end = metadata['night_end']
     hours = float(metadata.get('night_hours') or 0.0)
@@ -464,7 +474,9 @@ def _build_plan(user, metadata: dict, setup: dict, combination: dict, picks: lis
     logger.info(f"Demo mode: planned {len(picks)} targets for {combination.get('name')!r} on {str(start)[:10]}")
 
 
-def _log_plan(user, plan: dict, setup: dict, combination: dict, in_astrodex: set[str]) -> None:
+def _log_plan(
+    user: User, plan: dict[str, Any], setup: dict[str, Any], combination: dict[str, Any], in_astrodex: set[str]
+) -> None:
     """Turn a finished plan into a logged session; its best target joins the Astrodex."""
     session = observation_sessions.create_session_from_plan(user.user_id, user.username, plan)
     if not session:
@@ -517,7 +529,7 @@ def _log_plan(user, plan: dict, setup: dict, combination: dict, in_astrodex: set
 # ---------------------------------------------------------------------------
 
 
-def repair_demo_data(user, combinations: dict[str, dict], today: date) -> None:
+def repair_demo_data(user: User, combinations: dict[str, dict[str, Any]], today: date) -> None:
     """Finish what an earlier check could not, and bring older records to today's shape.
 
     - Logged nights older than ``DEMO_HISTORY_DAYS`` go, with the items they added.
@@ -539,7 +551,7 @@ def _seed_names() -> set[str]:
     return names
 
 
-def _prune_history(user, today: date) -> None:
+def _prune_history(user: User, today: date) -> None:
     """Delete the logged nights older than DEMO_HISTORY_DAYS and the items they added."""
     cutoff = (today - timedelta(days=DEMO_HISTORY_DAYS)).isoformat()
     seed = _seed_names()
@@ -562,7 +574,7 @@ def _prune_history(user, today: date) -> None:
         )
 
 
-def _expand_constellations(user) -> None:
+def _expand_constellations(user: User) -> None:
     for item in astrodex.load_user_astrodex(user.user_id, user.username).get('items', []):
         current = item.get('constellation') if isinstance(item, dict) else None
         if current and current != _astrodex_constellation(current):
@@ -580,9 +592,9 @@ def _expand_constellations(user) -> None:
         observation_sessions.save_user_sessions(user.user_id, data, username=user.username)
 
 
-def _linked_entries(user) -> dict[str, tuple[dict, dict]]:
+def _linked_entries(user: User) -> dict[str, tuple[dict[str, Any], dict[str, Any]]]:
     """Astrodex item id -> (session, entry) of the logged entry that added it."""
-    linked: dict[str, tuple[dict, dict]] = {}
+    linked: dict[str, tuple[dict[str, Any], dict[str, Any]]] = {}
     for session in observation_sessions.load_user_sessions(user.user_id, user.username).get('sessions', []):
         for entry in session.get('entries', []) if isinstance(session, dict) else []:
             if isinstance(entry, dict) and entry.get('astrodex_item_id'):
@@ -590,7 +602,7 @@ def _linked_entries(user) -> dict[str, tuple[dict, dict]]:
     return linked
 
 
-def _retry_missing_pictures(user, combinations: dict[str, dict], today: date) -> None:
+def _retry_missing_pictures(user: User, combinations: dict[str, dict[str, Any]], today: date) -> None:
     """Give a few picture-less items their survey picture; stop at the first failure.
 
     A failure means every survey server is down or backed off: the next check retries.
@@ -623,14 +635,16 @@ def _retry_missing_pictures(user, combinations: dict[str, dict], today: date) ->
         logger.info(f"Demo mode: survey picture added to {item.get('name')!r} on retry")
 
 
-def _setup_of_combination(combination_id, combinations: dict[str, dict]) -> tuple[dict, dict] | None:
+def _setup_of_combination(
+    combination_id: str | None, combinations: dict[str, dict[str, Any]]
+) -> tuple[dict[str, Any], dict[str, Any]] | None:
     for key, combination in combinations.items():
         if combination.get('id') == combination_id:
             return _setup_by_key(key), combination
     return None
 
 
-def _night_date(session: dict, entry: dict) -> str:
+def _night_date(session: dict[str, Any], entry: dict[str, Any]) -> str:
     """The date of the night an entry was logged on (the session's first night otherwise)."""
     nights = [night for night in session.get('nights') or [] if isinstance(night, dict)]
     night = next((night for night in nights if night.get('id') == entry.get('night_id')), None)
@@ -639,7 +653,9 @@ def _night_date(session: dict, entry: dict) -> str:
     return str(night.get('date') or '')
 
 
-def _logged_picture(link: tuple[dict, dict], combinations: dict[str, dict]) -> dict | None:
+def _logged_picture(
+    link: tuple[dict[str, Any], dict[str, Any]], combinations: dict[str, dict[str, Any]]
+) -> dict[str, Any] | None:
     """The picture arguments of an item added from a logged night, as _log_plan made them."""
     session, entry = link
     found = _setup_of_combination(session.get('combination_id'), combinations)
@@ -664,7 +680,7 @@ def _logged_picture(link: tuple[dict, dict], combinations: dict[str, dict]) -> d
     }
 
 
-def _seed_picture(item: dict, combinations: dict[str, dict], today: date) -> dict | None:
+def _seed_picture(item: dict[str, Any], combinations: dict[str, dict[str, Any]], today: date) -> dict[str, Any] | None:
     """The picture arguments of a seeded item, as _seed_astrodex made them."""
     for index, (name, setup_key) in enumerate(DEMO_ASTRODEX_SEED):
         target = skytonight_targets.find_target(name)
@@ -697,11 +713,11 @@ def _seed_picture(item: dict, combinations: dict[str, dict], today: date) -> dic
 # ---------------------------------------------------------------------------
 
 
-def _normalize(name) -> str:
+def _normalize(name: str | None) -> str:
     return ''.join(str(name or '').lower().split())
 
 
-def _astrodex_constellation(value) -> str:
+def _astrodex_constellation(value: str | None) -> str:
     """The constellation as the Astrodex form stores it: the full name, lowercase."""
     return full_constellation_name(value).lower()
 
@@ -710,13 +726,13 @@ def _seed_date(today: date, index: int) -> date:
     return today - timedelta(days=12 + 19 * index)
 
 
-def _variation(name, spread: int) -> int:
+def _variation(name: str, spread: int) -> int:
     """A stable pseudo-random number in [0, spread) for a target name."""
     digest = hashlib.sha256(str(name or '').encode('utf-8')).digest()
     return int.from_bytes(digest[:4], 'big') % spread
 
 
-def _acquisition(setup: dict, name, planned_minutes) -> tuple[int, float]:
+def _acquisition(setup: dict[str, Any], name: str, planned_minutes: float | str | None) -> tuple[int, float]:
     """Frames and integration minutes for a target: 70 to 95 % of the planned time."""
     try:
         planned = float(planned_minutes or setup['planned_minutes'])
@@ -727,23 +743,23 @@ def _acquisition(setup: dict, name, planned_minutes) -> tuple[int, float]:
     return frames, round(frames * setup['sub_exposure_seconds'] / 60.0, 1)
 
 
-def _rating(name) -> float:
+def _rating(name: str) -> float:
     """3.5 to 5 stars, in half steps."""
     return 3.5 + 0.5 * _variation(f'rating:{name}', 4)
 
 
 def _add_to_astrodex(
-    user,
-    item_data: dict,
+    user: User,
+    item_data: dict[str, Any],
     *,
     ra_deg: float,
     dec_deg: float,
-    setup: dict,
-    combination: dict,
+    setup: dict[str, Any],
+    combination: dict[str, Any],
     when: date,
-    frames,
-    integration_minutes,
-    rating,
+    frames: int,
+    integration_minutes: float,
+    rating: float,
 ) -> tuple[str | None, str | None]:
     """Create an Astrodex item with one survey picture framed to the setup's field."""
     item = astrodex.create_astrodex_item(user.user_id, item_data, username=user.username)
@@ -765,17 +781,17 @@ def _add_to_astrodex(
 
 
 def _attach_picture(
-    user,
+    user: User,
     item_id: str,
     *,
     ra_deg: float,
     dec_deg: float,
-    setup: dict,
-    combination: dict,
+    setup: dict[str, Any],
+    combination: dict[str, Any],
     when: date,
-    frames,
-    integration_minutes,
-    rating,
+    frames: int,
+    integration_minutes: float,
+    rating: float,
 ) -> str | None:
     """Download a survey picture framed to the setup's field and add it to an item."""
     filename = _download_picture(user.user_id, ra_deg, dec_deg, max(field_of_view_deg(setup)))

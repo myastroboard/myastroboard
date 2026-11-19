@@ -7,6 +7,7 @@ import uuid
 from dataclasses import asdict, dataclass, fields
 from datetime import UTC, datetime
 from enum import Enum
+from typing import Any, overload
 
 from db import documents, queries
 from utils.logging_config import get_logger
@@ -14,7 +15,11 @@ from utils.logging_config import get_logger
 logger = get_logger(__name__)
 
 
-def _get_float_or_none(value, default=None):
+@overload
+def _get_float_or_none(value: float | str | None, default: float) -> float: ...
+@overload
+def _get_float_or_none(value: float | str | None, default: None = None) -> float | None: ...
+def _get_float_or_none(value: float | str | None, default: float | None = None) -> float | None:
     """Convert an optional numeric form field to a float, treating '' and None as unset.
 
     Checks explicitly for None/'' rather than falsiness so a legitimate 0 (e.g. a lens focal
@@ -25,7 +30,12 @@ def _get_float_or_none(value, default=None):
     return float(value)
 
 
-def _parse_optional_bool(value):
+def _stored_float(item: dict[str, Any], key: str, default: float) -> float:
+    """A float field of a stored profile row: rows are written by asdict() from float fields."""
+    return item.get(key, default)
+
+
+def _parse_optional_bool(value: bool | str | None):
     """Parse an optional tri-state boolean form field. '' and None mean "not set" (-> None)."""
     if value is None or value == '':
         return None
@@ -170,7 +180,7 @@ class Mount:
 _MOUNT_FLIP_FIELDS = ('meridian_flip_required', 'meridian_flip_delay_min', 'meridian_flip_duration_min')
 
 
-def normalize_mount_flip_fields(mount: dict | None) -> dict | None:
+def normalize_mount_flip_fields(mount: dict[str, Any] | None) -> dict[str, Any] | None:
     """Backfill the v1.4 meridian-flip fields on a raw mount dict read from disk.
 
     Mount profiles written before v1.4 have no ``meridian_flip_required`` /
@@ -274,11 +284,11 @@ class CombinationAnalysis:
     """Equipment combination analysis results"""
 
     combination_id: str
-    telescope: dict | None = None
-    camera: dict | None = None
-    mount: dict | None = None
-    filters: list[dict] | None = None
-    accessories: list[dict] | None = None
+    telescope: dict[str, Any] | None = None
+    camera: dict[str, Any] | None = None
+    mount: dict[str, Any] | None = None
+    filters: list[dict[str, Any]] | None = None
+    accessories: list[dict[str, Any]] | None = None
     fov_calculation: FOVCalculation | None = None
     suitability: list[str] | None = None
     recommendations: list[str] | None = None
@@ -304,7 +314,7 @@ def equipment_kind(equipment_type: str) -> str:
     return f'equipment.{equipment_type}'
 
 
-def validate_equipment_data(data) -> tuple[bool, str]:
+def validate_equipment_data(data: list[int] | str | dict[str, Any]) -> tuple[bool, str]:
     """
     Validate an equipment document before it is stored
 
@@ -320,7 +330,7 @@ def validate_equipment_data(data) -> tuple[bool, str]:
     return True, ""
 
 
-def _load_equipment_document(user_id: str, equipment_type: str) -> dict | None:
+def _load_equipment_document(user_id: str, equipment_type: str) -> dict[str, Any] | None:
     """The stored document, or None when there is none (or it cannot be used)."""
     try:
         data = documents.get_document(user_id, equipment_kind(equipment_type))
@@ -333,7 +343,7 @@ def _load_equipment_document(user_id: str, equipment_type: str) -> dict | None:
     return data
 
 
-def safe_save_equipment(user_id: str, equipment_type: str, data: dict) -> bool:
+def safe_save_equipment(user_id: str, equipment_type: str, data: dict[str, Any]) -> bool:
     """
     Validate and store a user's equipment of one type (one transaction, nothing half-written)
 
@@ -364,7 +374,7 @@ def _iter_equipment_documents(equipment_type: str):
 # ============================================================
 
 
-def load_all_shared_equipment(equipment_type: str, exclude_user_id: str) -> list[dict]:
+def load_all_shared_equipment(equipment_type: str, exclude_user_id: str) -> list[dict[str, Any]]:
     """Return items marked is_shared=True from all users except exclude_user_id.
 
     Each returned item is annotated with owner_id and owner_username.
@@ -373,7 +383,7 @@ def load_all_shared_equipment(equipment_type: str, exclude_user_id: str) -> list
 
     user_map = user_manager.display_names_by_id()
 
-    shared_items: list[dict] = []
+    shared_items: list[dict[str, Any]] = []
     try:
         # Only object rows carry is_shared, so every item here is a dict
         for owner_id, item in queries.shared_equipment(equipment_type, exclude_user_id):
@@ -390,7 +400,7 @@ def load_all_shared_equipment(equipment_type: str, exclude_user_id: str) -> list
 _BASIC_EQUIPMENT_TYPES = ('telescopes', 'cameras', 'mounts', 'filters', 'accessories')
 
 
-def index_owned_and_shared_equipment(user_id: str) -> tuple[dict[str, dict], dict[str, dict]]:
+def index_owned_and_shared_equipment(user_id: str) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
     """Build (own_by_id, shared_by_id) indexes across all 5 basic equipment types.
 
     Exposed (not module-private) so a caller that needs the same index for several combinations
@@ -405,8 +415,8 @@ def index_owned_and_shared_equipment(user_id: str) -> tuple[dict[str, dict], dic
         'filters': load_user_filters,
         'accessories': load_user_accessories,
     }
-    own_by_id: dict[str, dict] = {}
-    shared_by_id: dict[str, dict] = {}
+    own_by_id: dict[str, dict[str, Any]] = {}
+    shared_by_id: dict[str, dict[str, Any]] = {}
     for eq_type in _BASIC_EQUIPMENT_TYPES:
         for item in loaders[eq_type](user_id).get('items', []):
             own_by_id[item['id']] = item
@@ -415,20 +425,20 @@ def index_owned_and_shared_equipment(user_id: str) -> tuple[dict[str, dict], dic
     return own_by_id, shared_by_id
 
 
-def index_telescopes_and_cameras(user_id: str) -> tuple[dict[str, dict], dict[str, dict]]:
+def index_telescopes_and_cameras(user_id: str) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
     """Return (telescopes_by_id, cameras_by_id) merging this user's own + all shared items.
 
     Used by SkyTonight's combination-aware scoring to resolve a combination's
     telescope_id/camera_id into full equipment dicts without re-reading every equipment document
     per combination.
     """
-    telescopes_by_id: dict[str, dict] = {}
+    telescopes_by_id: dict[str, dict[str, Any]] = {}
     for item in load_user_telescopes(user_id).get('items', []):
         telescopes_by_id[item['id']] = item
     for item in load_all_shared_equipment('telescopes', user_id):
         telescopes_by_id[item['id']] = item
 
-    cameras_by_id: dict[str, dict] = {}
+    cameras_by_id: dict[str, dict[str, Any]] = {}
     for item in load_user_cameras(user_id).get('items', []):
         cameras_by_id[item['id']] = item
     for item in load_all_shared_equipment('cameras', user_id):
@@ -437,7 +447,7 @@ def index_telescopes_and_cameras(user_id: str) -> tuple[dict[str, dict], dict[st
     return telescopes_by_id, cameras_by_id
 
 
-def _combination_reference_ids(combination: dict) -> list[str]:
+def _combination_reference_ids(combination: dict[str, Any]) -> list[str]:
     """Flatten every equipment id a combination references into one list."""
     ref_ids: list[str] = []
     for field in ('telescope_id', 'camera_id', 'guide_camera_id', 'mount_id'):
@@ -449,7 +459,7 @@ def _combination_reference_ids(combination: dict) -> list[str]:
     return ref_ids
 
 
-def _find_combinations_referencing(equipment_type: str, equipment_id: str) -> list[dict]:
+def _find_combinations_referencing(equipment_type: str, equipment_id: str) -> list[dict[str, Any]]:
     """Return {name, owner_id} for every combination (any user) referencing this equipment id.
 
     Used as a delete-guard: equipment referenced by a combination cannot be removed while the
@@ -464,8 +474,10 @@ def _find_combinations_referencing(equipment_type: str, equipment_id: str) -> li
 
 
 def compute_combination_validity_status(
-    combination: dict, user_id: str, equipment_index: tuple[dict[str, dict], dict[str, dict]] | None = None
-) -> dict:
+    combination: dict[str, Any],
+    user_id: str,
+    equipment_index: tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]] | None = None,
+) -> dict[str, Any]:
     """Compute is_valid/invalid_reasons for a combination (feature.md's 'autocheck' requirement).
 
     Distinct from is_disabled (the combination's own explicit toggle): is_valid is computed
@@ -499,8 +511,10 @@ def compute_combination_validity_status(
 
 
 def compute_combination_share_status(
-    combination: dict, user_id: str, equipment_index: tuple[dict[str, dict], dict[str, dict]] | None = None
-) -> dict:
+    combination: dict[str, Any],
+    user_id: str,
+    equipment_index: tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]] | None = None,
+) -> dict[str, Any]:
     """Compute is_shared, has_broken_share, and broken_items for a combination.
 
     A combination is 'shared' iff ALL constituent equipment items are accessible
@@ -530,7 +544,7 @@ def compute_combination_share_status(
             broken_items.append(eq_id)
 
     # Build per-equipment-id metadata for the UI (shared status of each item)
-    items_share_info: dict[str, dict] = {}
+    items_share_info: dict[str, dict[str, Any]] = {}
     for eq_id in ref_ids:
         if eq_id in own_by_id:
             item = own_by_id[eq_id]
@@ -557,7 +571,7 @@ def compute_combination_share_status(
     }
 
 
-def load_all_shared_combinations(exclude_user_id: str) -> list[dict]:
+def load_all_shared_combinations(exclude_user_id: str) -> list[dict[str, Any]]:
     """Return combinations from other users whose constituent equipment is all shared.
 
     Computes share status from the owner's perspective for each combination.
@@ -566,7 +580,7 @@ def load_all_shared_combinations(exclude_user_id: str) -> list[dict]:
 
     user_map = user_manager.display_names_by_id()
 
-    result: list[dict] = []
+    result: list[dict[str, Any]] = []
     try:
         for owner_id, data in _iter_equipment_documents('combinations'):
             if owner_id == exclude_user_id:
@@ -591,7 +605,7 @@ def load_all_shared_combinations(exclude_user_id: str) -> list[dict]:
 # ============================================================
 
 
-def load_user_telescopes(user_id: str) -> dict:
+def load_user_telescopes(user_id: str) -> dict[str, Any]:
     """Load user's telescope profiles"""
     data = _load_equipment_document(user_id, 'telescopes')
     if data is None:
@@ -599,13 +613,13 @@ def load_user_telescopes(user_id: str) -> dict:
     return data
 
 
-def save_user_telescopes(user_id: str, data: dict) -> bool:
+def save_user_telescopes(user_id: str, data: dict[str, Any]) -> bool:
     """Save user's telescope profiles with safety checks"""
     data['updated_at'] = datetime.now(UTC).isoformat()
     return safe_save_equipment(user_id, 'telescopes', data)
 
 
-def create_telescope(user_id: str, telescope_data: dict) -> dict | None:
+def create_telescope(user_id: str, telescope_data: dict[str, Any]) -> dict[str, Any] | None:
     """Create a new telescope profile"""
     try:
         # Create telescope object with auto-calculated fields
@@ -644,7 +658,7 @@ def create_telescope(user_id: str, telescope_data: dict) -> dict | None:
         return None
 
 
-def get_telescope(user_id: str, telescope_id: str) -> dict | None:
+def get_telescope(user_id: str, telescope_id: str) -> dict[str, Any] | None:
     """Get a specific telescope profile"""
     data = load_user_telescopes(user_id)
     for item in data['items']:
@@ -653,7 +667,7 @@ def get_telescope(user_id: str, telescope_id: str) -> dict | None:
     return None
 
 
-def update_telescope(user_id: str, telescope_id: str, telescope_data: dict) -> dict | None:
+def update_telescope(user_id: str, telescope_id: str, telescope_data: dict[str, Any]) -> dict[str, Any] | None:
     """Update a telescope profile"""
     try:
         data = load_user_telescopes(user_id)
@@ -668,7 +682,9 @@ def update_telescope(user_id: str, telescope_id: str, telescope_data: dict) -> d
                     telescope_type=telescope_data['telescope_type'],
                     aperture_mm=float(telescope_data['aperture_mm']),
                     focal_length_mm=float(telescope_data['focal_length_mm']),
-                    weight_kg=_get_float_or_none(telescope_data.get('weight_kg'), item.get('weight_kg', 0.0)),
+                    weight_kg=_get_float_or_none(
+                        telescope_data.get('weight_kg'), _stored_float(item, 'weight_kg', 0.0)
+                    ),
                     reducer_barlow_factor=_get_float_or_none(telescope_data.get('reducer_barlow_factor'), 1.0),
                     native_focal_ratio=0.0,
                     effective_focal_length=0.0,
@@ -718,7 +734,7 @@ def delete_telescope(user_id: str, telescope_id: str) -> tuple[bool, list[str] |
 # ============================================================
 
 
-def load_user_cameras(user_id: str) -> dict:
+def load_user_cameras(user_id: str) -> dict[str, Any]:
     """Load user's camera profiles"""
     data = _load_equipment_document(user_id, 'cameras')
     if data is None:
@@ -726,13 +742,13 @@ def load_user_cameras(user_id: str) -> dict:
     return data
 
 
-def save_user_cameras(user_id: str, data: dict) -> bool:
+def save_user_cameras(user_id: str, data: dict[str, Any]) -> bool:
     """Save user's camera profiles with safety checks"""
     data['updated_at'] = datetime.now(UTC).isoformat()
     return safe_save_equipment(user_id, 'cameras', data)
 
 
-def create_camera(user_id: str, camera_data: dict) -> dict | None:
+def create_camera(user_id: str, camera_data: dict[str, Any]) -> dict[str, Any] | None:
     """Create a new camera profile"""
     try:
         camera = Camera(
@@ -770,7 +786,7 @@ def create_camera(user_id: str, camera_data: dict) -> dict | None:
         return None
 
 
-def get_camera(user_id: str, camera_id: str) -> dict | None:
+def get_camera(user_id: str, camera_id: str) -> dict[str, Any] | None:
     """Get a specific camera profile"""
     data = load_user_cameras(user_id)
     for item in data['items']:
@@ -779,7 +795,7 @@ def get_camera(user_id: str, camera_id: str) -> dict | None:
     return None
 
 
-def update_camera(user_id: str, camera_id: str, camera_data: dict) -> dict | None:
+def update_camera(user_id: str, camera_id: str, camera_data: dict[str, Any]) -> dict[str, Any] | None:
     """Update a camera profile"""
     try:
         data = load_user_cameras(user_id)
@@ -796,7 +812,7 @@ def update_camera(user_id: str, camera_id: str, camera_data: dict) -> dict | Non
                     resolution_height_px=int(camera_data['resolution_height_px']),
                     pixel_size_um=float(camera_data['pixel_size_um']),
                     sensor_type=camera_data['sensor_type'],
-                    weight_kg=_get_float_or_none(camera_data.get('weight_kg'), item.get('weight_kg', 0.0)),
+                    weight_kg=_get_float_or_none(camera_data.get('weight_kg'), _stored_float(item, 'weight_kg', 0.0)),
                     sensor_diagonal_mm=0.0,
                     cooling_supported=camera_data.get('cooling_supported', False),
                     min_temperature_c=_get_float_or_none(camera_data.get('min_temperature_c')),
@@ -845,7 +861,7 @@ def delete_camera(user_id: str, camera_id: str) -> tuple[bool, list[str] | None]
 # ============================================================
 
 
-def load_user_mounts(user_id: str) -> dict:
+def load_user_mounts(user_id: str) -> dict[str, Any]:
     """Load user's mount profiles"""
     data = _load_equipment_document(user_id, 'mounts')
     if data is None:
@@ -853,13 +869,13 @@ def load_user_mounts(user_id: str) -> dict:
     return data
 
 
-def save_user_mounts(user_id: str, data: dict) -> bool:
+def save_user_mounts(user_id: str, data: dict[str, Any]) -> bool:
     """Save user's mount profiles with safety checks"""
     data['updated_at'] = datetime.now(UTC).isoformat()
     return safe_save_equipment(user_id, 'mounts', data)
 
 
-def create_mount(user_id: str, mount_data: dict) -> dict | None:
+def create_mount(user_id: str, mount_data: dict[str, Any]) -> dict[str, Any] | None:
     """Create a new mount profile"""
     try:
         mount = Mount(
@@ -895,7 +911,7 @@ def create_mount(user_id: str, mount_data: dict) -> dict | None:
         return None
 
 
-def get_mount(user_id: str, mount_id: str) -> dict | None:
+def get_mount(user_id: str, mount_id: str) -> dict[str, Any] | None:
     """Get a specific mount profile.
 
     The v1.4 meridian-flip fields are backfilled for pre-v1.4 mount files so every
@@ -908,7 +924,7 @@ def get_mount(user_id: str, mount_id: str) -> dict | None:
     return None
 
 
-def update_mount(user_id: str, mount_id: str, mount_data: dict) -> dict | None:
+def update_mount(user_id: str, mount_id: str, mount_data: dict[str, Any]) -> dict[str, Any] | None:
     """Update a mount profile"""
     try:
         data = load_user_mounts(user_id)
@@ -934,10 +950,11 @@ def update_mount(user_id: str, mount_id: str, mount_data: dict) -> dict | None:
                         else item.get('meridian_flip_required')
                     ),
                     meridian_flip_delay_min=_get_float_or_none(
-                        mount_data.get('meridian_flip_delay_min'), item.get('meridian_flip_delay_min', 0.0)
+                        mount_data.get('meridian_flip_delay_min'), _stored_float(item, 'meridian_flip_delay_min', 0.0)
                     ),
                     meridian_flip_duration_min=_get_float_or_none(
-                        mount_data.get('meridian_flip_duration_min'), item.get('meridian_flip_duration_min', 5.0)
+                        mount_data.get('meridian_flip_duration_min'),
+                        _stored_float(item, 'meridian_flip_duration_min', 5.0),
                     ),
                     is_shared=bool(mount_data.get('is_shared', item.get('is_shared', False))),
                     is_disabled=bool(mount_data.get('is_disabled', item.get('is_disabled', False))),
@@ -978,7 +995,7 @@ def delete_mount(user_id: str, mount_id: str) -> tuple[bool, list[str] | None]:
 # ============================================================
 
 
-def load_user_filters(user_id: str) -> dict:
+def load_user_filters(user_id: str) -> dict[str, Any]:
     """Load user's filter profiles"""
     data = _load_equipment_document(user_id, 'filters')
     if data is None:
@@ -986,13 +1003,13 @@ def load_user_filters(user_id: str) -> dict:
     return data
 
 
-def save_user_filters(user_id: str, data: dict) -> bool:
+def save_user_filters(user_id: str, data: dict[str, Any]) -> bool:
     """Save user's filter profiles with safety checks"""
     data['updated_at'] = datetime.now(UTC).isoformat()
     return safe_save_equipment(user_id, 'filters', data)
 
 
-def create_filter(user_id: str, filter_data: dict) -> dict | None:
+def create_filter(user_id: str, filter_data: dict[str, Any]) -> dict[str, Any] | None:
     """Create a new filter profile"""
     try:
         filter_obj = Filter(
@@ -1025,7 +1042,7 @@ def create_filter(user_id: str, filter_data: dict) -> dict | None:
         return None
 
 
-def get_filter(user_id: str, filter_id: str) -> dict | None:
+def get_filter(user_id: str, filter_id: str) -> dict[str, Any] | None:
     """Get a specific filter profile"""
     data = load_user_filters(user_id)
     for item in data['items']:
@@ -1034,7 +1051,7 @@ def get_filter(user_id: str, filter_id: str) -> dict | None:
     return None
 
 
-def update_filter(user_id: str, filter_id: str, filter_data: dict) -> dict | None:
+def update_filter(user_id: str, filter_id: str, filter_data: dict[str, Any]) -> dict[str, Any] | None:
     """Update a filter profile"""
     try:
         data = load_user_filters(user_id)
@@ -1093,7 +1110,7 @@ def delete_filter(user_id: str, filter_id: str) -> tuple[bool, list[str] | None]
 # ============================================================
 
 
-def load_user_accessories(user_id: str) -> dict:
+def load_user_accessories(user_id: str) -> dict[str, Any]:
     """Load user's accessory profiles"""
     data = _load_equipment_document(user_id, 'accessories')
     if data is None:
@@ -1105,12 +1122,12 @@ def load_user_accessories(user_id: str) -> dict:
     return data
 
 
-def save_user_accessories(user_id: str, data: dict) -> bool:
+def save_user_accessories(user_id: str, data: dict[str, Any]) -> bool:
     """Save user's accessory profiles"""
     return safe_save_equipment(user_id, 'accessories', data)
 
 
-def create_accessory(user_id: str, accessory_data: dict) -> dict | None:
+def create_accessory(user_id: str, accessory_data: dict[str, Any]) -> dict[str, Any] | None:
     """Create a new accessory profile"""
     try:
         accessory = Accessory(
@@ -1137,7 +1154,7 @@ def create_accessory(user_id: str, accessory_data: dict) -> dict | None:
         return None
 
 
-def get_accessory(user_id: str, accessory_id: str) -> dict | None:
+def get_accessory(user_id: str, accessory_id: str) -> dict[str, Any] | None:
     """Get a specific accessory profile"""
     data = load_user_accessories(user_id)
     for item in data['items']:
@@ -1146,7 +1163,7 @@ def get_accessory(user_id: str, accessory_id: str) -> dict | None:
     return None
 
 
-def update_accessory(user_id: str, accessory_id: str, accessory_data: dict) -> dict | None:
+def update_accessory(user_id: str, accessory_id: str, accessory_data: dict[str, Any]) -> dict[str, Any] | None:
     """Update an accessory profile"""
     try:
         data = load_user_accessories(user_id)
@@ -1158,7 +1175,9 @@ def update_accessory(user_id: str, accessory_id: str, accessory_data: dict) -> d
                     name=accessory_data['name'],
                     manufacturer=accessory_data.get('manufacturer', item.get('manufacturer', '')),
                     accessory_type=accessory_data.get('accessory_type', item.get('accessory_type', '')),
-                    weight_kg=_get_float_or_none(accessory_data.get('weight_kg'), item.get('weight_kg', 0.0)),
+                    weight_kg=_get_float_or_none(
+                        accessory_data.get('weight_kg'), _stored_float(item, 'weight_kg', 0.0)
+                    ),
                     notes=accessory_data.get('notes', ''),
                     created_at=item.get('created_at', datetime.now(UTC).isoformat()),
                     updated_at=datetime.now(UTC).isoformat(),
@@ -1258,7 +1277,7 @@ def calculate_fov(
 # ============================================================
 
 
-def load_user_combinations(user_id: str) -> dict:
+def load_user_combinations(user_id: str) -> dict[str, Any]:
     """Load user's equipment combinations"""
     data = _load_equipment_document(user_id, 'combinations')
     if data is None:
@@ -1266,13 +1285,13 @@ def load_user_combinations(user_id: str) -> dict:
     return data
 
 
-def save_user_combinations(user_id: str, data: dict) -> bool:
+def save_user_combinations(user_id: str, data: dict[str, Any]) -> bool:
     """Save user's equipment combinations with safety checks"""
     data['updated_at'] = datetime.now(UTC).isoformat()
     return safe_save_equipment(user_id, 'combinations', data)
 
 
-def create_combination(user_id: str, combination_data: dict) -> dict | None:
+def create_combination(user_id: str, combination_data: dict[str, Any]) -> dict[str, Any] | None:
     """Create a new equipment combination"""
     try:
         # Validate: at minimum telescope or camera must be selected
@@ -1315,7 +1334,7 @@ def create_combination(user_id: str, combination_data: dict) -> dict | None:
         return None
 
 
-def get_combination(user_id: str, combination_id: str) -> dict | None:
+def get_combination(user_id: str, combination_id: str) -> dict[str, Any] | None:
     """Get a specific equipment combination"""
     data = load_user_combinations(user_id)
     for item in data['items']:
@@ -1324,7 +1343,7 @@ def get_combination(user_id: str, combination_id: str) -> dict | None:
     return None
 
 
-def update_combination(user_id: str, combination_id: str, combination_data: dict) -> dict | None:
+def update_combination(user_id: str, combination_id: str, combination_data: dict[str, Any]) -> dict[str, Any] | None:
     """Update an equipment combination"""
     try:
         data = load_user_combinations(user_id)
@@ -1425,13 +1444,13 @@ def analyze_combination(user_id: str, combination_id: str) -> CombinationAnalysi
         camera = get_camera(user_id, camera_id) if camera_id else None
         mount = get_mount(user_id, mount_id) if mount_id else None
 
-        filter_items: list[dict] = []
+        filter_items: list[dict[str, Any]] = []
         for filter_id in combination.get('filter_ids', []) or []:
             filter_obj = get_filter(user_id, filter_id)
             if filter_obj:
                 filter_items.append(filter_obj)
 
-        accessory_items: list[dict] = []
+        accessory_items: list[dict[str, Any]] = []
         for accessory_id in combination.get('accessory_ids', []) or []:
             accessory_obj = get_accessory(user_id, accessory_id)
             if accessory_obj:
@@ -1512,7 +1531,7 @@ def analyze_combination(user_id: str, combination_id: str) -> CombinationAnalysi
 # ============================================================
 
 
-def get_all_equipment_summary(user_id: str) -> dict:
+def get_all_equipment_summary(user_id: str) -> dict[str, Any]:
     """Get a summary of all user equipment"""
     return {
         'telescopes_count': len(load_user_telescopes(user_id).get('items', [])),

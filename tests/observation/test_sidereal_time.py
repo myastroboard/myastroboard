@@ -354,7 +354,8 @@ class TestExceptionHandlerBranches:
     def test_get_sidereal_info_for_time_exception_returns_empty(self, monkeypatch):
         """invalid input that raises → empty dict."""
         svc = SiderealTimeService(45.0, -73.5)
-        result = svc.get_sidereal_info_for_time("not-a-datetime")  # type: ignore
+        # the test passes a deliberately invalid value
+        result = svc.get_sidereal_info_for_time("not-a-datetime")  # pyright: ignore[reportArgumentType]
         assert result == {}
 
     def test_get_hourly_sidereal_times_exception_returns_empty_list(self, monkeypatch):
@@ -392,7 +393,8 @@ class TestExceptionHandlerBranches:
             svc, '_calculate_sidereal_info', lambda t: (_ for _ in ()).throw(RuntimeError("calc error"))
         )
         # Pass an invalid date type to trigger exception
-        result = svc.get_best_observation_times(6.0, 45.0, "not-a-date")  # type: ignore
+        # the test passes a deliberately invalid value
+        result = svc.get_best_observation_times(6.0, 45.0, "not-a-date")  # pyright: ignore[reportArgumentType]
         assert result == {}
 
 

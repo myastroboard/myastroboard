@@ -14,6 +14,7 @@ import os
 import platform
 import shlex
 import sys
+from typing import Any
 
 import psutil
 
@@ -29,7 +30,7 @@ RECOMMENDED_MEMORY_MB = 1024
 _CGROUP_V1_UNLIMITED = 1 << 60
 
 
-def _read_text(path):
+def _read_text(path: str):
     """A small text file's content, stripped, or None when it cannot be read."""
     try:
         with open(path, encoding='ascii', errors='replace') as fh:
@@ -38,7 +39,7 @@ def _read_text(path):
         return None
 
 
-def cgroup_memory_limit_bytes(root='/sys/fs/cgroup'):
+def cgroup_memory_limit_bytes(root: str = '/sys/fs/cgroup'):
     """The container's memory limit in bytes, or None when it has none (or no cgroup is visible)."""
     value = _read_text(os.path.join(root, 'memory.max'))  # cgroup v2
     if value is None:
@@ -52,7 +53,7 @@ def cgroup_memory_limit_bytes(root='/sys/fs/cgroup'):
     return None if limit >= _CGROUP_V1_UNLIMITED else limit
 
 
-def cgroup_cpu_limit(root='/sys/fs/cgroup'):
+def cgroup_cpu_limit(root: str = '/sys/fs/cgroup'):
     """The container's CPU quota as a number of CPUs (0.5, 2.0...), or None when it has none."""
     value = _read_text(os.path.join(root, 'cpu.max'))  # cgroup v2: "<quota> <period>" or "max <period>"
     if value is not None:
@@ -72,7 +73,7 @@ def cgroup_cpu_limit(root='/sys/fs/cgroup'):
     return round(quota_value / period_value, 2)
 
 
-def file_system_type(path, mounts_file='/proc/mounts'):
+def file_system_type(path: str, mounts_file: str = '/proc/mounts'):
     """The type of the file system holding ``path`` ('ext4', 'nfs4'...), or None when unknown."""
     try:
         with open(mounts_file, encoding='utf-8', errors='replace') as fh:
@@ -92,7 +93,7 @@ def file_system_type(path, mounts_file='/proc/mounts'):
     return best_type
 
 
-def _gunicorn_option(args, short, long):
+def _gunicorn_option(args: list[str], short: str, long: str) -> str | None:
     """The value of ``short`` / ``long`` (or ``long=value``) in *args*, or None."""
     for index, arg in enumerate(args):
         if arg in (short, long) and index + 1 < len(args):
@@ -102,7 +103,7 @@ def _gunicorn_option(args, short, long):
     return None
 
 
-def _gunicorn_args(argv):
+def _gunicorn_args(argv: list[str]) -> list[str]:
     """Command-line options, then GUNICORN_CMD_ARGS: both override gunicorn.conf.py."""
     try:
         extra = shlex.split(os.environ.get('GUNICORN_CMD_ARGS', ''))
@@ -111,7 +112,7 @@ def _gunicorn_args(argv):
     return list(argv[1:]) + extra
 
 
-def gunicorn_worker_count(argv=None):
+def gunicorn_worker_count(argv: list[str] | None = None):
     """How many worker processes gunicorn runs, or None outside gunicorn.
 
     An explicit ``-w`` / ``--workers`` wins; otherwise the count gunicorn.conf.py chose (it
@@ -126,7 +127,7 @@ def gunicorn_worker_count(argv=None):
     return os.environ.get('MAB_GUNICORN_WORKERS') or os.environ.get('WEB_CONCURRENCY', '1')
 
 
-def gunicorn_thread_count(argv=None):
+def gunicorn_thread_count(argv: list[str] | None = None):
     """Request threads per gunicorn worker, or None outside gunicorn or when unknown."""
     argv = sys.argv if argv is None else argv
     if not argv or 'gunicorn' not in os.path.basename(argv[0]):
@@ -134,11 +135,11 @@ def gunicorn_thread_count(argv=None):
     return _gunicorn_option(_gunicorn_args(argv), '', '--threads') or os.environ.get('MAB_GUNICORN_THREADS')
 
 
-def _megabytes(value):
+def _megabytes(value: int):
     return f'{value / (1024 * 1024):.0f} MB'
 
 
-def collect_host_summary(data_dir):
+def collect_host_summary(data_dir: str) -> dict[str, Any]:
     """The figures logged at startup, as a dict (None where a value is unknown)."""
     # Lazy: metrics_collector imports this module for resource_status()
     from utils.metrics_collector import is_running_in_container
@@ -166,7 +167,7 @@ def collect_host_summary(data_dir):
     }
 
 
-def effective_memory_bytes(summary):
+def effective_memory_bytes(summary: dict[str, Any]) -> int | None:
     """The memory the app can really use: the container limit when lower than the host's RAM."""
     limit = summary.get('memory_limit')
     total = summary.get('memory_total')
@@ -175,7 +176,7 @@ def effective_memory_bytes(summary):
     return limit or total
 
 
-def resource_status(memory_total):
+def resource_status(memory_total: int | None) -> dict[str, Any]:
     """Container limits and the low-memory flag, for Parameters -> Metrics.
 
     ``memory_total`` is the host RAM psutil reports; inside a container the cgroup limit
@@ -193,7 +194,7 @@ def resource_status(memory_total):
     }
 
 
-def format_host_summary(summary, version):
+def format_host_summary(summary: dict[str, Any], version: str):
     """One log line describing the host."""
     cpus = f"{summary['cpus']} CPUs"
     if summary.get('cpu_limit'):
@@ -218,7 +219,7 @@ def format_host_summary(summary, version):
     return 'Host: ' + ', '.join(parts)
 
 
-def log_host_summary(data_dir, version):
+def log_host_summary(data_dir: str, version: str):
     """Log the host summary (INFO), plus a warning for each resource known to cause trouble."""
     try:
         summary = collect_host_summary(data_dir)

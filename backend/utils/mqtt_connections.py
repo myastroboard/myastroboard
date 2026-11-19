@@ -181,7 +181,9 @@ def client_id_conflict(config: dict[str, Any], name: str, connection_id: str, cl
 # ---------------------------------------------------------------------------
 
 
-def _validate(config: dict[str, Any], data: dict[str, Any], current: dict[str, Any] | None) -> tuple[dict, str | None]:
+def _validate(
+    config: dict[str, Any], data: dict[str, Any], current: dict[str, Any] | None
+) -> tuple[dict[str, Any], str | None]:
     """The connection fields from *data* (over *current* for an update), or an error string."""
     # Lazy: connectors/ is not imported by utils/ at module level.
     from connectors.mqtt_connector import parse_broker_url

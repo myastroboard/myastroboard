@@ -3,6 +3,7 @@
 import io
 import re
 from datetime import datetime
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from flask import Blueprint, jsonify, request, send_file
@@ -20,7 +21,7 @@ logger = get_logger(__name__)
 plan_my_night_bp = Blueprint('plan_my_night', __name__)
 
 
-def _resolve_observing_night_for_plan() -> dict | None:
+def _resolve_observing_night_for_plan() -> dict[str, Any] | None:
     """Return the nautical night window for Plan My Night.
 
     Uses nautical dusk/dawn (sun at -12 deg) so the observing session starts
@@ -88,7 +89,7 @@ def _resolve_observing_night_for_plan() -> dict | None:
     return None
 
 
-def _enrich_plan_entries_with_astrodex_status(plan_payload: dict, user_id: str) -> dict:
+def _enrich_plan_entries_with_astrodex_status(plan_payload: dict[str, Any], user_id: str) -> dict[str, Any]:
     """Attach Astrodex presence flag to each plan entry for UI actions."""
     if not isinstance(plan_payload, dict):
         return plan_payload
@@ -141,7 +142,7 @@ def _format_minutes_hhmm(minutes: int) -> str:
     return f"{safe // 60}h{safe % 60:02d}"
 
 
-def _compute_plan_fill_metrics(plan: dict) -> dict:
+def _compute_plan_fill_metrics(plan: dict[str, Any]) -> dict[str, Any]:
     entries = plan.get('entries', []) if isinstance(plan, dict) else []
     if not isinstance(entries, list):
         entries = []
@@ -331,7 +332,7 @@ def patch_plan_my_night():
 
 @plan_my_night_bp.route('/api/plan-my-night/targets/<entry_id>', methods=['PUT'])
 @user_required
-def update_plan_my_night_target(entry_id):
+def update_plan_my_night_target(entry_id: str):
     """Update target planned duration or done status."""
     try:
         user = get_current_user()
@@ -362,7 +363,7 @@ def update_plan_my_night_target(entry_id):
 
 @plan_my_night_bp.route('/api/plan-my-night/targets/<entry_id>/reorder', methods=['POST'])
 @user_required
-def reorder_plan_my_night_target(entry_id):
+def reorder_plan_my_night_target(entry_id: str):
     """Reorder plan targets within the current night timeline."""
     try:
         user = get_current_user()
@@ -459,7 +460,7 @@ def apply_plan_my_night_optimization():
 
 @plan_my_night_bp.route('/api/plan-my-night/targets/<entry_id>', methods=['DELETE'])
 @user_required
-def delete_plan_my_night_target(entry_id):
+def delete_plan_my_night_target(entry_id: str):
     """Delete a target from the active plan."""
     try:
         user = get_current_user()
@@ -521,7 +522,7 @@ def clear_all_plans_my_night():
 
 @plan_my_night_bp.route('/api/plan-my-night/targets/<entry_id>/add-to-astrodex', methods=['POST'])
 @user_required
-def add_plan_target_to_astrodex(entry_id):
+def add_plan_target_to_astrodex(entry_id: str):
     """Add an existing plan target to Astrodex if not already present."""
     try:
         user = get_current_user()

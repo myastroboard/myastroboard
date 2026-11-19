@@ -83,7 +83,7 @@ CONSUMED_HANDOFFS_KEY = 'myastroshine_consumed_handoffs'
 # ---------------------------------------------------------------------------
 
 
-def get_integration_config(config: dict | None = None) -> dict[str, Any]:
+def get_integration_config(config: dict[str, Any] | None = None) -> dict[str, Any]:
     """Return the ``connectors.myastroshine`` config block, credentials included.
 
     The token and signing secret live in the connector-secrets sidecar (utils/connector_secrets.py),
@@ -96,7 +96,7 @@ def get_integration_config(config: dict | None = None) -> dict[str, Any]:
     return merge_secrets(MyAstroShineConnector.name, block, MyAstroShineConnector.SECRET_FIELDS)
 
 
-def integration_enabled(cfg: dict | None = None) -> bool:
+def integration_enabled(cfg: dict[str, Any] | None = None) -> bool:
     """Effective-enabled: the switch is on AND url/token/signing_secret are all set."""
     if cfg is None:
         cfg = get_integration_config()
@@ -150,7 +150,7 @@ def _hmac_hex(secret: str, message: bytes) -> str:
     return hmac.new(secret.encode('utf-8'), message, hashlib.sha256).hexdigest()
 
 
-def verify_return_signature(cfg: dict, payload_obj: Any, image_bytes: bytes, signature_header: str) -> bool:
+def verify_return_signature(cfg: dict[str, Any], payload_obj: Any, image_bytes: bytes, signature_header: str) -> bool:
     """Constant-time check of the ``X-Webhook-Signature`` on an inbound enhanced upload.
 
     The signing input is ``canonical_json(payload) + "\\n" + sha256_hex(image_bytes)``:
@@ -171,7 +171,9 @@ def verify_return_signature(cfg: dict, payload_obj: Any, image_bytes: bytes, sig
 # ---------------------------------------------------------------------------
 
 
-def mint_handoff(cfg: dict, *, user_id: str, item_id: str, picture_id: str, callback_base: str) -> dict[str, str]:
+def mint_handoff(
+    cfg: dict[str, Any], *, user_id: str, item_id: str, picture_id: str, callback_base: str
+) -> dict[str, str]:
     """Mint an opaque, single-use handoff token for the browser to carry.
 
     ``callback_base`` is set by the board (never user input) - it is the URL the
@@ -202,7 +204,7 @@ def mint_handoff(cfg: dict, *, user_id: str, item_id: str, picture_id: str, call
     }
 
 
-def verify_handoff(cfg: dict, token: str) -> dict[str, Any] | None:
+def verify_handoff(cfg: dict[str, Any], token: str) -> dict[str, Any] | None:
     """Verify a handoff token's signature, ``kid`` and expiry. Returns claims or None.
 
     Does NOT check the single-use ``jti`` - read endpoints (``/source``,
@@ -275,7 +277,7 @@ def mark_handoff_consumed(jti: str, expiry_epoch: float | None = None) -> None:
     if expiry_epoch is None:
         expiry_epoch = time.time() + MyAstroShineConnector.HANDOFF_TTL_SECONDS
 
-    def _mark(stored):
+    def _mark(stored: dict[str, float] | None):
         alive = _unexpired(stored, time.time())
         alive[jti] = float(expiry_epoch)
         return alive, None
@@ -292,7 +294,7 @@ def claim_handoff(jti: str, expiry_epoch: float | None = None) -> bool:
     if expiry_epoch is None:
         expiry_epoch = time.time() + MyAstroShineConnector.HANDOFF_TTL_SECONDS
 
-    def _claim(stored):
+    def _claim(stored: dict[str, float] | list[str] | None):
         alive = _unexpired(stored, time.time())
         if jti in alive:
             return None, False
@@ -305,7 +307,7 @@ def claim_handoff(jti: str, expiry_epoch: float | None = None) -> bool:
 def release_handoff(jti: str) -> None:
     """Un-spend a claimed jti after the duplicate could not be created, so it can be retried."""
 
-    def _release(stored):
+    def _release(stored: Any) -> tuple[dict[str, float], None]:
         alive = _unexpired(stored, time.time())
         alive.pop(jti, None)
         return alive, None
@@ -318,7 +320,9 @@ def release_handoff(jti: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _find_item_and_picture(user_id: str, item_id: str, picture_id: str) -> tuple[dict | None, dict | None]:
+def _find_item_and_picture(
+    user_id: str, item_id: str, picture_id: str
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
     # user_id builds a per-user file path inside load_user_astrodex(); re-check
     # its shape here, right before that call, regardless of upstream validation.
     if not _is_handoff_id(user_id):

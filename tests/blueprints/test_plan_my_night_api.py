@@ -11,16 +11,16 @@ import pytest
 if 'psutil' not in sys.modules:
     sys.modules['psutil'] = types.ModuleType('psutil')
 
-import app as app_module  # type: ignore[import-not-found]
-from blueprints import plan_my_night as plan_my_night_bp_module  # type: ignore[import-not-found]
+import app as app_module
+from blueprints import plan_my_night as plan_my_night_bp_module
 from observation import (
-    astrodex,  # type: ignore[import-not-found]
-    plan_my_night,  # type: ignore[import-not-found]
+    astrodex,
+    plan_my_night,
 )
-from skytonight import skytonight_targets  # type: ignore[import-not-found]
+from skytonight import skytonight_targets
 
 app = app_module.app
-from utils.auth import user_manager  # type: ignore[import-not-found]
+from utils.auth import user_manager
 
 
 @pytest.fixture

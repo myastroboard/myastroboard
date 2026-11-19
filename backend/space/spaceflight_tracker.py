@@ -416,7 +416,7 @@ def get_launch_vidurls(launch_id: str) -> list[dict[str, Any]]:
         except Exception:
             return False
 
-    def _sort_key(v):
+    def _sort_key(v: dict[str, Any]) -> tuple[Any, ...]:
         is_yt = 1 if _is_youtube(v.get("url") or "") else 0
         return (-is_yt, -(v.get("priority") or 0))
 
@@ -430,7 +430,7 @@ def get_launch_vidurls(launch_id: str) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 
-def prune_image_cache(active_data: list) -> None:
+def prune_image_cache(active_data: list[Any]) -> None:
     """
     Delete images from the local spaceflight_images directory that are no longer
     referenced in *active_data* (a flat list of all image path strings currently
@@ -443,7 +443,7 @@ def prune_image_cache(active_data: list) -> None:
         return
 
     # Build the set of filenames that are still in use
-    in_use: set = set()
+    in_use: set[Any] = set()
     for path in active_data:
         if path and isinstance(path, str) and path.startswith("/api/spaceflight/img/"):
             in_use.add(os.path.basename(path))
@@ -476,7 +476,7 @@ def prune_image_cache(active_data: list) -> None:
         )
 
 
-def spaceflight_cache_images_intact(cache_data: dict) -> bool:
+def spaceflight_cache_images_intact(cache_data: dict[str, Any]) -> bool:
     """
     Return True if every ``/api/spaceflight/img/`` path referenced in
     *cache_data* has a corresponding file on disk.
@@ -488,7 +488,7 @@ def spaceflight_cache_images_intact(cache_data: dict) -> bool:
     if not cache_data:
         return True
 
-    def _walk(obj):
+    def _walk(obj: int | list[dict[str, Any]] | str | tuple[Any, ...] | dict[str, Any]):
         if isinstance(obj, str):
             if obj.startswith("/api/spaceflight/img/"):
                 fname = os.path.basename(obj)

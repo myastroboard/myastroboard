@@ -10,9 +10,10 @@ IERS, AllSky) keep running exactly once per cycle.
 """
 
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
+from typing import Any
 
 from astroweather.aurora_predictions import get_aurora_report
 from astroweather.horizon_graph import HorizonGraphService
@@ -65,7 +66,7 @@ logger = get_logger(__name__)
 _legacy_cache_migration_state = {'done': False}
 
 
-def _resolve_job_location(config, location):
+def _resolve_job_location(config: dict[str, Any], location: dict[str, Any] | None) -> dict[str, Any]:
     """Return the location preset a cache job should compute for.
 
     Jobs called directly (tests, manual refresh) without a location fall back
@@ -81,10 +82,10 @@ def _resolve_job_location(config, location):
     return default
 
 
-def _masked_location_log(location):
+def _masked_location_log(location: dict[str, Any]):
     """Return a safe, masked location string for logs without leaking timezone details."""
 
-    def _safe_coord(value):
+    def _safe_coord(value: Any) -> int | str:
         try:
             return int(float(value))
         except TypeError, ValueError:
@@ -150,7 +151,7 @@ def check_and_handle_config_changes():
     return any_changed
 
 
-def update_moon_report_cache(config=None, location=None):
+def update_moon_report_cache(config: dict[str, Any] | None = None, location: dict[str, Any] | None = None):
     """
     Updates the Moon report cache.
     Delegates to update_moon_caches() so the MoonService report is computed once.
@@ -158,7 +159,7 @@ def update_moon_report_cache(config=None, location=None):
     update_moon_caches(config=config, location=location)
 
 
-def update_dark_window_cache(config=None, location=None):
+def update_dark_window_cache(config: dict[str, Any] | None = None, location: dict[str, Any] | None = None):
     """
     Updates the dark window cache.
     Delegates to update_moon_caches() so the MoonService report is computed once.
@@ -166,7 +167,7 @@ def update_dark_window_cache(config=None, location=None):
     update_moon_caches(config=config, location=location)
 
 
-def update_moon_caches(config=None, location=None):
+def update_moon_caches(config: dict[str, Any] | None = None, location: dict[str, Any] | None = None):
     """
     Computes MoonService.get_report() ONCE and writes both the moon_report and
     dark_window caches. Calling the two caches separately would instantiate
@@ -208,7 +209,7 @@ def update_moon_caches(config=None, location=None):
         logger.error(f"Failed to update Moon/Dark window caches: {e}")
 
 
-def update_moon_planner_cache(config=None, location=None):
+def update_moon_planner_cache(config: dict[str, Any] | None = None, location: dict[str, Any] | None = None):
     """
     Updates the Moon Planner cache (next 7 nights report)
     """
@@ -240,7 +241,7 @@ def update_moon_planner_cache(config=None, location=None):
         logger.error(f"Failed to update Moon Planner cache: {e}")
 
 
-def _next_astronomical_dusk_utc(sun_service, tz_name: str) -> str | None:
+def _next_astronomical_dusk_utc(sun_service: SunService, tz_name: str) -> str | None:
     """Return the next upcoming astronomical dusk as a UTC ISO string.
 
     Looks at today's and tomorrow's reports so the value stays valid even
@@ -266,7 +267,7 @@ def _next_astronomical_dusk_utc(sun_service, tz_name: str) -> str | None:
     return None
 
 
-def update_sun_report_cache(config=None, location=None):
+def update_sun_report_cache(config: dict[str, Any] | None = None, location: dict[str, Any] | None = None):
     """
     Updates the Sun report cache (today report)
     """
@@ -302,7 +303,7 @@ def update_sun_report_cache(config=None, location=None):
         logger.error(f"Failed to update Sun report cache: {e}")
 
 
-def update_best_window_cache(config=None, location=None):
+def update_best_window_cache(config: dict[str, Any] | None = None, location: dict[str, Any] | None = None):
     """
     Updates all three best-window caches (strict, practical, illumination) in a single
     night scan - altitudes are computed once per time-step instead of once per mode.
@@ -337,7 +338,7 @@ def update_best_window_cache(config=None, location=None):
         logger.error(f"Failed to update best window cache: {e}")
 
 
-def update_weather_cache(config=None, location=None):
+def update_weather_cache(config: dict[str, Any] | None = None, location: dict[str, Any] | None = None):
     """
     Updates the weather forecast cache for one location.
     Pre-fetches weather data from Open-Meteo API and caches it.
@@ -378,7 +379,7 @@ def update_weather_cache(config=None, location=None):
         logger.error(f"Failed to update Weather forecast cache: {e}")
 
 
-def update_astro_weather_cache(config=None, location=None):
+def update_astro_weather_cache(config: dict[str, Any] | None = None, location: dict[str, Any] | None = None):
     """Update the jet-stream-aware astrophotography weather analysis cache for one location.
 
     This is the single source of truth for the app-wide observation score: the sky widget
@@ -416,7 +417,7 @@ def update_astro_weather_cache(config=None, location=None):
         logger.error(f"Failed to update Astro weather analysis cache: {e}")
 
 
-def update_solar_eclipse_cache(config=None, location=None):
+def update_solar_eclipse_cache(config: dict[str, Any] | None = None, location: dict[str, Any] | None = None):
     """
     Updates the Solar Eclipse cache
     """
@@ -467,7 +468,7 @@ def update_solar_eclipse_cache(config=None, location=None):
         logger.error(f"Failed to update Solar Eclipse cache: {e}", exc_info=True)
 
 
-def update_lunar_eclipse_cache(config=None, location=None):
+def update_lunar_eclipse_cache(config: dict[str, Any] | None = None, location: dict[str, Any] | None = None):
     """
     Updates the Lunar Eclipse cache
     """
@@ -518,7 +519,7 @@ def update_lunar_eclipse_cache(config=None, location=None):
         logger.error(f"Failed to update Lunar Eclipse cache: {e}", exc_info=True)
 
 
-def update_horizon_graph_cache(config=None, location=None):
+def update_horizon_graph_cache(config: dict[str, Any] | None = None, location: dict[str, Any] | None = None):
     """
     Updates the Horizon Graph cache (sun and moon positions throughout the day)
     """
@@ -565,7 +566,7 @@ def update_horizon_graph_cache(config=None, location=None):
         logger.error(f"Failed to update Horizon Graph cache: {e}", exc_info=True)
 
 
-def update_aurora_cache(config=None, location=None):
+def update_aurora_cache(config: dict[str, Any] | None = None, location: dict[str, Any] | None = None):
     """
     Updates the Aurora Borealis predictions cache.
     The NOAA Kp fetch is location-independent (and internally cached by the
@@ -595,7 +596,9 @@ def update_aurora_cache(config=None, location=None):
         logger.error(f"Failed to update Aurora cache: {e}", exc_info=True)
 
 
-def update_iss_passes_cache(days: int = 20, config=None, location=None):
+def update_iss_passes_cache(
+    days: int = 20, config: dict[str, Any] | None = None, location: dict[str, Any] | None = None
+):
     """
     Updates the ISS passes cache for one location.
     The TLE fetch inside the pass service is satellite-specific (not observer-
@@ -630,7 +633,9 @@ def update_iss_passes_cache(days: int = 20, config=None, location=None):
         logger.warning(f"Failed to update ISS passes cache: {e}")
 
 
-def update_css_passes_cache(days: int = 20, config=None, location=None):
+def update_css_passes_cache(
+    days: int = 20, config: dict[str, Any] | None = None, location: dict[str, Any] | None = None
+):
     """Updates the CSS (Tiangong) passes cache for one location."""
     try:
         logger.info("Updating CSS passes cache...")
@@ -660,7 +665,7 @@ def update_css_passes_cache(days: int = 20, config=None, location=None):
         logger.warning(f"Failed to update CSS passes cache: {e}")
 
 
-def update_planetary_events_cache(config=None, location=None):
+def update_planetary_events_cache(config: dict[str, Any] | None = None, location: dict[str, Any] | None = None):
     """
     Updates the Planetary Events cache
     Calculates planetary conjunctions, oppositions, elongations, and retrograde motion
@@ -699,7 +704,7 @@ def update_planetary_events_cache(config=None, location=None):
         logger.error(f"Failed to update Planetary events cache: {e}", exc_info=True)
 
 
-def update_special_phenomena_cache(config=None, location=None):
+def update_special_phenomena_cache(config: dict[str, Any] | None = None, location: dict[str, Any] | None = None):
     """
     Updates the Special Phenomena cache
     Calculates equinoxes, solstices, zodiacal light windows, and Milky Way visibility
@@ -739,7 +744,7 @@ def update_special_phenomena_cache(config=None, location=None):
         logger.error(f"Failed to update Special phenomena cache: {e}", exc_info=True)
 
 
-def update_solar_system_events_cache(config=None, location=None):
+def update_solar_system_events_cache(config: dict[str, Any] | None = None, location: dict[str, Any] | None = None):
     """
     Updates the Solar System Events cache
     Calculates meteor shower peaks, comet appearances, and asteroid occultations
@@ -783,7 +788,7 @@ def update_solar_system_events_cache(config=None, location=None):
         logger.error(f"Failed to update Solar system events cache: {e}", exc_info=True)
 
 
-def update_sidereal_time_cache(config=None, location=None):
+def update_sidereal_time_cache(config: dict[str, Any] | None = None, location: dict[str, Any] | None = None):
     """
     Updates the Sidereal Time cache
     Provides sidereal time information for current observation planning
@@ -831,7 +836,7 @@ def update_sidereal_time_cache(config=None, location=None):
         logger.error(f"Failed to update Sidereal time cache: {e}", exc_info=True)
 
 
-def update_seeing_forecast_cache(config=None, location=None):
+def update_seeing_forecast_cache(config: dict[str, Any] | None = None, location: dict[str, Any] | None = None):
     """
     Updates the Seeing Forecast cache
     Provides atmospheric seeing conditions for planetary imaging
@@ -988,7 +993,7 @@ def update_spaceflight_events_cache():
 
             from space.spaceflight_tracker import prune_image_cache
 
-            def _collect_images(obj):
+            def _collect_images(obj: list[dict[str, Any]] | str | dict[str, Any]) -> Iterator[str]:
                 """Recursively yield all string values that look like cached image paths."""
                 if isinstance(obj, dict):
                     for v in obj.values():
@@ -1058,13 +1063,16 @@ def update_iers_cache():
         from astropy.utils.iers import IERS_A, earth_orientation_table
 
         table = IERS_A.open(IERS_CACHE_FILE)
-        IERS_Auto.iers_table = table  # type: ignore[assignment]  # atomic swap — never passes through None
+        # astropy annotates IERS_Auto.iers_table as IERS_Auto | None; this atomic swap installs the downloaded IERS_A
+        # table and never passes through None
+        IERS_Auto.iers_table = table  # pyright: ignore[reportAttributeAccessIssue]
         # IERS_Auto.open() with auto_download=False always overwrites iers_table with the
         # bundled (old) table, bypassing our downloaded one. Setting earth_orientation_table
         # directly ensures coordinate transforms (get_polar_motion) use the fresh data.
         earth_orientation_table.set(table)
 
-        mjd_max = table['MJD'].max()  # type: ignore[union-attr]
+        # astropy Table column access is untyped (inferred as Table | Row | columns)
+        mjd_max = table['MJD'].max()  # pyright: ignore[reportAttributeAccessIssue]
         if hasattr(mjd_max, 'value'):  # pragma: no branch
             mjd_max = float(mjd_max.value)
         valid_until = Time(float(mjd_max), format='mjd').iso[:10]
@@ -1079,7 +1087,7 @@ def update_iers_cache():
         logger.error("Failed to refresh IERS-A data: %s. Will retry next scheduler cycle.", e)
 
 
-def update_allsky_health_cache(config=None):
+def update_allsky_health_cache(config: dict[str, Any] | None = None):
     """Runs per-module reachability checks against the AllSky instance and stores results in cache."""
     if config is None:
         config = load_config()
@@ -1107,7 +1115,7 @@ _EVENT_END_FIELDS = {
 }
 
 
-def _cached_event_has_ended(job_name, entry):
+def _cached_event_has_ended(job_name: str, entry: dict[str, Any] | None):
     """True when a single-event cache still holds an event whose window has closed.
 
     Falls back to False (TTL decides) for any job not listed in _EVENT_END_FIELDS, and
@@ -1220,7 +1228,7 @@ def fully_initialize_caches():
         install_default_id = get_install_default_location(config).get("id")
         multi_location = len(scheduler_locations) > 1
 
-        def _job_label(job_name, location):
+        def _job_label(job_name: str, location: dict[str, Any]) -> str:
             """Metrics/progress key: plain name for the install default, suffixed otherwise."""
             if not multi_location or location.get("id") == install_default_id:
                 return job_name
@@ -1264,7 +1272,7 @@ def fully_initialize_caches():
                     )
 
         # --- Global jobs (spaceflight, IERS, AllSky) ---
-        global_jobs: list[tuple[str, str | None, Callable[..., None], int, dict]] = [
+        global_jobs: list[tuple[str, str | None, Callable[..., None], int, dict[str, Any]]] = [
             (
                 "spaceflight_launches",
                 "spaceflight_launches",
@@ -1340,7 +1348,8 @@ def fully_initialize_caches():
 
             iers_table = _IERS_Auto.iers_table
             if iers_table is not None:
-                mjd_max = iers_table['MJD'].max()  # type: ignore[index, union-attr]
+                # astropy Table column access is untyped (inferred as Table | Row | columns)
+                mjd_max = iers_table['MJD'].max()  # pyright: ignore[reportAttributeAccessIssue]
                 if hasattr(mjd_max, 'value'):
                     mjd_max = float(mjd_max.value)
                 else:
@@ -1348,7 +1357,8 @@ def fully_initialize_caches():
 
                 # Keep a small forward cushion so startup does not run right at the
                 # edge of table validity and emit warnings under normal workload.
-                iers_stale_or_near_expiry = mjd_max <= (float(_Time.now().mjd) + 2.0)  # type: ignore[arg-type]
+                # astropy SkyCoord attributes are untyped (inferred as SkyCoord | Any | None)
+                iers_stale_or_near_expiry = mjd_max <= (float(_Time.now().mjd) + 2.0)  # pyright: ignore[reportArgumentType]
         except Exception as _iers_state_err:
             logger.warning("Unable to evaluate loaded IERS table validity: %s", _iers_state_err)
 

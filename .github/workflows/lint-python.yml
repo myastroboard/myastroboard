@@ -11,6 +11,7 @@ on:
       - "pyrightconfig.json"
       - "pyproject.toml"
       - ".github/org/ruff.base.toml"
+      - ".github/org/pyright.base.json"
       - ".github/workflows/lint-python.yml"
   pull_request:
     paths:
@@ -22,11 +23,12 @@ on:
       - "pyrightconfig.json"
       - "pyproject.toml"
       - ".github/org/ruff.base.toml"
+      - ".github/org/pyright.base.json"
       - ".github/workflows/lint-python.yml"
 
 jobs:
   lint-python:
-    name: ruff (whole repo) / pyright (backend, changed files)
+    name: ruff (whole repo) / pyright (backend + scripts)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -34,8 +36,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -53,27 +53,10 @@ jobs:
       - name: ruff check
         run: ruff check .
 
-      - name: Determine changed Python files
-        id: changed
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            git fetch origin "${{ github.base_ref }}" --depth=1
-            BASE_SHA=$(git merge-base "origin/${{ github.base_ref }}" HEAD)
-          else
-            BASE_SHA="${{ github.event.before }}"
-            if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$BASE_SHA" 2>/dev/null; then
-              # First push to a new branch, or a force-push that rewrote history: fall back
-              # to the previous commit so the diff stays scoped instead of erroring out.
-              BASE_SHA=$(git rev-parse HEAD^ 2>/dev/null || git rev-parse HEAD)
-            fi
-          fi
-          CHANGED=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" HEAD -- ':(glob)backend/**/*.py' ':(glob)scripts/**/*.py')
-          # pyright stays backend/scripts-only: test code's heavy use of monkeypatch/MagicMock
-          # would drown real findings in false positives (see CONTRIBUTING.md).
-          BACKEND_FILES=$(printf '%s' "$CHANGED" | tr '\n' ' ')
-          echo "backend_files=$BACKEND_FILES" >> "$GITHUB_OUTPUT"
-          echo "Changed backend/scripts files (pyright): $BACKEND_FILES"
-
+      # pyright checks the whole scope set in pyrightconfig.json (backend/ and scripts/; tests/
+      # stays out, see CONTRIBUTING.md) in about 15 seconds, so - like ruff - it never narrows to
+      # the changed files: a change to the configuration or the synced organization baseline is
+      # caught too. --level error keeps the log to the errors that fail the job; the warnings are
+      # the annotation debt relaxed in pyrightconfig.json.
       - name: pyright
-        if: steps.changed.outputs.backend_files != ''
-        run: pyright ${{ steps.changed.outputs.backend_files }}
+        run: pyright --level error

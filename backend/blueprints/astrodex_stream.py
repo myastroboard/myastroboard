@@ -17,6 +17,7 @@ stream).
 import time
 from collections import deque
 from threading import Lock
+from typing import Any
 
 from flask import Blueprint, Response, jsonify, request
 
@@ -34,7 +35,7 @@ astrodex_stream_bp = Blueprint('astrodex_stream', __name__)
 _RATE_LIMIT = 120
 _RATE_WINDOW_SECONDS = 60
 _rate_lock = Lock()
-_rate_hits: dict = {}
+_rate_hits: dict[str, Any] = {}
 
 
 def _rate_limited(client_key: str) -> bool:
@@ -56,12 +57,12 @@ def _client_key(*parts: str) -> str:
     return "|".join((request.remote_addr or 'unknown', *parts))
 
 
-def _connector_block() -> dict:
+def _connector_block() -> dict[str, Any]:
     config = load_config()
     return (config.get('connectors') or {}).get(AstrodexStreamConnector.name) or {}
 
 
-def _connector_config() -> dict:
+def _connector_config() -> dict[str, Any]:
     """This connector's CONFIG_FIELDS, defaults overlaid with whatever was saved."""
     block = _connector_block()
     merged = dict(AstrodexStreamConnector.CONFIG_FIELDS)
@@ -104,7 +105,7 @@ def get_stream_urls():
 
 
 @astrodex_stream_bp.route('/api/astrodex/stream/<user_id>/<token>/current.jpg', methods=['GET'])
-def personal_stream(user_id, token):
+def personal_stream(user_id: str, token: str):
     if not _enabled():
         return _not_found()
     if not astrodex_stream.verify_personal_token(user_id, token):
@@ -116,7 +117,7 @@ def personal_stream(user_id, token):
 
 
 @astrodex_stream_bp.route('/api/astrodex/stream/shared/<token>/current.jpg', methods=['GET'])
-def shared_stream(token):
+def shared_stream(token: str):
     if not _enabled():
         return _not_found()
     config = load_config()

@@ -87,7 +87,7 @@ def load_shared_json(path: str, default: Any = None) -> Any:
             data = _cached(path, signature, now)
         if data is not None:
             return data
-        unreadable: dict = {}
+        unreadable: dict[str, Any] = {}
         data = load_json_file(path, default=unreadable)
         if data is unreadable:
             return default

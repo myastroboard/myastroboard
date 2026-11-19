@@ -12,6 +12,7 @@ import unicodedata
 import uuid
 from contextlib import contextmanager
 from datetime import UTC, datetime
+from typing import Any
 
 import yaml
 
@@ -26,7 +27,7 @@ try:
 
     _HAS_NUMPY = True
 except ImportError:  # pragma: no cover - numpy is a hard dependency
-    _np = None  # type: ignore[assignment]
+    _np = None
     _HAS_NUMPY = False
 
 
@@ -38,31 +39,31 @@ class _NumpySafeEncoder(json.JSONEncoder):
     NaN and Inf values are replaced with None so the output remains valid JSON.
     """
 
-    def default(self, obj: object) -> object:  # type: ignore[override]
-        if _HAS_NUMPY:  # pragma: no branch
-            if isinstance(obj, _np.integer):  # type: ignore[union-attr]
-                return int(obj)
-            if isinstance(obj, _np.floating):  # type: ignore[union-attr]
-                v = float(obj)
+    def default(self, o: object) -> object:
+        if _np is not None:  # pragma: no branch
+            if isinstance(o, _np.integer):
+                return int(o)
+            if isinstance(o, _np.floating):
+                v = float(o)
                 return None if (math.isnan(v) or math.isinf(v)) else v
-            if isinstance(obj, _np.ndarray):  # type: ignore[union-attr]
-                return obj.tolist()
-            if isinstance(obj, _np.bool_):  # type: ignore[union-attr]
-                return bool(obj)
-        return super().default(obj)
+            if isinstance(o, _np.ndarray):
+                return o.tolist()
+            if isinstance(o, _np.bool_):
+                return bool(o)
+        return super().default(o)
 
 
 def _sanitize_for_json(obj: object) -> object:
     """Recursively convert numpy types and replace NaN/Inf with None."""
-    if _HAS_NUMPY:  # pragma: no branch
-        if isinstance(obj, _np.integer):  # type: ignore[union-attr]
+    if _np is not None:  # pragma: no branch
+        if isinstance(obj, _np.integer):
             return int(obj)
-        if isinstance(obj, _np.floating):  # type: ignore[union-attr]
+        if isinstance(obj, _np.floating):
             v = float(obj)
             return None if (math.isnan(v) or math.isinf(v)) else v
-        if isinstance(obj, _np.bool_):  # type: ignore[union-attr]
+        if isinstance(obj, _np.bool_):
             return bool(obj)
-        if isinstance(obj, _np.ndarray):  # type: ignore[union-attr]
+        if isinstance(obj, _np.ndarray):
             return [_sanitize_for_json(x) for x in obj.tolist()]
     if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
         return None
@@ -77,7 +78,7 @@ def _sanitize_for_json(obj: object) -> object:
 class IndentDumper(yaml.Dumper):
     """Custom YAML dumper that ensures proper indentation for lists"""
 
-    def increase_indent(self, flow=False, indentless=False):
+    def increase_indent(self, flow: bool = False, indentless: bool = False):
         return super().increase_indent(flow, False)
 
 
@@ -115,7 +116,7 @@ def safe_file_exists(file_path: str) -> bool:
         return False
 
 
-def load_json_file(file_path: str, default: dict | None = None) -> dict:
+def load_json_file(file_path: str, default: dict[str, Any] | None = None) -> dict[str, Any]:
     """
     Safely load a JSON file with fallback to default value
 
@@ -139,7 +140,7 @@ def load_json_file(file_path: str, default: dict | None = None) -> dict:
     return default
 
 
-def save_json_file(file_path: str, data: dict) -> bool:
+def save_json_file(file_path: str, data: dict[str, Any]) -> bool:
     """
     Safely save data to a JSON file
 
