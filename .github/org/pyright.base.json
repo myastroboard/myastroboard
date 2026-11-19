@@ -1,0 +1,36 @@
+// Shared pyright baseline for every Python repository of the MyAstroBoard organization.
+//
+// Source of truth: standards/pyright.base.json in myastroboard/.github. Each repository receives a
+// synced copy at .github/org/pyright.base.json - do not edit the copy. A repository's own
+// pyrightconfig.json, at its root, extends it and adds its own paths:
+//
+//     {
+//       "extends": ".github/org/pyright.base.json",
+//       "include": ["backend"],
+//       "pythonVersion": "3.15"
+//     }
+//
+// No paths here: pyright resolves the paths of a base file relative to that file (.github/org/),
+// not to the repository root. pythonVersion is left to each repository, like ruff's
+// target-version.
+//
+// A repository may raise typeCheckingMode to "strict" or turn more rules on. It never turns a rule
+// below off. The one allowed relaxation: a repository with existing unannotated code may set the
+// three annotation rules to "warning" (never "none"), with a comment, while it clears that debt.
+{
+  "typeCheckingMode": "standard",
+
+  // Every function is annotated: parameters, and the type arguments of generics (list[str], not
+  // list). Return types are inferred, so they may be left out.
+  "reportMissingParameterType": "error",
+  "reportUnknownParameterType": "error",
+  "reportMissingTypeArgument": "error",
+
+  // A decorator without types erases the signature of whatever it decorates.
+  "reportUntypedFunctionDecorator": "error",
+
+  // Dead suppressions: a `# type: ignore` or a cast() that no longer does anything hides the next
+  // real error at that spot.
+  "reportUnnecessaryTypeIgnoreComment": "error",
+  "reportUnnecessaryCast": "error"
+}
