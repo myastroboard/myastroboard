@@ -105,8 +105,13 @@ Pass prediction requires up-to-date Two-Line Element (TLE) data. The service tri
 
 TLE data is cached locally in `data/cache/iss_tle_cache.json` for up to **6 hours**. (Skyfield's own ephemeris files are stored separately under `data/cache/skyfield/`.) If all sources fail, the last valid TLE is used for up to 3 hours before the prediction is considered unreliable.
 
-After Celestrak blocked the server, an admin can clear the block with `POST /api/iss/celestrak/restart`
-(`/api/css/celestrak/restart` for the CSS); the banner offers the button to admins only.
+When Celestrak answers anything but 200, Celestrak queries stop and the other sources are used:
+
+- **5xx (server overloaded)**: the pause lifts on its own. Celestrak is asked again after 6 hours,
+  then 12 hours, then every 24 hours while it stays overloaded; the banner shows the retry time.
+- **4xx, or 3 timeouts in a row** (this server may be blocked): the pause lasts until an admin
+  clears it with `POST /api/iss/celestrak/restart` (`/api/css/celestrak/restart` for the CSS); the
+  banner offers the button to admins only.
 
 ### Pass prediction algorithm
 

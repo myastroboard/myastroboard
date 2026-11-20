@@ -514,7 +514,7 @@
     "map_not_visible": "Não visível",
     "celestrak_blocked_title": "O acesso ao Celestrak está bloqueado no momento",
     "celestrak_blocked_description": "O MyAstroBoard detectou um bloqueio de política do Celestrak para este host. As consultas automáticas ao Celestrak foram pausadas e provedores alternativos estão sendo usados.",
-    "celestrak_blocked_description_overload": "O Celestrak retornou o código HTTP {code}, o que significa que o servidor deles está sobrecarregado no momento. Aguarde o aviso oficial de que a situação foi normalizada antes de reiniciar - tentar novamente agora só aumentaria a carga.",
+    "celestrak_blocked_description_overload": "O Celestrak retornou o código HTTP {code}, o que significa que o servidor deles está sobrecarregado no momento. As consultas ao Celestrak estão pausadas e serão retomadas automaticamente após {time}; enquanto isso, provedores alternativos estão sendo usados.",
     "celestrak_blocked_description_denied": "O Celestrak retornou o código HTTP {code} para este host, o que pode indicar um bloqueio ou limitação de taxa. Verifique o link da política abaixo antes de reiniciar.",
     "celestrak_check_link": "Verificar Celestrak neste host",
     "celestrak_policy_link": "Abrir política do Celestrak",

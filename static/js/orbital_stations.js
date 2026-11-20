@@ -292,8 +292,13 @@ function _appendCelestrakBanner(container, celestrakStatus, station) {
     const description = document.createElement('div');
     description.className = 'mb-2';
     const statusCode = Number(celestrakStatus.blocked_status_code || 0);
-    if (statusCode >= 500 && statusCode < 600) {
-        description.textContent = i18n.t('iss.celestrak_blocked_description_overload', { code: statusCode });
+    // A server overload (5xx) lifts itself at retry_at: nothing for the admin to do.
+    const retryAt = Number(celestrakStatus.retry_at || 0);
+    if (retryAt > 0) {
+        description.textContent = i18n.t('iss.celestrak_blocked_description_overload', {
+            code: statusCode,
+            time: formatTimeThenDate(new Date(retryAt * 1000).toISOString()),
+        });
     } else if (statusCode >= 400 && statusCode < 500) {
         description.textContent = i18n.t('iss.celestrak_blocked_description_denied', { code: statusCode });
     } else {
@@ -325,7 +330,7 @@ function _appendCelestrakBanner(container, celestrakStatus, station) {
     // hint and the button are only offered to admins (the route refuses everyone else).
     const isAdmin = typeof currentUser !== 'undefined' && currentUser?.role === 'admin';
     const restartBtn = document.createElement('button');
-    if (isAdmin) {
+    if (isAdmin && retryAt <= 0) {
         const hint = document.createElement('div');
         hint.className = 'small text-muted mb-2';
         hint.textContent = i18n.t('iss.celestrak_restart_hint');

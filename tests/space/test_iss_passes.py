@@ -154,7 +154,9 @@ class TestISSPassServiceTleFallback:
         recorded_block = {}
         monkeypatch.setattr(
             "space.iss_passes._set_celestrak_block",
-            lambda status_code, reason, source_url: recorded_block.update(status_code=status_code),
+            lambda status_code, reason, source_url, retry_at=0: recorded_block.update(
+                status_code=status_code, retry_at=retry_at
+            ),
         )
 
         class _CelestrakResponse:
@@ -187,6 +189,8 @@ class TestISSPassServiceTleFallback:
         # The block is recorded with the real status code, but the mirror is still
         # tried in the same pass instead of aborting the whole fetch.
         assert recorded_block["status_code"] == 403
+        # A 403 may mean this host is blocked: no automatic retry is scheduled.
+        assert recorded_block["retry_at"] == 0
         assert calls["count"] == 2
         assert line1.startswith("1 25544")
         assert line2.startswith("2 25544")
@@ -1128,6 +1132,7 @@ def test_fetch_tle_celestrak_non_200_sets_block_and_raises(monkeypatch):
     monkeypatch.setattr(mod, "_set_tle_error_timestamp", lambda: None)
     monkeypatch.setattr(mod, "_reset_celestrak_timeout_streak", lambda: None)
     monkeypatch.setattr(mod, "_set_celestrak_block", lambda *a, **k: None)
+    monkeypatch.setattr(mod, "_next_celestrak_overload_retry_at", lambda: 1)
 
     class _Resp:
         status_code = 500
@@ -2196,3 +2201,157 @@ def test_moon_altaz_radius_illum_arrays_real_skyfield_computation(real_skyfield_
     assert all(0.0 <= value < 360.0 for value in azimuth)
     assert all(radius > 0.0)
     assert all(0.0 <= value <= 100.0 for value in illumination)
+
+
+# ---- Celestrak overload (5xx): automatic pause and retry ----
+
+
+class _OverloadResp:
+    def __init__(self, status_code, text):
+        self.status_code = status_code
+        self.text = text
+
+    def raise_for_status(self):
+        return None
+
+
+def _use_celestrak_store(monkeypatch, store, clock):
+    monkeypatch.setattr(mod, "_read_tle_cache", lambda: dict(store))
+    monkeypatch.setattr(mod, "_write_tle_cache", lambda payload: (store.clear(), store.update(payload)))
+    monkeypatch.setattr(mod, "_utc_timestamp", lambda: clock["now"])
+
+
+def _use_tle_responses(monkeypatch, celestrak, requested):
+    """Answer Celestrak with ``celestrak["status"]`` and every mirror with a valid TLE."""
+
+    def _get(url, **_kwargs):
+        requested.append(url)
+        if mod._is_celestrak_url(url):
+            if celestrak["status"] == 200:
+                return _OverloadResp(200, '{"line1": "1 CELESTRAK", "line2": "2 CELESTRAK"}')
+            return _OverloadResp(celestrak["status"], "")
+        return _OverloadResp(200, '{"line1": "1 MIRROR", "line2": "2 MIRROR"}')
+
+    monkeypatch.setattr(mod.requests, "get", _get)
+
+
+def test_celestrak_overload_retry_delay_doubles_and_caps(monkeypatch):
+    """Each overload answer in a row doubles the automatic pause, never beyond the cap."""
+    store = {}
+    _use_celestrak_store(monkeypatch, store, {"now": 1000})
+    base = mod.CELESTRAK_OVERLOAD_RETRY_BASE_SECONDS
+    cap = mod.CELESTRAK_OVERLOAD_RETRY_MAX_SECONDS
+
+    assert mod._next_celestrak_overload_retry_at() == 1000 + base
+    assert mod._next_celestrak_overload_retry_at() == 1000 + 2 * base
+    assert mod._next_celestrak_overload_retry_at() == 1000 + min(4 * base, cap)
+    for _ in range(20):
+        mod._next_celestrak_overload_retry_at()
+    assert mod._next_celestrak_overload_retry_at() == 1000 + cap
+
+
+def test_clearing_celestrak_block_resets_overload_streak(monkeypatch):
+    """Once Celestrak answers again, the next overload starts over at the shortest pause."""
+    store = {}
+    _use_celestrak_store(monkeypatch, store, {"now": 1000})
+    mod._next_celestrak_overload_retry_at()
+    mod._next_celestrak_overload_retry_at()
+
+    mod._clear_celestrak_block()
+
+    assert store["celestrak_blocked_retry_at"] is None
+    assert mod._next_celestrak_overload_retry_at() == 1000 + mod.CELESTRAK_OVERLOAD_RETRY_BASE_SECONDS
+
+
+@pytest.mark.parametrize(
+    ("payload", "expected"),
+    [
+        ({"celestrak_blocked": False, "celestrak_blocked_status_code": 503}, 0),
+        ({"celestrak_blocked": True, "celestrak_blocked_status_code": 403, "celestrak_blocked_at": 100}, 0),
+        ({"celestrak_blocked": True, "celestrak_blocked_status_code": 0, "celestrak_blocked_at": 100}, 0),
+        ({"celestrak_blocked": True, "celestrak_blocked_status_code": 503, "celestrak_blocked_retry_at": 5000}, 5000),
+        (
+            {"celestrak_blocked": True, "celestrak_blocked_status_code": 503, "celestrak_blocked_at": 100},
+            100 + mod.CELESTRAK_OVERLOAD_RETRY_BASE_SECONDS,
+        ),
+    ],
+)
+def test_celestrak_status_reports_automatic_retry_only_for_overload(monkeypatch, payload, expected):
+    """A 5xx block reports when it lifts on its own (an older one without a stored time
+    included); a 4xx or timeout block reports none, since only an admin can lift it."""
+    monkeypatch.setattr(mod, "_read_tle_cache", lambda: dict(payload))
+    assert mod.get_celestrak_status()["retry_at"] == expected
+
+
+def test_fetch_tle_celestrak_overload_pauses_then_retries_on_its_own(monkeypatch):
+    """A 503 pauses Celestrak and serves a mirror; Celestrak is skipped until the retry
+    time, then asked again without any admin action, and a 200 clears the block."""
+    store = {}
+    clock = {"now": 1000}
+    celestrak = {"status": 503}
+    requested = []
+    _use_celestrak_store(monkeypatch, store, clock)
+    _use_tle_responses(monkeypatch, celestrak, requested)
+    svc = mod.ISSPassService(45.5, -73.5, 10, "UTC")
+    retry_at = 1000 + mod.CELESTRAK_OVERLOAD_RETRY_BASE_SECONDS
+
+    assert svc._fetch_iss_tle() == ("1 MIRROR", "2 MIRROR")
+    assert store["celestrak_blocked"] is True
+    assert store["celestrak_blocked_status_code"] == 503
+    assert mod.get_celestrak_status()["retry_at"] == retry_at
+
+    # Later fetches: the cached TLE is stale and no failure cooldown applies.
+    monkeypatch.setattr(mod, "_get_cached_tle", lambda max_age_seconds=None: None)
+    monkeypatch.setattr(mod, "_in_tle_failure_cooldown", lambda: False)
+
+    requested.clear()
+    clock["now"] = retry_at - 1
+    assert svc._fetch_iss_tle() == ("1 MIRROR", "2 MIRROR")
+    assert not any(mod._is_celestrak_url(url) for url in requested)
+
+    requested.clear()
+    clock["now"] = retry_at
+    celestrak["status"] = 200
+    assert svc._fetch_iss_tle() == ("1 CELESTRAK", "2 CELESTRAK")
+    assert mod._is_celestrak_url(requested[0])
+    assert store["celestrak_blocked"] is False
+    assert store["celestrak_overload_streak"] == 0
+
+
+def test_fetch_tle_celestrak_still_overloaded_waits_longer(monkeypatch):
+    """When Celestrak is still overloaded at the retry time, the next pause is twice as long."""
+    store = {}
+    clock = {"now": 1000}
+    requested = []
+    _use_celestrak_store(monkeypatch, store, clock)
+    _use_tle_responses(monkeypatch, {"status": 503}, requested)
+    monkeypatch.setattr(mod, "_get_cached_tle", lambda max_age_seconds=None: None)
+    monkeypatch.setattr(mod, "_in_tle_failure_cooldown", lambda: False)
+    svc = mod.ISSPassService(45.5, -73.5, 10, "UTC")
+    base = mod.CELESTRAK_OVERLOAD_RETRY_BASE_SECONDS
+
+    svc._fetch_iss_tle()
+    clock["now"] = 1000 + base
+    svc._fetch_iss_tle()
+
+    assert mod.get_celestrak_status()["retry_at"] == 1000 + base + 2 * base
+
+
+def test_fetch_tle_celestrak_denied_still_needs_manual_reset(monkeypatch):
+    """A 403 can mean this host is blocked: Celestrak stays skipped however long it waits."""
+    store = {}
+    clock = {"now": 1000}
+    requested = []
+    _use_celestrak_store(monkeypatch, store, clock)
+    _use_tle_responses(monkeypatch, {"status": 403}, requested)
+    svc = mod.ISSPassService(45.5, -73.5, 10, "UTC")
+
+    assert svc._fetch_iss_tle() == ("1 MIRROR", "2 MIRROR")
+    assert mod.get_celestrak_status()["retry_at"] == 0
+
+    monkeypatch.setattr(mod, "_get_cached_tle", lambda max_age_seconds=None: None)
+    monkeypatch.setattr(mod, "_in_tle_failure_cooldown", lambda: False)
+    requested.clear()
+    clock["now"] = 1000 + 30 * 24 * 60 * 60
+    svc._fetch_iss_tle()
+    assert not any(mod._is_celestrak_url(url) for url in requested)
