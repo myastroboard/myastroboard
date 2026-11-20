@@ -96,7 +96,8 @@ After a restart or a location change, the first values take a few minutes. App s
 ### ISS / CSS passes stop updating
 
 Celestrak may block a server that asked too often. A banner explains it; an admin can clear the
-block from it ([SPACEFLIGHT.md](SPACEFLIGHT.md)).
+block from it ([SPACEFLIGHT.md](SPACEFLIGHT.md)). When Celestrak is only overloaded (HTTP 5xx), the
+pause lifts by itself and the banner shows when Celestrak is asked again.
 
 ## Notifications
 

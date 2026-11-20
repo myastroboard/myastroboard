@@ -76,6 +76,12 @@ ISS_TLE_URLS = [
 ]
 REQUEST_TIMEOUT_SECONDS = 10
 CELESTRAK_TIMEOUT_BLOCK_THRESHOLD = 3
+# A 5xx answer means Celestrak itself is overloaded, not that this host is blocked: the
+# Celestrak queries pause and resume on their own, the pause doubling on each overload in
+# a row (6 h, 12 h, then 24 h). A 4xx or repeated timeouts can mean this host is blocked,
+# and those still wait for an admin.
+CELESTRAK_OVERLOAD_RETRY_BASE_SECONDS = 6 * 60 * 60
+CELESTRAK_OVERLOAD_RETRY_MAX_SECONDS = 24 * 60 * 60
 DEFAULT_FORECAST_DAYS = 20
 MAX_FORECAST_DAYS = 30
 MIN_EVENT_ALTITUDE_DEG = 10.0
@@ -223,15 +229,52 @@ def _in_tle_failure_cooldown() -> bool:
     return (_utc_timestamp() - last_error_at) < ISS_TLE_FAILURE_COOLDOWN_SECONDS
 
 
-def _set_celestrak_block(status_code: int, reason: str, source_url: str) -> None:
+def _set_celestrak_block(status_code: int, reason: str, source_url: str, retry_at: int = 0) -> None:
+    """Flag Celestrak as blocked; ``retry_at`` > 0 lifts the block on its own at that time."""
+
     def _mutate(payload: dict[str, Any]) -> None:
         payload['celestrak_blocked'] = True
         payload['celestrak_blocked_at'] = _utc_timestamp()
         payload['celestrak_blocked_status_code'] = int(status_code)
         payload['celestrak_blocked_reason'] = reason
         payload['celestrak_blocked_source_url'] = source_url
+        payload['celestrak_blocked_retry_at'] = int(retry_at) if retry_at > 0 else None
 
     _update_tle_cache(_mutate)
+
+
+def _is_celestrak_overload_status(status_code: int) -> bool:
+    """Tell whether an HTTP status means the Celestrak server is overloaded (5xx)."""
+    return 500 <= status_code < 600
+
+
+def _next_celestrak_overload_retry_at() -> int:
+    """Count one more overload answer in a row and return when Celestrak may be asked again."""
+    captured: dict[str, int] = {}
+
+    def _mutate(payload: dict[str, Any]) -> None:
+        streak = int(payload.get('celestrak_overload_streak') or 0) + 1
+        payload['celestrak_overload_streak'] = streak
+        delay = min(
+            CELESTRAK_OVERLOAD_RETRY_BASE_SECONDS * 2 ** min(streak - 1, 8), CELESTRAK_OVERLOAD_RETRY_MAX_SECONDS
+        )
+        captured['retry_at'] = _utc_timestamp() + delay
+
+    _update_tle_cache(_mutate)
+    return captured['retry_at']
+
+
+def _celestrak_retry_at(payload: dict[str, Any]) -> int:
+    """Return when a blocked Celestrak may be asked again on its own, or 0 when only an admin can lift it."""
+    if payload.get('celestrak_blocked') is not True:
+        return 0
+    retry_at = int(payload.get('celestrak_blocked_retry_at') or 0)
+    if retry_at > 0:
+        return retry_at
+    # A 5xx block recorded before automatic retries existed carries no retry time.
+    if _is_celestrak_overload_status(int(payload.get('celestrak_blocked_status_code') or 0)):
+        return int(payload.get('celestrak_blocked_at') or 0) + CELESTRAK_OVERLOAD_RETRY_BASE_SECONDS
+    return 0
 
 
 def _reset_celestrak_timeout_streak() -> None:
@@ -273,9 +316,10 @@ class _CelestrakHTTPError(RuntimeError):
     instead of guessing it back out of a formatted error string.
     """
 
-    def __init__(self, status_code: int, message: str):
+    def __init__(self, status_code: int, message: str, retry_at: int = 0):
         super().__init__(message)
         self.status_code = status_code
+        self.retry_at = retry_at
 
 
 def _clear_celestrak_block(reset_failure_cooldown: bool = True) -> None:
@@ -285,6 +329,8 @@ def _clear_celestrak_block(reset_failure_cooldown: bool = True) -> None:
         payload['celestrak_blocked_status_code'] = None
         payload['celestrak_blocked_reason'] = None
         payload['celestrak_blocked_source_url'] = None
+        payload['celestrak_blocked_retry_at'] = None
+        payload['celestrak_overload_streak'] = 0
         payload['celestrak_timeout_streak'] = 0
         payload['celestrak_last_timeout_at'] = None
         payload['celestrak_last_timeout_reason'] = None
@@ -303,6 +349,7 @@ def get_celestrak_status() -> dict[str, Any]:
         "blocked_status_code": int(payload.get("celestrak_blocked_status_code") or 0),
         "blocked_reason": str(payload.get("celestrak_blocked_reason") or "").strip(),
         "blocked_source_url": str(payload.get("celestrak_blocked_source_url") or "").strip(),
+        "retry_at": _celestrak_retry_at(payload),
         "timeout_streak": int(payload.get("celestrak_timeout_streak") or 0),
         "timeout_block_threshold": CELESTRAK_TIMEOUT_BLOCK_THRESHOLD,
         "last_timeout_at": int(payload.get("celestrak_last_timeout_at") or 0),
@@ -447,28 +494,46 @@ class ISSPassService:
 
             for tle_url in ISS_TLE_URLS:
                 if celestrak_status.get("blocked") and _is_celestrak_url(tle_url):
-                    logger.warning("Celestrak is flagged as blocked; skipping Celestrak query until manually reset")
-                    continue
+                    retry_at = int(celestrak_status.get("retry_at") or 0)
+                    if retry_at <= 0:
+                        logger.warning("Celestrak is flagged as blocked; skipping Celestrak query until manually reset")
+                        continue
+                    if _utc_timestamp() < retry_at:
+                        logger.info(
+                            "Celestrak is paused after an overload answer; skipping it until %s",
+                            datetime.fromtimestamp(retry_at, UTC).isoformat(),
+                        )
+                        continue
+                    logger.info("Celestrak overload pause is over; querying Celestrak again")
 
                 try:
                     response = requests.get(tle_url, timeout=REQUEST_TIMEOUT_SECONDS)
                     status_code = int(getattr(response, "status_code", 200) or 0)
 
-                    # Celestrak policy compliance: a non-200 response must stop further
-                    # Celestrak queries and be escalated to human review, but the other
+                    # Celestrak policy compliance: a non-200 response stops further
+                    # Celestrak queries - until an admin review for a 4xx, until the
+                    # automatic retry time for a 5xx (server overload) - but the other
                     # (non-Celestrak) sources below are still tried in this same pass.
                     if _is_celestrak_url(tle_url) and status_code != 200:
                         _reset_celestrak_timeout_streak()
                         _set_tle_error_timestamp()
+                        overloaded = _is_celestrak_overload_status(status_code)
+                        retry_at = _next_celestrak_overload_retry_at() if overloaded else 0
                         _set_celestrak_block(
                             status_code=status_code,
                             reason=f"HTTP {status_code}",
                             source_url=tle_url,
+                            retry_at=retry_at,
                         )
                         raise _CelestrakHTTPError(
                             status_code,
                             f"Celestrak returned HTTP {status_code};"
-                            " stopping Celestrak queries and requiring manual investigation",
+                            + (
+                                " pausing Celestrak queries until the automatic retry"
+                                if overloaded
+                                else " stopping Celestrak queries and requiring manual investigation"
+                            ),
+                            retry_at=retry_at,
                         )
 
                     response.raise_for_status()
@@ -480,7 +545,14 @@ class ISSPassService:
                     return line1, line2
                 except Exception as exc:
                     if _is_celestrak_url(tle_url):
-                        if isinstance(exc, _CelestrakHTTPError):
+                        if isinstance(exc, _CelestrakHTTPError) and exc.retry_at > 0:
+                            logger.warning(
+                                "Celestrak is overloaded (HTTP %s). Celestrak queries are paused and resume "
+                                "automatically after %s; alternative TLE sources are used meanwhile.",
+                                exc.status_code,
+                                datetime.fromtimestamp(exc.retry_at, UTC).isoformat(),
+                            )
+                        elif isinstance(exc, _CelestrakHTTPError):
                             logger.error(
                                 "Celestrak rejected a TLE request with a non-200 response (HTTP %s). "
                                 "Automatic Celestrak queries have been stopped and human intervention is "

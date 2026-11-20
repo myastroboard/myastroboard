@@ -12,7 +12,8 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
-- None.
+- ISS / CSS trackers: a Celestrak overload (HTTP 5xx) no longer needs an admin to clear it; Celestrak is
+  asked again on its own after 6 h, 12 h, then 24 h ([SPACEFLIGHT.md](docs/SPACEFLIGHT.md#tle-data)).
 
 ### Breaking changes
 
