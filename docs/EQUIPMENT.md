@@ -262,6 +262,14 @@ sensor has no other way to be represented, since a plain telescope preset only c
 - A sensor size the maker does not publish is derived as resolution x pixel size (Seestar S50 Pro:
   2160 x 3840 px at 2.9 um = 6.26 x 11.14 mm; Seestar S30 Plus: 1440 x 2560 px at 2.9 um = 4.18 x 7.42 mm).
   A published size must agree with resolution x pixel size within 2 %, on each axis.
+- A pixel size the maker does not publish (camera bodies, as a rule) is derived as sensor width /
+  resolution width (Nikon Z 6II: 35.9 mm / 6048 px = 5.94 um), with the resolution of the largest RAW image.
+  A body's `weight_kg` is the weight with battery and card when the maker gives both, since that is what the
+  mount carries; it is left out when the maker publishes none (Canon EOS 6D Mark II, EOS 2000D).
+- Sony's UK and Australian spec pages omit the Alpha 7 IV image size; its 7008 x 4672 px comes from the spec
+  page of the official Sony Thailand store
+  (<https://store.sony.co.th/th/blogs/en_7149167116331_40893409230891/en_7149167116331_40893409230891_specifications/?locale=en>),
+  and `source_url` stays the Sony UK page that gives every other value.
 - When the maker publishes neither the sensor size nor its resolution, but does publish the field of view,
   the focal length and the pixel size (Unistellar Odyssey: 45 x 33.6 arcmin, 320 mm, 1.45 um), the sensor
   size is derived as focal length x field of view in radians (4.19 x 3.13 mm), and the resolution as sensor

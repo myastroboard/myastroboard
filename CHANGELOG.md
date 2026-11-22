@@ -11,8 +11,9 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Equipment presets: Vaonis Atlas Twin, Unistellar Odyssey, Odyssey Pro, eVscope 2 and eQuinox 2, DWARFLAB Draco
   and Celestron Origin Mark II smart telescopes, each with its built-in camera and mount ([EQUIPMENT.md](docs/EQUIPMENT.md#bundles-smart-telescopes)).
 - Equipment presets: ZWO Seestar TC20 tripod and TH10 tripod head accessories.
-- Equipment presets: 31 more common items - Celestron C6 / C9.25 / C11 and EdgeHD 9.25 / 11, William Optics
-  and Sky-Watcher refractors and Newtonians, ZWO and Player One cameras, ZWO, Sky-Watcher and Celestron mounts.
+- Equipment presets: 43 more common items - Celestron C6 / C9.25 / C11 and EdgeHD 9.25 / 11, William Optics
+  and Sky-Watcher refractors and Newtonians, ZWO and Player One cameras, Canon, Nikon and Sony camera bodies,
+  ZWO, Sky-Watcher and Celestron mounts.
 - Equipment presets are now edited as one small file per gear type and manufacturer under
   `presets/equipment/`, with JSON Schemas and a checking script run in CI
   ([EQUIPMENT.md](docs/EQUIPMENT.md#adding-or-editing-a-preset)).
