@@ -624,7 +624,8 @@ Contributors will be acknowledged in:
 - Test in multiple browsers
 - Equipment presets are edited in `presets/equipment/<type>/<manufacturer>.json`, then built into
   `static/data/equipment_presets.json` with `python scripts/build_equipment_presets.py` - see
-  [docs/EQUIPMENT.md#adding-or-editing-a-preset](docs/EQUIPMENT.md#adding-or-editing-a-preset)
+  [docs/EQUIPMENT.md#adding-or-editing-a-preset](docs/EQUIPMENT.md#adding-or-editing-a-preset).
+  A preset request without a pull request goes through the "Equipment preset" issue template.
 
 ### Documentation (`docs/`)
 - The pages are published at [docs.myastroboard.org](https://docs.myastroboard.org/) by the

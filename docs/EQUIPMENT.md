@@ -183,7 +183,10 @@ Consumed in two places:
 
 ### Adding or editing a preset
 
-No code change or restart is needed: the browser fetches the generated file fresh.
+No code change or restart is needed: the browser fetches the generated file fresh. To ask for a preset
+without editing it yourself, open an
+[Equipment preset issue](https://github.com/myastroboard/myastroboard/issues/new?template=equipment_preset.yml)
+with the maker's spec page; it is labelled `component: equipment-presets`.
 
 1. Open the file of the gear type and manufacturer, for example `presets/equipment/telescopes/zwo.json`,
    or create it. The file name is the manufacturer in lowercase, every run of other characters replaced
