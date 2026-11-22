@@ -8,12 +8,15 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Features
 
-- None.
+- Equipment presets: Vaonis Atlas Twin, Unistellar Odyssey, Odyssey Pro, eVscope 2 and eQuinox 2, DWARFLAB Draco
+  and Celestron Origin Mark II smart telescopes, each with its built-in camera and mount ([EQUIPMENT.md](docs/EQUIPMENT.md#bundles-smart-telescopes)).
 
 ### Fixes
 
 - ISS / CSS trackers: a Celestrak overload (HTTP 5xx) no longer needs an admin to clear it; Celestrak is
   asked again on its own after 6 h, 12 h, then 24 h ([SPACEFLIGHT.md](docs/SPACEFLIGHT.md#tle-data)).
+- Equipment presets: a Vespera II created from its preset no longer shows a payload warning for its own
+  built-in mount ([EQUIPMENT.md](docs/EQUIPMENT.md#preset-field-reference)).
 
 ### Breaking changes
 
