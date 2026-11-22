@@ -167,10 +167,10 @@ Disabled or invalid combinations (see [Disabling equipment](#disabling-equipment
 A curated list of real-world gear (telescopes, cameras, mounts, filters, accessories) that lets users
 skip manual data entry for common models. Each entry has an `id`, a `label`, a `manufacturer`, a
 `source_url` for provenance, a `suggests_experience` (`beginner` / `intermediate` / `advanced`) used to
-sort the closest match to the user's own experience level to the top, and type-specific spec fields
-matching the corresponding [gear type](#gear-types) table above one-to-one (e.g. a telescope preset's
-`type` maps to `telescope_type`, a filter preset's `filter_type` must be one of the enum values listed
-under [Filters](#filters), etc.).
+sort the closest match to the user's own experience level to the top, and type-specific spec fields.
+**Several preset keys are not named like the stored fields** of the [Telescopes](#telescopes) and
+[Cameras](#cameras) tables below (`label`, `type`, `resolution_w`, `resolution_h`): use the
+[preset field reference](#preset-field-reference), not those tables, when writing a preset.
 
 Consumed in two places:
 
@@ -180,8 +180,9 @@ Consumed in two places:
   adding a new item, not when editing an existing one.
 
 To add a preset, append an entry to the relevant array in the JSON file - no code change or restart needed
-(it's fetched fresh by the browser). Keep enum-like fields (`type`, `sensor_type`, `mount_type`, `filter_type`)
-consistent with the values each form's `<select>` accepts, or the preset will silently fail to prefill that field.
+(it's fetched fresh by the browser). A wrong key or enum value raises no error in the browser: the field is
+left empty or replaced by a default. `tests/equipment/test_equipment_presets.py` checks every entry against
+the rules below; run it after any edit.
 
 ### Bundles (smart telescopes)
 
@@ -229,6 +230,60 @@ optical specs (aperture/focal length), not sensor data.
   capacity), so the combination does not report a payload warning for the device itself.
 - A sensor size the maker does not publish is derived as resolution x pixel size (Seestar S50 Pro:
   2160 x 3840 px at 2.9 um = 6.26 x 11.14 mm; Seestar S30 Plus: 1440 x 2560 px at 2.9 um = 4.18 x 7.42 mm).
+  A published size must agree with resolution x pixel size within 2 %, on each axis.
+- When the maker publishes neither the sensor size nor its resolution, but does publish the field of view,
+  the focal length and the pixel size (Unistellar Odyssey: 45 x 33.6 arcmin, 320 mm, 1.45 um), the sensor
+  size is derived as focal length x field of view in radians (4.19 x 3.13 mm), and the resolution as sensor
+  size / pixel size (2890 x 2159 px). Without at least these three figures, the preset is not added.
+- A device that bins its sensor for astro images (DWARFLAB Draco: 8192 x 6144 at 1.197 um, delivered 2x2
+  binned) gets the delivered resolution and binned pixel size (4096 x 3072 at 2.394 um); the sensor size is
+  the same either way.
+- Maker spec tables are often rendered by JavaScript or folded in an accordion (DWARFLAB, Unistellar shop,
+  Celestron): read the rendered page, not the raw HTML, before concluding a value is not published.
+- **Atlas Twin** carries two identical 80 mm modules pointed at the same target. A combination holds one
+  imaging camera, so the preset has one module's optics and camera (same field of view, same image scale)
+  and the weight of the mount plus both modules (3.5 + 2 x 3 kg). The doubled light ("F/3.2 equivalent")
+  is not modelled.
+
+### Preset field reference
+
+The exact keys the frontend reads from a preset (`static/js/equipment.js`, `equipment_bundles.js`,
+`first_run.js`). Any other key is ignored; a key under its stored name (`name`, `telescope_type`,
+`sensor_type`, `resolution_width_px`) is ignored too, which leaves the field empty.
+
+**Every entry**: `id` (unique snake_case across the whole file, bundle items included), `label` (becomes
+the item's `name`), `manufacturer`, `source_url` (the maker's official spec page) and `suggests_experience`
+(`beginner` / `intermediate` / `advanced`). Bundle items also carry `kind` and may leave out `source_url`
+and `suggests_experience`.
+
+| Preset | Key in the preset | Stored as | Notes |
+|--------|-------------------|-----------|-------|
+| Telescope | `type` | `telescope_type` | A **code**, not the form label: `refractor`, `apo`, `reflector`, `sct`, `edgehd`, `rasa`, `rc`, `newtonian`, `maksutov`, `cassegrain`, `dobsonian`. An unknown value becomes `Refractor`. |
+| Telescope | `aperture_mm`, `focal_length_mm`, `weight_kg` | same | Aperture 10-5000 mm, focal length 100-50000 mm. For a smart telescope, `weight_kg` is the whole unit. |
+| Telescope | `focal_ratio` | not stored | Informational; the f-ratio is recalculated from focal length / aperture. |
+| Telescope | `auto_combination`, `bundle` | - | See [Bundles](#bundles-smart-telescopes). |
+| Camera | `type` | `sensor_type` | A **code**: `cmos_color`, `cmos_mono`, `ccd_color`, `ccd_mono`, `dslr_color`, `mirrorless_color` (the last two are stored as `CMOS Color`). An unknown value becomes `CMOS Color`, so a mono camera with a wrong code silently turns into a colour one. |
+| Camera | `resolution_w`, `resolution_h` | `resolution_width_px`, `resolution_height_px` | Width 640-16000 px, height 480-12000 px. **Not** `resolution_width_px`: the API then rejects the camera, and a bundle is created without it. |
+| Camera | `sensor_width_mm`, `sensor_height_mm`, `pixel_size_um` | same | Sensor 1-100 mm, pixel 1-10 um. Width and height in the same orientation as `resolution_w` / `resolution_h`, and equal to resolution x pixel size within 2 %. |
+| Camera | `weight_kg`, `cooling_supported`, `min_temperature_c` | same | `min_temperature_c` between -50 and 0, only for cooled cameras. |
+| Mount | `mount_type` | same | The exact form value: `Equatorial`, `Alt-Azimuth`, `Dobsonian`, `Fork Mount`. |
+| Mount | `payload_capacity_kg`, `tracking_accuracy_arcsec`, `guiding_supported`, `meridian_flip_required`, `meridian_flip_delay_min`, `meridian_flip_duration_min` | same | In a **bundle**, only `mount_type`, `payload_capacity_kg` and `guiding_supported` are kept. |
+| Filter | `filter_type` | same | The exact form value, see [Filters](#filters). |
+| Filter | `central_wavelength_nm`, `bandwidth_nm`, `intended_use` | same | Wavelength 300-2000 nm, bandwidth 1-1000 nm. |
+| Accessory | `accessory_type`, `weight_kg` | same | `accessory_type` is free text. |
+
+Not carried by presets: a camera's `read_noise_e` and `quantum_efficiency` (the user enters them; the
+Exposure Calculator needs them), a telescope's `reducer_barlow_factor` (always 1.0).
+
+**Checklist for a new preset**, for a person or an AI agent:
+
+1. Take every value from the maker's official spec page, and put that page in `source_url`. Never estimate
+   a value; a sensor size the maker does not publish is derived as described above.
+2. Use the preset keys and codes of the table above, not the stored field names.
+3. For a smart telescope: a `bundle` with exactly one `camera` and at most one `mount`, `weight_kg: 0` on
+   every bundle item, the bundle camera in the orientation the device delivers its images, and a mount
+   `payload_capacity_kg` of at least the unit's `weight_kg` / 0.75.
+4. Run `pytest tests/equipment/test_equipment_presets.py tests/equipment/test_framing.py`.
 
 ---
 
@@ -292,7 +347,7 @@ not rewritten.
 
 | Field | Description |
 |-------|-------------|
-| `filter_type` | `LRGB`, `Narrowband`, `Broadband`, `Luminance`, `H-Alpha`, `OIII`, `SII`, `UHC`, `Light Pollution Reduction`, `Solar`, `Other` |
+| `filter_type` | `LRGB`, `Narrowband`, `Broadband`, `Luminance`, `RGB`, `H-Alpha`, `OIII`, `SII`, `UHC`, `Light Pollution Reduction`, `Solar`, `Other` |
 | `central_wavelength_nm` | Centre of the passband in nm |
 | `bandwidth_nm` | Full-width at half-maximum in nm |
 | `intended_use` | e.g. "emission nebulae", "broadband imaging" |

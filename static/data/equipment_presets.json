@@ -162,6 +162,15 @@
           "payload_capacity_kg": 3,
           "guiding_supported": false,
           "weight_kg": 0
+        },
+        {
+          "kind": "filter",
+          "id": "dwarflab_dwarf3_solar_filter",
+          "label": "DWARF 3 Magnetic ND Solar Filter",
+          "manufacturer": "DWARFLAB",
+          "filter_type": "Solar",
+          "intended_use": "Magnetic ND solar filter included in the DWARF 3 box for solar imaging",
+          "weight_kg": 0
         }
       ]
     },
@@ -201,6 +210,15 @@
           "payload_capacity_kg": 2,
           "guiding_supported": false,
           "weight_kg": 0
+        },
+        {
+          "kind": "filter",
+          "id": "dwarflab_dwarf_mini_solar_filter",
+          "label": "DWARF mini ND Filter",
+          "manufacturer": "DWARFLAB",
+          "filter_type": "Solar",
+          "intended_use": "ND solar filter included in the DWARF mini box for solar imaging",
+          "weight_kg": 0
         }
       ]
     },
@@ -237,7 +255,7 @@
           "label": "Vespera II built-in AZ mount/tripod",
           "manufacturer": "Vaonis",
           "mount_type": "Alt-Azimuth",
-          "payload_capacity_kg": 6,
+          "payload_capacity_kg": 6.7,
           "guiding_supported": false,
           "weight_kg": 0
         }
@@ -451,6 +469,288 @@
           "manufacturer": "Vaonis",
           "mount_type": "Alt-Azimuth",
           "payload_capacity_kg": 8.7,
+          "guiding_supported": false,
+          "weight_kg": 0
+        }
+      ]
+    },
+    {
+      "id": "vaonis_atlas_twin",
+      "label": "Atlas Twin (2 x 80 mm modules)",
+      "manufacturer": "Vaonis",
+      "aperture_mm": 80,
+      "focal_length_mm": 360,
+      "focal_ratio": 4.5,
+      "type": "refractor",
+      "weight_kg": 9.5,
+      "suggests_experience": "intermediate",
+      "source_url": "https://vaonis.com/pages/product/atlas",
+      "auto_combination": true,
+      "bundle": [
+        {
+          "kind": "camera",
+          "id": "vaonis_atlas_twin_camera",
+          "label": "Atlas Twin 80 mm module built-in camera (Sony IMX585)",
+          "manufacturer": "Vaonis",
+          "sensor_width_mm": 11.2,
+          "sensor_height_mm": 6.3,
+          "pixel_size_um": 2.9,
+          "resolution_w": 3840,
+          "resolution_h": 2160,
+          "type": "cmos_color",
+          "weight_kg": 0,
+          "source_url": "https://vaonis.com/pages/product/atlas"
+        },
+        {
+          "kind": "mount",
+          "id": "vaonis_atlas_twin_mount",
+          "label": "Atlas Twin built-in AZ mount",
+          "manufacturer": "Vaonis",
+          "mount_type": "Alt-Azimuth",
+          "payload_capacity_kg": 12.7,
+          "guiding_supported": false,
+          "weight_kg": 0
+        }
+      ]
+    },
+    {
+      "id": "unistellar_odyssey",
+      "label": "Odyssey",
+      "manufacturer": "Unistellar",
+      "aperture_mm": 85,
+      "focal_length_mm": 320,
+      "focal_ratio": 3.9,
+      "type": "reflector",
+      "weight_kg": 4.0,
+      "suggests_experience": "beginner",
+      "source_url": "https://shop.eu.unistellar.com/products/odyssey",
+      "auto_combination": true,
+      "bundle": [
+        {
+          "kind": "camera",
+          "id": "unistellar_odyssey_camera",
+          "label": "Odyssey built-in camera",
+          "manufacturer": "Unistellar",
+          "sensor_width_mm": 4.19,
+          "sensor_height_mm": 3.13,
+          "pixel_size_um": 1.45,
+          "resolution_w": 2890,
+          "resolution_h": 2159,
+          "type": "cmos_color",
+          "weight_kg": 0,
+          "source_url": "https://shop.eu.unistellar.com/products/odyssey"
+        },
+        {
+          "kind": "mount",
+          "id": "unistellar_odyssey_mount",
+          "label": "Odyssey built-in motorized AZ mount",
+          "manufacturer": "Unistellar",
+          "mount_type": "Alt-Azimuth",
+          "payload_capacity_kg": 5.4,
+          "guiding_supported": false,
+          "weight_kg": 0
+        }
+      ]
+    },
+    {
+      "id": "unistellar_odyssey_pro",
+      "label": "Odyssey Pro",
+      "manufacturer": "Unistellar",
+      "aperture_mm": 85,
+      "focal_length_mm": 320,
+      "focal_ratio": 3.9,
+      "type": "reflector",
+      "weight_kg": 4.0,
+      "suggests_experience": "beginner",
+      "source_url": "https://shop.eu.unistellar.com/products/odyssey-pro",
+      "auto_combination": true,
+      "bundle": [
+        {
+          "kind": "camera",
+          "id": "unistellar_odyssey_pro_camera",
+          "label": "Odyssey Pro built-in camera",
+          "manufacturer": "Unistellar",
+          "sensor_width_mm": 4.19,
+          "sensor_height_mm": 3.13,
+          "pixel_size_um": 1.45,
+          "resolution_w": 2890,
+          "resolution_h": 2159,
+          "type": "cmos_color",
+          "weight_kg": 0,
+          "source_url": "https://shop.eu.unistellar.com/products/odyssey-pro"
+        },
+        {
+          "kind": "mount",
+          "id": "unistellar_odyssey_pro_mount",
+          "label": "Odyssey Pro built-in motorized AZ mount",
+          "manufacturer": "Unistellar",
+          "mount_type": "Alt-Azimuth",
+          "payload_capacity_kg": 5.4,
+          "guiding_supported": false,
+          "weight_kg": 0
+        }
+      ]
+    },
+    {
+      "id": "unistellar_evscope2",
+      "label": "eVscope 2",
+      "manufacturer": "Unistellar",
+      "aperture_mm": 114,
+      "focal_length_mm": 450,
+      "focal_ratio": 4.0,
+      "type": "reflector",
+      "weight_kg": 7.0,
+      "suggests_experience": "beginner",
+      "source_url": "https://shop.eu.unistellar.com/products/evscope-2",
+      "auto_combination": true,
+      "bundle": [
+        {
+          "kind": "camera",
+          "id": "unistellar_evscope2_camera",
+          "label": "eVscope 2 built-in camera",
+          "manufacturer": "Unistellar",
+          "sensor_width_mm": 5.97,
+          "sensor_height_mm": 4.48,
+          "pixel_size_um": 2.9,
+          "resolution_w": 2059,
+          "resolution_h": 1545,
+          "type": "cmos_color",
+          "weight_kg": 0,
+          "source_url": "https://shop.eu.unistellar.com/products/evscope-2"
+        },
+        {
+          "kind": "mount",
+          "id": "unistellar_evscope2_mount",
+          "label": "eVscope 2 built-in motorized AZ mount",
+          "manufacturer": "Unistellar",
+          "mount_type": "Alt-Azimuth",
+          "payload_capacity_kg": 9.4,
+          "guiding_supported": false,
+          "weight_kg": 0
+        }
+      ]
+    },
+    {
+      "id": "unistellar_equinox2",
+      "label": "eQuinox 2",
+      "manufacturer": "Unistellar",
+      "aperture_mm": 114,
+      "focal_length_mm": 450,
+      "focal_ratio": 4.0,
+      "type": "reflector",
+      "weight_kg": 7.0,
+      "suggests_experience": "beginner",
+      "source_url": "https://shop.eu.unistellar.com/products/equinox-2",
+      "auto_combination": true,
+      "bundle": [
+        {
+          "kind": "camera",
+          "id": "unistellar_equinox2_camera",
+          "label": "eQuinox 2 built-in camera",
+          "manufacturer": "Unistellar",
+          "sensor_width_mm": 5.97,
+          "sensor_height_mm": 4.48,
+          "pixel_size_um": 2.9,
+          "resolution_w": 2059,
+          "resolution_h": 1545,
+          "type": "cmos_color",
+          "weight_kg": 0,
+          "source_url": "https://shop.eu.unistellar.com/products/equinox-2"
+        },
+        {
+          "kind": "mount",
+          "id": "unistellar_equinox2_mount",
+          "label": "eQuinox 2 built-in motorized AZ mount",
+          "manufacturer": "Unistellar",
+          "mount_type": "Alt-Azimuth",
+          "payload_capacity_kg": 9.4,
+          "guiding_supported": false,
+          "weight_kg": 0
+        }
+      ]
+    },
+    {
+      "id": "dwarflab_draco",
+      "label": "Draco",
+      "manufacturer": "DWARFLAB",
+      "aperture_mm": 90,
+      "focal_length_mm": 340,
+      "focal_ratio": 3.8,
+      "type": "refractor",
+      "weight_kg": 5.5,
+      "suggests_experience": "intermediate",
+      "source_url": "https://www.dwarflab.com/pages/draco-smart-telescope",
+      "auto_combination": true,
+      "bundle": [
+        {
+          "kind": "camera",
+          "id": "dwarflab_draco_camera",
+          "label": "Draco built-in telephoto camera (OmniVision OV50Q40, 2x2 binned)",
+          "manufacturer": "DWARFLAB",
+          "sensor_width_mm": 9.81,
+          "sensor_height_mm": 7.35,
+          "pixel_size_um": 2.394,
+          "resolution_w": 4096,
+          "resolution_h": 3072,
+          "type": "cmos_color",
+          "weight_kg": 0,
+          "source_url": "https://www.dwarflab.com/pages/draco-smart-telescope"
+        },
+        {
+          "kind": "mount",
+          "id": "dwarflab_draco_mount",
+          "label": "Draco built-in AZ/EQ mount",
+          "manufacturer": "DWARFLAB",
+          "mount_type": "Alt-Azimuth",
+          "payload_capacity_kg": 7.4,
+          "guiding_supported": false,
+          "weight_kg": 0
+        },
+        {
+          "kind": "filter",
+          "id": "dwarflab_draco_solar_filter",
+          "label": "Draco ND Solar Filter",
+          "manufacturer": "DWARFLAB",
+          "filter_type": "Solar",
+          "intended_use": "ND OD 5 solar filter: built in (Standard Edition) or external magnetic, included (SHO Edition)",
+          "weight_kg": 0
+        }
+      ]
+    },
+    {
+      "id": "celestron_origin_mk2",
+      "label": "Origin Mark II Intelligent Home Observatory",
+      "manufacturer": "Celestron",
+      "aperture_mm": 152,
+      "focal_length_mm": 335,
+      "focal_ratio": 2.2,
+      "type": "rasa",
+      "weight_kg": 4.8,
+      "suggests_experience": "beginner",
+      "source_url": "https://www.celestron.com/products/celestron-origin-intelligent-home-observatory",
+      "auto_combination": true,
+      "bundle": [
+        {
+          "kind": "camera",
+          "id": "celestron_origin_mk2_camera",
+          "label": "Origin Mark II built-in camera (Origin 678C, Sony IMX678)",
+          "manufacturer": "Celestron",
+          "sensor_width_mm": 7.71,
+          "sensor_height_mm": 4.36,
+          "pixel_size_um": 2.0,
+          "resolution_w": 3856,
+          "resolution_h": 2180,
+          "type": "cmos_color",
+          "weight_kg": 0,
+          "source_url": "https://www.celestron.com/products/celestron-origin-intelligent-home-observatory"
+        },
+        {
+          "kind": "mount",
+          "id": "celestron_origin_mk2_mount",
+          "label": "Origin Mark II computerized AZ mount",
+          "manufacturer": "Celestron",
+          "mount_type": "Alt-Azimuth",
+          "payload_capacity_kg": 6.4,
           "guiding_supported": false,
           "weight_kg": 0
         }
