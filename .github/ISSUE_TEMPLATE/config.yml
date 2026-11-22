@@ -1,7 +1,7 @@
 blank_issues_enabled: false
 contact_links:
   - name: 📖 Documentation
-    url: https://github.com/myastroboard/myastroboard/blob/main/docs/README.md
+    url: https://docs.myastroboard.org/
     about: Read the full documentation including installation and quick start guides
   - name: 💬 Questions & Discussions
     url: https://github.com/myastroboard/myastroboard/discussions
