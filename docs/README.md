@@ -1,5 +1,11 @@
 # MyAstroBoard Documentation
 
+<!-- github-only -->
+> [!TIP]
+> **Read this documentation on [docs.myastroboard.org](https://docs.myastroboard.org/)**: the same
+> pages, with search, a menu and a light or dark theme.
+<!-- /github-only -->
+
 > [!NOTE]
 > Some parts of the documentation may be generated with AI.
 >

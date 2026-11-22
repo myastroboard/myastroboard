@@ -7,6 +7,13 @@
 [![Documentation](https://img.shields.io/badge/docs-docs.myastroboard.org-blue)](https://docs.myastroboard.org/)
 [![Live demo](https://img.shields.io/badge/live%20demo-demo.myastroboard.org-brightgreen)](https://demo.myastroboard.org/)
 
+**[Documentation](https://docs.myastroboard.org/)** |
+**[Live demo](https://demo.myastroboard.org/)** |
+**[Install](https://docs.myastroboard.org/1.INSTALLATION.html)** |
+**[Quick start](https://docs.myastroboard.org/2.QUICKSTART.html)** |
+**[Troubleshooting](https://docs.myastroboard.org/TROUBLESHOOTING.html)** |
+**[Discussions](https://github.com/myastroboard/myastroboard/discussions)**
+
 MyAstroBoard is a self-hosted astronomy dashboard with Docker-first deployment, also available as a
 Home Assistant app.
 It combines weather and astronomical conditions, automated SkyTonight execution,

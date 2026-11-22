@@ -87,6 +87,20 @@ def test_landing_page_puts_the_index_after_the_hero_without_its_title():
 
 
 @pytest.mark.unit
+def test_landing_page_drops_the_github_only_banner():
+    """The "read this on the site" banner of docs/README.md is kept on GitHub but not on the site."""
+    readme = (
+        '# MyAstroBoard Documentation\n\n'
+        '<!-- github-only -->\n> Read this on the site.\n<!-- /github-only -->\n\n'
+        'Intro text.\n'
+    )
+    page = build_docs_site.landing_page(readme, '9.9.9')
+    assert 'Read this on the site.' not in page
+    assert 'github-only' not in page
+    assert 'Intro text.' in page
+
+
+@pytest.mark.unit
 def test_converted_images_point_to_webp_copies():
     """References to converted screenshots switch to .webp; other images are left alone."""
     text = '![a](img/shot.png) ![b](img/anim.gif) ![c](img/banner.png)'

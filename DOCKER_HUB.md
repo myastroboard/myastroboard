@@ -2,6 +2,13 @@
 
 **A self-hosted astronomy dashboard for observation planning and astrophotography management.**
 
+**[Documentation](https://docs.myastroboard.org/)** |
+**[Live demo](https://demo.myastroboard.org/)** |
+**[Install](https://docs.myastroboard.org/1.INSTALLATION.html)** |
+**[Quick start](https://docs.myastroboard.org/2.QUICKSTART.html)** |
+**[Troubleshooting](https://docs.myastroboard.org/TROUBLESHOOTING.html)** |
+**[Source code](https://github.com/myastroboard/myastroboard)**
+
 MyAstroBoard combines weather analysis, automated sky calculations, and planning tools into a single Docker-first application - designed for amateur astronomers who want full control over their data.
 
 ![Demo MyAstroBoard](https://raw.githubusercontent.com/myastroboard/myastroboard/main/docs/img/overview.gif)

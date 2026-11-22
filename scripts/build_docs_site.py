@@ -150,9 +150,14 @@ def install_katex(dest: Path, local_tgz: str | None):
 
 
 def landing_page(readme_text: str, version: str):
-    """Site home page: the landing template, then the docs index without its own title."""
+    """Site home page: the landing template, then the docs index without its own title.
+
+    A block between `<!-- github-only -->` and `<!-- /github-only -->` (the "read this on the
+    site" banner shown when browsing docs/ on GitHub) is dropped.
+    """
     template = (SITE_SRC / 'landing.html').read_text(encoding='utf-8').replace('{{VERSION}}', version)
     body = re.sub(r'\A\s*# [^\n]*\n', '', readme_text, count=1)
+    body = re.sub(r'<!-- github-only -->.*?<!-- /github-only -->\n?', '', body, flags=re.DOTALL)
     return template.rstrip() + '\n\n' + body.lstrip()
 
 
