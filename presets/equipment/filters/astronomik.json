@@ -1,0 +1,38 @@
+{
+  "$schema": "../filters.schema.json",
+  "presets": [
+    {
+      "id": "astronomik_ha6",
+      "label": "H-alpha 6nm CCD",
+      "manufacturer": "Astronomik",
+      "filter_type": "H-Alpha",
+      "central_wavelength_nm": 656,
+      "bandwidth_nm": 6,
+      "intended_use": "Narrowband emission-nebula imaging with mono cameras",
+      "suggests_experience": "advanced",
+      "source_url": "https://www.astronomik.com/en/photographic-filters/h-alpha-6nm-ccd-filter.html"
+    },
+    {
+      "id": "astronomik_oiii6",
+      "label": "OIII 6nm CCD",
+      "manufacturer": "Astronomik",
+      "filter_type": "OIII",
+      "central_wavelength_nm": 501,
+      "bandwidth_nm": 6,
+      "intended_use": "Narrowband emission-nebula imaging with mono cameras",
+      "suggests_experience": "advanced",
+      "source_url": "https://www.astronomik.com/en/fotografische-emissionslinienfilter/schmalbandfilter-oiii-ccd-6nm.html"
+    },
+    {
+      "id": "astronomik_sii6",
+      "label": "SII 6nm CCD",
+      "manufacturer": "Astronomik",
+      "filter_type": "SII",
+      "central_wavelength_nm": 672,
+      "bandwidth_nm": 6,
+      "intended_use": "Narrowband emission-nebula imaging with mono cameras (SHO palette)",
+      "suggests_experience": "advanced",
+      "source_url": "https://www.astronomik.com/en/Narrowband-Filters/SII/"
+    }
+  ]
+}

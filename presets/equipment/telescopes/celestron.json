@@ -1,0 +1,118 @@
+{
+  "$schema": "../telescopes.schema.json",
+  "presets": [
+    {
+      "id": "celestron_c11",
+      "label": "C11 (11\" SCT)",
+      "manufacturer": "Celestron",
+      "aperture_mm": 279.4,
+      "focal_length_mm": 2800,
+      "focal_ratio": 10.0,
+      "type": "sct",
+      "weight_kg": 12.4,
+      "suggests_experience": "intermediate",
+      "source_url": "https://www.celestron.com/products/c11-optical-tube-assembly-cge-dovetail"
+    },
+    {
+      "id": "celestron_c6",
+      "label": "C6 (6\" SCT)",
+      "manufacturer": "Celestron",
+      "aperture_mm": 150,
+      "focal_length_mm": 1500,
+      "focal_ratio": 10.0,
+      "type": "sct",
+      "weight_kg": 4.54,
+      "suggests_experience": "beginner",
+      "source_url": "https://www.celestron.com/products/c6-optical-tube-assembly-cg-5-dovetail"
+    },
+    {
+      "id": "celestron_c8",
+      "label": "C8 (8\" SCT)",
+      "manufacturer": "Celestron",
+      "aperture_mm": 203,
+      "focal_length_mm": 2032,
+      "focal_ratio": 10.0,
+      "type": "sct",
+      "weight_kg": 5.7,
+      "suggests_experience": "intermediate",
+      "source_url": "https://www.celestron.com/products/c8-optical-tube-assembly-cge-dovetail"
+    },
+    {
+      "id": "celestron_c925",
+      "label": "C9.25 (9.25\" SCT)",
+      "manufacturer": "Celestron",
+      "aperture_mm": 235,
+      "focal_length_mm": 2350,
+      "focal_ratio": 10.0,
+      "type": "sct",
+      "weight_kg": 9.07,
+      "suggests_experience": "intermediate",
+      "source_url": "https://www.celestron.com/products/c9-25-optical-tube-assembly-cge-dovetail"
+    },
+    {
+      "id": "celestron_edgehd11",
+      "label": "EdgeHD 11",
+      "manufacturer": "Celestron",
+      "aperture_mm": 279.4,
+      "focal_length_mm": 2800,
+      "focal_ratio": 10.0,
+      "type": "edgehd",
+      "weight_kg": 13.0,
+      "suggests_experience": "advanced",
+      "source_url": "https://www.celestron.com/products/edgehd-11-optical-tube-assembly-cge-dovetail"
+    },
+    {
+      "id": "celestron_edgehd8",
+      "label": "EdgeHD 8",
+      "manufacturer": "Celestron",
+      "aperture_mm": 203,
+      "focal_length_mm": 2032,
+      "focal_ratio": 10.0,
+      "type": "edgehd",
+      "weight_kg": 6.3,
+      "suggests_experience": "advanced",
+      "source_url": "https://www.celestron.com/products/edgehd-8-optical-tube-assembly-cge-dovetail"
+    },
+    {
+      "id": "celestron_edgehd925",
+      "label": "EdgeHD 9.25",
+      "manufacturer": "Celestron",
+      "aperture_mm": 234.95,
+      "focal_length_mm": 2350,
+      "focal_ratio": 10.0,
+      "type": "edgehd",
+      "weight_kg": 9.53,
+      "suggests_experience": "advanced",
+      "source_url": "https://www.celestron.com/products/edgehd-925-optical-tube-assembly-cge-dovetail"
+    },
+    {
+      "id": "celestron_origin_mk2",
+      "label": "Origin Mark II Intelligent Home Observatory",
+      "manufacturer": "Celestron",
+      "aperture_mm": 152,
+      "focal_length_mm": 335,
+      "focal_ratio": 2.2,
+      "type": "rasa",
+      "weight_kg": 4.8,
+      "suggests_experience": "beginner",
+      "source_url": "https://www.celestron.com/products/celestron-origin-intelligent-home-observatory",
+      "auto_combination": true,
+      "bundle": [
+        "celestron_origin_mk2_camera",
+        "celestron_origin_mk2_mount"
+      ]
+    },
+    {
+      "id": "celestron_rasa8",
+      "label": "RASA 8",
+      "manufacturer": "Celestron",
+      "aperture_mm": 203,
+      "focal_length_mm": 400,
+      "focal_ratio": 2.0,
+      "type": "rasa",
+      "weight_kg": 6.4,
+      "suggests_experience": "advanced",
+      "source_url": "https://www.celestron.com/products/8-rowe-ackermann-schmidt-astrograph-rasa-8-optical-tube-assembly-cge-dovetail"
+    }
+  ]
+}

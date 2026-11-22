@@ -1,0 +1,14 @@
+{
+  "$schema": "../accessories.schema.json",
+  "presets": [
+    {
+      "id": "pegasus_focuscube3",
+      "label": "FocusCube 3",
+      "manufacturer": "Pegasus Astro",
+      "accessory_type": "Electronic Focuser",
+      "weight_kg": 0.26,
+      "suggests_experience": "intermediate",
+      "source_url": "https://pegasusastro.com/products/focuscube-3-universal/"
+    }
+  ]
+}

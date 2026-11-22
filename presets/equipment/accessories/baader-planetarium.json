@@ -1,0 +1,14 @@
+{
+  "$schema": "../accessories.schema.json",
+  "presets": [
+    {
+      "id": "baader_mpcc3",
+      "label": "MPCC Mark III Coma Corrector",
+      "manufacturer": "Baader Planetarium",
+      "accessory_type": "Coma Corrector",
+      "weight_kg": 0.08,
+      "suggests_experience": "intermediate",
+      "source_url": "https://www.baader-planetarium.com/en/2%22-mpcc-mark-iii-(multi-purpose-coma-corrector-for-newtons).html"
+    }
+  ]
+}

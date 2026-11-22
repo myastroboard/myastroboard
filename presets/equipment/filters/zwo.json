@@ -1,0 +1,43 @@
+{
+  "$schema": "../filters.schema.json",
+  "presets": [
+    {
+      "id": "seestar_s30_plus_solar_filter",
+      "label": "Seestar S30 Plus Solar Filter",
+      "manufacturer": "ZWO",
+      "filter_type": "Solar",
+      "intended_use": "Magnetic solar filter included in the Seestar S30 Plus box for solar imaging/viewing",
+      "weight_kg": 0,
+      "built_in": true
+    },
+    {
+      "id": "seestar_s50_pro_solar_filter",
+      "label": "Seestar S50 Pro Solar Filter",
+      "manufacturer": "ZWO",
+      "filter_type": "Solar",
+      "intended_use": "Magnetic solar filter included in the Seestar S50 Pro box for solar imaging/viewing",
+      "weight_kg": 0,
+      "built_in": true
+    },
+    {
+      "id": "seestar_s50_solar_filter",
+      "label": "Seestar S50 Solar Filter",
+      "manufacturer": "ZWO",
+      "filter_type": "Solar",
+      "intended_use": "Included in the Seestar S50 box for solar imaging/viewing",
+      "weight_kg": 0,
+      "built_in": true
+    },
+    {
+      "id": "zwo_duoband",
+      "label": "Duo-Band Filter",
+      "manufacturer": "ZWO",
+      "filter_type": "Narrowband",
+      "central_wavelength_nm": null,
+      "bandwidth_nm": null,
+      "intended_use": "Dual-band H-alpha 656nm (15nm) + OIII 501nm (35nm) nebula imaging with OSC/mono cameras",
+      "suggests_experience": "intermediate",
+      "source_url": "https://www.zwoastro.com/product/duo-band-filters/"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "../cameras.schema.json",
+  "presets": [
+    {
+      "id": "qhy268c",
+      "label": "QHY268C",
+      "manufacturer": "QHYCCD",
+      "sensor_width_mm": 23.5,
+      "sensor_height_mm": 15.7,
+      "pixel_size_um": 3.76,
+      "resolution_w": 6280,
+      "resolution_h": 4210,
+      "type": "cmos_color",
+      "weight_kg": 0.6,
+      "cooling_supported": true,
+      "min_temperature_c": -35,
+      "suggests_experience": "advanced",
+      "source_url": "https://www.qhyccd.com/astronomical-camera-qhy268/"
+    }
+  ]
+}

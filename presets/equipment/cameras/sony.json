@@ -1,0 +1,20 @@
+{
+  "$schema": "../cameras.schema.json",
+  "presets": [
+    {
+      "id": "sony_a7s",
+      "label": "Sony A7S (Mirrorless)",
+      "manufacturer": "Sony",
+      "sensor_width_mm": 35.6,
+      "sensor_height_mm": 23.8,
+      "pixel_size_um": 8.4,
+      "resolution_w": 4240,
+      "resolution_h": 2832,
+      "type": "mirrorless_color",
+      "weight_kg": 0.49,
+      "cooling_supported": false,
+      "suggests_experience": "intermediate",
+      "source_url": "https://www.bhphotovideo.com/c/product/1044728-REG/sony_ilce7s_b_alpha_a7s_mirrorless_digital.html"
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "$schema": "../mounts.schema.json",
+  "presets": [
+    {
+      "id": "unistellar_equinox2_mount",
+      "label": "eQuinox 2 built-in motorized AZ mount",
+      "manufacturer": "Unistellar",
+      "mount_type": "Alt-Azimuth",
+      "payload_capacity_kg": 9.4,
+      "guiding_supported": false,
+      "weight_kg": 0,
+      "built_in": true
+    },
+    {
+      "id": "unistellar_evscope2_mount",
+      "label": "eVscope 2 built-in motorized AZ mount",
+      "manufacturer": "Unistellar",
+      "mount_type": "Alt-Azimuth",
+      "payload_capacity_kg": 9.4,
+      "guiding_supported": false,
+      "weight_kg": 0,
+      "built_in": true
+    },
+    {
+      "id": "unistellar_odyssey_mount",
+      "label": "Odyssey built-in motorized AZ mount",
+      "manufacturer": "Unistellar",
+      "mount_type": "Alt-Azimuth",
+      "payload_capacity_kg": 5.4,
+      "guiding_supported": false,
+      "weight_kg": 0,
+      "built_in": true
+    },
+    {
+      "id": "unistellar_odyssey_pro_mount",
+      "label": "Odyssey Pro built-in motorized AZ mount",
+      "manufacturer": "Unistellar",
+      "mount_type": "Alt-Azimuth",
+      "payload_capacity_kg": 5.4,
+      "guiding_supported": false,
+      "weight_kg": 0,
+      "built_in": true
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+name: Validate equipment presets
+
+# Runs only when a file the check reads changes: the preset sources, the generated file, the
+# script, and the frontend/route sources it reads the allowed codes and ranges from. The script
+# needs only the standard library, so nothing is installed and the job takes a few seconds.
+on:
+  push:
+    paths:
+      - 'presets/equipment/**'
+      - 'static/data/equipment_presets.json'
+      - 'scripts/build_equipment_presets.py'
+      - 'static/js/equipment.js'
+      - 'static/js/equipment_bundles.js'
+      - 'backend/blueprints/equipment.py'
+      - '.github/workflows/validate-equipment-presets.yml'
+  pull_request:
+    paths:
+      - 'presets/equipment/**'
+      - 'static/data/equipment_presets.json'
+      - 'scripts/build_equipment_presets.py'
+      - 'static/js/equipment.js'
+      - 'static/js/equipment_bundles.js'
+      - 'backend/blueprints/equipment.py'
+      - '.github/workflows/validate-equipment-presets.yml'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  validate-equipment-presets:
+    name: Equipment presets checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.15'
+
+      - name: Validate the preset sources and the generated files
+        run: python scripts/build_equipment_presets.py --check

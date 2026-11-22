@@ -1,0 +1,47 @@
+{
+  "$schema": "../cameras.schema.json",
+  "presets": [
+    {
+      "id": "dwarflab_draco_camera",
+      "label": "Draco built-in telephoto camera (OmniVision OV50Q40, 2x2 binned)",
+      "manufacturer": "DWARFLAB",
+      "sensor_width_mm": 9.81,
+      "sensor_height_mm": 7.35,
+      "pixel_size_um": 2.394,
+      "resolution_w": 4096,
+      "resolution_h": 3072,
+      "type": "cmos_color",
+      "weight_kg": 0,
+      "source_url": "https://www.dwarflab.com/pages/draco-smart-telescope",
+      "built_in": true
+    },
+    {
+      "id": "dwarflab_dwarf3_camera",
+      "label": "Dwarf 3 built-in camera (Sony IMX678)",
+      "manufacturer": "DWARFLAB",
+      "sensor_width_mm": 7.68,
+      "sensor_height_mm": 4.32,
+      "pixel_size_um": 2.0,
+      "resolution_w": 3840,
+      "resolution_h": 2160,
+      "type": "cmos_color",
+      "weight_kg": 0,
+      "source_url": "https://www.dwarflab.com/us/products/dwarf-3-smart-telescope",
+      "built_in": true
+    },
+    {
+      "id": "dwarflab_dwarf_mini_camera",
+      "label": "Dwarf Mini built-in camera (Sony IMX662)",
+      "manufacturer": "DWARFLAB",
+      "sensor_width_mm": 5.6,
+      "sensor_height_mm": 3.15,
+      "pixel_size_um": 2.9,
+      "resolution_w": 1920,
+      "resolution_h": 1080,
+      "type": "cmos_color",
+      "weight_kg": 0,
+      "source_url": "https://www.dwarflab.com/us/products/dwarf-mini-smart-telescope",
+      "built_in": true
+    }
+  ]
+}

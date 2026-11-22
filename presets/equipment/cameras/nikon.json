@@ -1,0 +1,20 @@
+{
+  "$schema": "../cameras.schema.json",
+  "presets": [
+    {
+      "id": "nikon_d5300",
+      "label": "Nikon D5300 (DSLR)",
+      "manufacturer": "Nikon",
+      "sensor_width_mm": 23.5,
+      "sensor_height_mm": 15.6,
+      "pixel_size_um": 3.91,
+      "resolution_w": 6000,
+      "resolution_h": 4000,
+      "type": "dslr_color",
+      "weight_kg": 0.53,
+      "cooling_supported": false,
+      "suggests_experience": "beginner",
+      "source_url": "https://www.nikonusa.com/p/d5300/1519/overview"
+    }
+  ]
+}

@@ -1,0 +1,108 @@
+{
+  "$schema": "../mounts.schema.json",
+  "presets": [
+    {
+      "id": "skywatcher_azeq6",
+      "label": "AZ-EQ6",
+      "manufacturer": "Sky-Watcher",
+      "mount_type": "Equatorial",
+      "payload_capacity_kg": 20.0,
+      "tracking_accuracy_arcsec": 5,
+      "guiding_supported": true,
+      "suggests_experience": "intermediate",
+      "source_url": "https://www.skywatcherusa.com/products/az-eq6-mount"
+    },
+    {
+      "id": "skywatcher_azgti",
+      "label": "AZ-GTi",
+      "manufacturer": "Sky-Watcher",
+      "mount_type": "Alt-Azimuth",
+      "payload_capacity_kg": 5.0,
+      "guiding_supported": false,
+      "suggests_experience": "beginner",
+      "source_url": "https://www.skywatcherusa.com/products/az-gti-mount"
+    },
+    {
+      "id": "skywatcher_eq6r_pro",
+      "label": "EQ6-R Pro",
+      "manufacturer": "Sky-Watcher",
+      "mount_type": "Equatorial",
+      "payload_capacity_kg": 20.0,
+      "tracking_accuracy_arcsec": 7,
+      "guiding_supported": true,
+      "meridian_flip_required": true,
+      "meridian_flip_delay_min": 15,
+      "meridian_flip_duration_min": 5,
+      "suggests_experience": "advanced",
+      "source_url": "https://skywatcher.com/product/eq6r-pro/"
+    },
+    {
+      "id": "skywatcher_eq8r",
+      "label": "EQ8-R",
+      "manufacturer": "Sky-Watcher",
+      "mount_type": "Equatorial",
+      "payload_capacity_kg": 50.0,
+      "guiding_supported": true,
+      "suggests_experience": "advanced",
+      "source_url": "https://www.skywatcherusa.com/products/eq8-r-mount-with-pier-tripod"
+    },
+    {
+      "id": "skywatcher_eqm35",
+      "label": "EQM-35 Pro",
+      "manufacturer": "Sky-Watcher",
+      "mount_type": "Equatorial",
+      "payload_capacity_kg": 10.0,
+      "guiding_supported": true,
+      "suggests_experience": "beginner",
+      "source_url": "https://www.skywatcherusa.com/products/eqm-35-mount"
+    },
+    {
+      "id": "skywatcher_heq5_pro",
+      "label": "HEQ5 Pro",
+      "manufacturer": "Sky-Watcher",
+      "mount_type": "Equatorial",
+      "payload_capacity_kg": 15.0,
+      "tracking_accuracy_arcsec": 10,
+      "guiding_supported": true,
+      "meridian_flip_required": true,
+      "meridian_flip_delay_min": 10,
+      "meridian_flip_duration_min": 5,
+      "suggests_experience": "intermediate",
+      "source_url": "http://skywatcher.com/product/heq5-synscan/"
+    },
+    {
+      "id": "skywatcher_star_adventurer_gti",
+      "label": "Star Adventurer GTi",
+      "manufacturer": "Sky-Watcher",
+      "mount_type": "Equatorial",
+      "payload_capacity_kg": 5.0,
+      "tracking_accuracy_arcsec": null,
+      "guiding_supported": true,
+      "meridian_flip_required": true,
+      "meridian_flip_delay_min": 0,
+      "meridian_flip_duration_min": 3,
+      "suggests_experience": "beginner",
+      "source_url": "https://www.skywatcher.com/product/star-adventurer-gti/"
+    },
+    {
+      "id": "skywatcher_wave100i",
+      "label": "Wave 100i",
+      "manufacturer": "Sky-Watcher",
+      "mount_type": "Equatorial",
+      "payload_capacity_kg": 10.0,
+      "guiding_supported": true,
+      "suggests_experience": "intermediate",
+      "source_url": "https://www.skywatcherusa.com/products/wave-100i-strainwave-mount"
+    },
+    {
+      "id": "skywatcher_wave150i",
+      "label": "Wave 150i",
+      "manufacturer": "Sky-Watcher",
+      "mount_type": "Equatorial",
+      "payload_capacity_kg": 15.0,
+      "guiding_supported": true,
+      "suggests_experience": "intermediate",
+      "source_url": "https://www.skywatcherusa.com/products/wave-150i-strainwave-mount"
+    }
+  ]
+}

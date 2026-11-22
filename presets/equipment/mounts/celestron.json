@@ -1,0 +1,39 @@
+{
+  "$schema": "../mounts.schema.json",
+  "presets": [
+    {
+      "id": "celestron_avx",
+      "label": "Advanced VX (AVX)",
+      "manufacturer": "Celestron",
+      "mount_type": "Equatorial",
+      "payload_capacity_kg": 13.6,
+      "tracking_accuracy_arcsec": null,
+      "guiding_supported": true,
+      "meridian_flip_required": true,
+      "meridian_flip_delay_min": 10,
+      "meridian_flip_duration_min": 5,
+      "suggests_experience": "beginner",
+      "source_url": "https://www.celestron.com/products/advanced-vx-mount-and-tripod"
+    },
+    {
+      "id": "celestron_cgx",
+      "label": "CGX",
+      "manufacturer": "Celestron",
+      "mount_type": "Equatorial",
+      "payload_capacity_kg": 25.0,
+      "guiding_supported": true,
+      "suggests_experience": "advanced",
+      "source_url": "https://www.celestron.com/products/cgx-equatorial-mount-and-tripod"
+    },
+    {
+      "id": "celestron_origin_mk2_mount",
+      "label": "Origin Mark II computerized AZ mount",
+      "manufacturer": "Celestron",
+      "mount_type": "Alt-Azimuth",
+      "payload_capacity_kg": 6.4,
+      "guiding_supported": false,
+      "weight_kg": 0,
+      "built_in": true
+    }
+  ]
+}

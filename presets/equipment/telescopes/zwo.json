@@ -1,0 +1,93 @@
+{
+  "$schema": "../telescopes.schema.json",
+  "presets": [
+    {
+      "id": "seestar_s30",
+      "label": "Seestar S30",
+      "manufacturer": "ZWO",
+      "aperture_mm": 30,
+      "focal_length_mm": 150,
+      "focal_ratio": 5.0,
+      "type": "refractor",
+      "weight_kg": 1.5,
+      "suggests_experience": "beginner",
+      "source_url": "https://www.seestar.com/blogs/faq/s30",
+      "auto_combination": true,
+      "bundle": [
+        "seestar_s30_camera",
+        "seestar_s30_mount"
+      ]
+    },
+    {
+      "id": "seestar_s30_plus",
+      "label": "Seestar S30 Plus",
+      "manufacturer": "ZWO",
+      "aperture_mm": 30,
+      "focal_length_mm": 160,
+      "focal_ratio": 5.3,
+      "type": "refractor",
+      "weight_kg": 1.65,
+      "suggests_experience": "beginner",
+      "source_url": "https://www.seestar.com/products/seestar-s30-plus-smart-telescope",
+      "auto_combination": true,
+      "bundle": [
+        "seestar_s30_plus_camera",
+        "seestar_s30_plus_mount",
+        "seestar_s30_plus_solar_filter"
+      ]
+    },
+    {
+      "id": "seestar_s30_pro",
+      "label": "Seestar S30 Pro",
+      "manufacturer": "ZWO",
+      "aperture_mm": 30,
+      "focal_length_mm": 160,
+      "focal_ratio": 5.3,
+      "type": "refractor",
+      "weight_kg": 1.6,
+      "suggests_experience": "beginner",
+      "source_url": "https://www.seestar.com/products/seestar-s30-pro",
+      "auto_combination": true,
+      "bundle": [
+        "seestar_s30_pro_camera",
+        "seestar_s30_pro_mount"
+      ]
+    },
+    {
+      "id": "seestar_s50",
+      "label": "Seestar S50",
+      "manufacturer": "ZWO",
+      "aperture_mm": 50,
+      "focal_length_mm": 250,
+      "focal_ratio": 5.0,
+      "type": "refractor",
+      "weight_kg": 2.5,
+      "suggests_experience": "beginner",
+      "source_url": "https://us.zwoastro.com/products/seestar-s50",
+      "auto_combination": true,
+      "bundle": [
+        "seestar_s50_camera",
+        "seestar_s50_mount",
+        "seestar_s50_solar_filter"
+      ]
+    },
+    {
+      "id": "seestar_s50_pro",
+      "label": "Seestar S50 Pro",
+      "manufacturer": "ZWO",
+      "aperture_mm": 50,
+      "focal_length_mm": 260,
+      "focal_ratio": 5.2,
+      "type": "refractor",
+      "weight_kg": 2.8,
+      "suggests_experience": "beginner",
+      "source_url": "https://www.seestar.com/products/seestar-s50-pro-smart-telescope",
+      "auto_combination": true,
+      "bundle": [
+        "seestar_s50_pro_camera",
+        "seestar_s50_pro_mount",
+        "seestar_s50_pro_solar_filter"
+      ]
+    }
+  ]
+}

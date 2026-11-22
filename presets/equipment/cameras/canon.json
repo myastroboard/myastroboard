@@ -1,0 +1,35 @@
+{
+  "$schema": "../cameras.schema.json",
+  "presets": [
+    {
+      "id": "canon_600d",
+      "label": "Canon EOS 600D (DSLR)",
+      "manufacturer": "Canon",
+      "sensor_width_mm": 22.3,
+      "sensor_height_mm": 14.9,
+      "pixel_size_um": 4.31,
+      "resolution_w": 5184,
+      "resolution_h": 3456,
+      "type": "dslr_color",
+      "weight_kg": 0.57,
+      "cooling_supported": false,
+      "suggests_experience": "beginner",
+      "source_url": "https://www.canon-europe.com/for_home/product_finder/cameras/digital_slr/eos_600d/specifications/"
+    },
+    {
+      "id": "canon_eos_ra",
+      "label": "Canon EOS Ra (Mirrorless)",
+      "manufacturer": "Canon",
+      "sensor_width_mm": 36.0,
+      "sensor_height_mm": 24.0,
+      "pixel_size_um": 5.36,
+      "resolution_w": 6720,
+      "resolution_h": 4480,
+      "type": "mirrorless_color",
+      "weight_kg": 0.66,
+      "cooling_supported": false,
+      "suggests_experience": "advanced",
+      "source_url": "https://www.usa.canon.com/internet/portal/us/home/products/details/cameras/eos-dslr-and-mirrorless-cameras/mirrorless/eos-ra"
+    }
+  ]
+}

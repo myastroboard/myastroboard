@@ -1,0 +1,38 @@
+{
+  "$schema": "../filters.schema.json",
+  "presets": [
+    {
+      "id": "optolong_lenhance",
+      "label": "L-eNhance",
+      "manufacturer": "Optolong",
+      "filter_type": "Narrowband",
+      "central_wavelength_nm": null,
+      "bandwidth_nm": null,
+      "intended_use": "Dual-band H-alpha 656nm (12nm) + OIII/H-beta 496-501nm (24nm) for emission nebulae with OSC cameras under moderate light pollution",
+      "suggests_experience": "beginner",
+      "source_url": "https://www.optolong.com/cms/document/detail/id/16.html"
+    },
+    {
+      "id": "optolong_lextreme",
+      "label": "L-eXtreme",
+      "manufacturer": "Optolong",
+      "filter_type": "Narrowband",
+      "central_wavelength_nm": null,
+      "bandwidth_nm": 7,
+      "intended_use": "Dual-band H-alpha 656nm + OIII 501nm (7nm each) for emission nebulae with OSC cameras under heavy light pollution",
+      "suggests_experience": "intermediate",
+      "source_url": "https://optolong.com/cms/document/detail/id/276.html"
+    },
+    {
+      "id": "optolong_lpro",
+      "label": "L-Pro",
+      "manufacturer": "Optolong",
+      "filter_type": "Light Pollution Reduction",
+      "central_wavelength_nm": null,
+      "bandwidth_nm": null,
+      "intended_use": "Broadband light-pollution suppression (380-750nm) for natural star colors with OSC/DSLR cameras; galaxies, reflection nebulae, star clusters",
+      "suggests_experience": "beginner",
+      "source_url": "https://www.optolong.com/cms/document/detail/id/13.html"
+    }
+  ]
+}

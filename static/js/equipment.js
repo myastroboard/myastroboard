@@ -1334,8 +1334,10 @@ async function showCameraModal(id = null) {
     const title = camera ? i18n.t('equipment.edit_camera') : i18n.t('equipment.new_camera');
     // The built-in cameras of smart telescopes are offered too, so a smart telescope saved
     // without its camera (before bundles existed, or with the bundle option unticked) can be completed.
+    // A camera sold on its own can also come in a bundle, or in several: keep each preset id once.
     const allPresets = camera ? {} : await _loadEquipmentPresets();
-    const presets = camera ? [] : [...(allPresets?.cameras || []), ...bundleCameraPresets(allPresets?.telescopes)];
+    const presets = camera ? [] : [...(allPresets?.cameras || []), ...bundleCameraPresets(allPresets?.telescopes)]
+        .filter((preset, index, all) => all.findIndex(other => other.id === preset.id) === index);
 
     const modalContent = `
         <form id="cameraForm" class="form row g-3">

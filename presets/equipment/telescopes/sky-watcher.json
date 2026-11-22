@@ -1,0 +1,101 @@
+{
+  "$schema": "../telescopes.schema.json",
+  "presets": [
+    {
+      "id": "skywatcher_130pds",
+      "label": "Explorer 130PDS",
+      "manufacturer": "Sky-Watcher",
+      "aperture_mm": 130,
+      "focal_length_mm": 650,
+      "focal_ratio": 5.0,
+      "type": "newtonian",
+      "weight_kg": 5.6,
+      "suggests_experience": "beginner",
+      "source_url": "https://www.firstlightoptics.com/telescopes-in-stock/skywatcher-explorer-130p-ds-ota.html"
+    },
+    {
+      "id": "skywatcher_200p",
+      "label": "Explorer 200P",
+      "manufacturer": "Sky-Watcher",
+      "aperture_mm": 200,
+      "focal_length_mm": 1000,
+      "focal_ratio": 5.0,
+      "type": "newtonian",
+      "weight_kg": 8.9,
+      "suggests_experience": "intermediate",
+      "source_url": "https://altairastro.com/sky-watcher-explorer-200p-ota-511-p.asp"
+    },
+    {
+      "id": "skywatcher_ed80",
+      "label": "Evostar 80ED",
+      "manufacturer": "Sky-Watcher",
+      "aperture_mm": 80,
+      "focal_length_mm": 600,
+      "focal_ratio": 7.5,
+      "type": "apo",
+      "weight_kg": 3.8,
+      "suggests_experience": "beginner",
+      "source_url": "https://www.skywatcherusa.com/products/evostar-80ed"
+    },
+    {
+      "id": "skywatcher_esprit100ed",
+      "label": "Esprit 100ED",
+      "manufacturer": "Sky-Watcher",
+      "aperture_mm": 100,
+      "focal_length_mm": 550,
+      "focal_ratio": 5.5,
+      "type": "apo",
+      "weight_kg": 6.5,
+      "suggests_experience": "advanced",
+      "source_url": "https://skywatcher.com/product/esprit-100-ed-apo-triplet/"
+    },
+    {
+      "id": "skywatcher_evostar72ed",
+      "label": "Evostar 72ED",
+      "manufacturer": "Sky-Watcher",
+      "aperture_mm": 72,
+      "focal_length_mm": 420,
+      "focal_ratio": 5.8,
+      "type": "apo",
+      "weight_kg": 2.7,
+      "suggests_experience": "beginner",
+      "source_url": "http://skywatcher.com/product/evostar-72ed/"
+    },
+    {
+      "id": "skywatcher_heritage150",
+      "label": "Heritage 150 Tabletop Dobsonian",
+      "manufacturer": "Sky-Watcher",
+      "aperture_mm": 150,
+      "focal_length_mm": 750,
+      "focal_ratio": 5.0,
+      "type": "dobsonian",
+      "weight_kg": 3.63,
+      "suggests_experience": "beginner",
+      "source_url": "https://www.skywatcherusa.com/products/heritage-150-tabletop-dobsonian"
+    },
+    {
+      "id": "skywatcher_quattro150p",
+      "label": "Quattro 150P",
+      "manufacturer": "Sky-Watcher",
+      "aperture_mm": 150,
+      "focal_length_mm": 600,
+      "focal_ratio": 4.0,
+      "type": "newtonian",
+      "weight_kg": 5.72,
+      "suggests_experience": "intermediate",
+      "source_url": "https://www.skywatcherusa.com/products/quattro-150p-imaging-newtonian-6"
+    },
+    {
+      "id": "skywatcher_quattro8",
+      "label": "Quattro 200P",
+      "manufacturer": "Sky-Watcher",
+      "aperture_mm": 203,
+      "focal_length_mm": 800,
+      "focal_ratio": 4.0,
+      "type": "newtonian",
+      "weight_kg": 8.3,
+      "suggests_experience": "advanced",
+      "source_url": "https://www.skywatcherusa.com/products/sky-watcher-quattro-200p-imaging-newtonian-8-205-mm"
+    }
+  ]
+}
