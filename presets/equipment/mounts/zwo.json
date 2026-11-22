@@ -1,0 +1,73 @@
+{
+  "$schema": "../mounts.schema.json",
+  "presets": [
+    {
+      "id": "seestar_s30_mount",
+      "label": "Seestar S30 built-in AZ mount/tripod",
+      "manufacturer": "ZWO",
+      "mount_type": "Alt-Azimuth",
+      "payload_capacity_kg": 3,
+      "guiding_supported": false,
+      "weight_kg": 0,
+      "built_in": true
+    },
+    {
+      "id": "seestar_s30_plus_mount",
+      "label": "Seestar S30 Plus built-in AZ mount/tripod",
+      "manufacturer": "ZWO",
+      "mount_type": "Alt-Azimuth",
+      "payload_capacity_kg": 2.2,
+      "guiding_supported": false,
+      "weight_kg": 0,
+      "built_in": true
+    },
+    {
+      "id": "seestar_s30_pro_mount",
+      "label": "Seestar S30 Pro built-in AZ mount/tripod",
+      "manufacturer": "ZWO",
+      "mount_type": "Alt-Azimuth",
+      "payload_capacity_kg": 3.2,
+      "guiding_supported": false,
+      "weight_kg": 0,
+      "built_in": true
+    },
+    {
+      "id": "seestar_s50_mount",
+      "label": "Seestar S50 built-in AZ mount/tripod",
+      "manufacturer": "ZWO",
+      "mount_type": "Alt-Azimuth",
+      "payload_capacity_kg": 5,
+      "guiding_supported": false,
+      "weight_kg": 0,
+      "built_in": true
+    },
+    {
+      "id": "seestar_s50_pro_mount",
+      "label": "Seestar S50 Pro built-in AZ mount/tripod",
+      "manufacturer": "ZWO",
+      "mount_type": "Alt-Azimuth",
+      "payload_capacity_kg": 3.8,
+      "guiding_supported": false,
+      "weight_kg": 0,
+      "built_in": true
+    },
+    {
+      "id": "zwo_am3n",
+      "label": "AM3N Harmonic Equatorial Mount",
+      "manufacturer": "ZWO",
+      "mount_type": "Equatorial",
+      "payload_capacity_kg": 8.0,
+      "suggests_experience": "beginner",
+      "source_url": "https://www.zwoastro.com/product/am3n-harmonic-equatorial-mount/"
+    },
+    {
+      "id": "zwo_am5n",
+      "label": "AM5N Harmonic Equatorial Mount",
+      "manufacturer": "ZWO",
+      "mount_type": "Equatorial",
+      "payload_capacity_kg": 15.0,
+      "suggests_experience": "intermediate",
+      "source_url": "https://www.zwoastro.com/product/zwo-am5n/"
+    }
+  ]
+}

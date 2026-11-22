@@ -1,0 +1,32 @@
+{
+  "$schema": "../filters.schema.json",
+  "presets": [
+    {
+      "id": "dwarflab_draco_solar_filter",
+      "label": "Draco ND Solar Filter",
+      "manufacturer": "DWARFLAB",
+      "filter_type": "Solar",
+      "intended_use": "ND OD 5 solar filter: built in (Standard Edition) or external magnetic, included (SHO Edition)",
+      "weight_kg": 0,
+      "built_in": true
+    },
+    {
+      "id": "dwarflab_dwarf3_solar_filter",
+      "label": "DWARF 3 Magnetic ND Solar Filter",
+      "manufacturer": "DWARFLAB",
+      "filter_type": "Solar",
+      "intended_use": "Magnetic ND solar filter included in the DWARF 3 box for solar imaging",
+      "weight_kg": 0,
+      "built_in": true
+    },
+    {
+      "id": "dwarflab_dwarf_mini_solar_filter",
+      "label": "DWARF mini ND Filter",
+      "manufacturer": "DWARFLAB",
+      "filter_type": "Solar",
+      "intended_use": "ND solar filter included in the DWARF mini box for solar imaging",
+      "weight_kg": 0,
+      "built_in": true
+    }
+  ]
+}

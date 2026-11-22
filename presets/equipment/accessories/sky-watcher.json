@@ -1,0 +1,14 @@
+{
+  "$schema": "../accessories.schema.json",
+  "presets": [
+    {
+      "id": "skywatcher_evoguide50ed",
+      "label": "Evoguide 50ED",
+      "manufacturer": "Sky-Watcher",
+      "accessory_type": "Guide Scope",
+      "weight_kg": 0.865,
+      "suggests_experience": "intermediate",
+      "source_url": "https://www.skywatcherusa.com/products/evoguide-50-apo-refractor"
+    }
+  ]
+}

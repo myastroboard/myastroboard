@@ -1,0 +1,35 @@
+{
+  "$schema": "../mounts.schema.json",
+  "presets": [
+    {
+      "id": "dwarflab_draco_mount",
+      "label": "Draco built-in AZ/EQ mount",
+      "manufacturer": "DWARFLAB",
+      "mount_type": "Alt-Azimuth",
+      "payload_capacity_kg": 7.4,
+      "guiding_supported": false,
+      "weight_kg": 0,
+      "built_in": true
+    },
+    {
+      "id": "dwarflab_dwarf3_mount",
+      "label": "Dwarf 3 built-in AZ/EQ mount",
+      "manufacturer": "DWARFLAB",
+      "mount_type": "Alt-Azimuth",
+      "payload_capacity_kg": 3,
+      "guiding_supported": false,
+      "weight_kg": 0,
+      "built_in": true
+    },
+    {
+      "id": "dwarflab_dwarf_mini_mount",
+      "label": "Dwarf Mini built-in AZ/EQ mount",
+      "manufacturer": "DWARFLAB",
+      "mount_type": "Alt-Azimuth",
+      "payload_capacity_kg": 2,
+      "guiding_supported": false,
+      "weight_kg": 0,
+      "built_in": true
+    }
+  ]
+}

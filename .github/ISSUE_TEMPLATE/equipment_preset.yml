@@ -1,0 +1,86 @@
+name: Equipment preset
+description: Ask for a telescope, camera, mount, filter or accessory preset to be added, or a wrong value fixed
+title: "[Preset]: "
+labels: ["component: equipment-presets"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Presets are the ready-made items offered in the Equipment tab. Every value of a preset comes
+        from the **maker's official spec page**: a request without that page cannot be added.
+        Shops, forums and reviews are not accepted as a source.
+
+        For a bug in the Equipment tab itself (combinations, field of view, framing), open a Bug report instead.
+
+  - type: dropdown
+    id: request
+    attributes:
+      label: Request
+      options:
+        - Add a new preset
+        - Fix a value of an existing preset
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Type
+      options:
+        - Telescope
+        - Smart telescope (built-in camera and mount)
+        - Camera (astro camera)
+        - Camera (DSLR or mirrorless body)
+        - Mount
+        - Filter
+        - Accessory
+    validations:
+      required: true
+
+  - type: input
+    id: model
+    attributes:
+      label: Manufacturer and model
+      placeholder: Sky-Watcher Esprit 80ED
+    validations:
+      required: true
+
+  - type: input
+    id: source
+    attributes:
+      label: Official spec page
+      description: The maker's own page that lists the values below (not a shop).
+      placeholder: https://...
+    validations:
+      required: true
+
+  - type: textarea
+    id: values
+    attributes:
+      label: Values
+      description: |
+        Copy them from the spec page, with their units, or paste the spec table or a screenshot.
+        Leave out what the page does not give: a missing value is better than a guessed one.
+        - Telescope: aperture (mm), focal length (mm), weight (kg)
+        - Smart telescope: the above, plus the camera sensor (mm), image size (px), pixel size (um), field of view
+        - Camera: sensor size (mm), image size (px, largest RAW), pixel size (um), weight, cooling
+        - Mount: type (equatorial / alt-az), payload (kg), weight, autoguiding
+        - Filter: type, central wavelength and bandwidth (nm)
+        - Accessory: type, weight (kg)
+        For a fix: the preset, the wrong value and the right one.
+      placeholder: |
+        Aperture: 80 mm
+        Focal length: 400 mm
+        Weight: 3.6 kg
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      description: >-
+        A preset is one small JSON file under presets/equipment/, checked automatically in CI.
+        See docs/EQUIPMENT.md, "Adding or editing a preset".
+      options:
+        - label: I'd be willing to open the pull request myself

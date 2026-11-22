@@ -1,0 +1,53 @@
+{
+  "$schema": "../cameras.schema.json",
+  "presets": [
+    {
+      "id": "playerone_ares_c_pro",
+      "label": "Ares-C Pro",
+      "manufacturer": "Player One",
+      "sensor_width_mm": 11.31,
+      "sensor_height_mm": 11.31,
+      "pixel_size_um": 3.76,
+      "resolution_w": 3008,
+      "resolution_h": 3008,
+      "type": "cmos_color",
+      "weight_kg": 0.42,
+      "cooling_supported": true,
+      "min_temperature_c": -40,
+      "suggests_experience": "beginner",
+      "source_url": "https://player-one-astronomy.com/product/ares-c-pro-usb3-0-color-camera-imx533/"
+    },
+    {
+      "id": "playerone_poseidon_c_pro",
+      "label": "Poseidon-C Pro",
+      "manufacturer": "Player One",
+      "sensor_width_mm": 23.51,
+      "sensor_height_mm": 15.7,
+      "pixel_size_um": 3.76,
+      "resolution_w": 6252,
+      "resolution_h": 4176,
+      "type": "cmos_color",
+      "weight_kg": 0.65,
+      "cooling_supported": true,
+      "min_temperature_c": -40,
+      "suggests_experience": "intermediate",
+      "source_url": "https://player-one-astronomy.com/product/poseidon-c-pro-imx571-usb3-0-color-cooled-camera/"
+    },
+    {
+      "id": "playerone_uranus_c_pro",
+      "label": "Uranus-C Pro",
+      "manufacturer": "Player One",
+      "sensor_width_mm": 11.18,
+      "sensor_height_mm": 6.32,
+      "pixel_size_um": 2.9,
+      "resolution_w": 3856,
+      "resolution_h": 2180,
+      "type": "cmos_color",
+      "weight_kg": 0.42,
+      "cooling_supported": true,
+      "min_temperature_c": -40,
+      "suggests_experience": "beginner",
+      "source_url": "https://player-one-astronomy.com/product/uranus-c-pro-usb3-0-color-camera-imx585/"
+    }
+  ]
+}

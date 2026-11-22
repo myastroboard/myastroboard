@@ -1,0 +1,65 @@
+{
+  "$schema": "../cameras.schema.json",
+  "presets": [
+    {
+      "id": "nikon_d5300",
+      "label": "Nikon D5300 (DSLR)",
+      "manufacturer": "Nikon",
+      "sensor_width_mm": 23.5,
+      "sensor_height_mm": 15.6,
+      "pixel_size_um": 3.91,
+      "resolution_w": 6000,
+      "resolution_h": 4000,
+      "type": "dslr_color",
+      "weight_kg": 0.53,
+      "cooling_supported": false,
+      "suggests_experience": "beginner",
+      "source_url": "https://www.nikonusa.com/p/d5300/1519/overview"
+    },
+    {
+      "id": "nikon_d7500",
+      "label": "Nikon D7500 (DSLR)",
+      "manufacturer": "Nikon",
+      "sensor_width_mm": 23.5,
+      "sensor_height_mm": 15.6,
+      "pixel_size_um": 4.22,
+      "resolution_w": 5568,
+      "resolution_h": 3712,
+      "type": "dslr_color",
+      "weight_kg": 0.64,
+      "cooling_supported": false,
+      "suggests_experience": "beginner",
+      "source_url": "https://www.nikonusa.com/p/d7500/1581/overview"
+    },
+    {
+      "id": "nikon_z5",
+      "label": "Nikon Z 5 (Mirrorless)",
+      "manufacturer": "Nikon",
+      "sensor_width_mm": 35.9,
+      "sensor_height_mm": 23.9,
+      "pixel_size_um": 5.97,
+      "resolution_w": 6016,
+      "resolution_h": 4016,
+      "type": "mirrorless_color",
+      "weight_kg": 0.59,
+      "cooling_supported": false,
+      "suggests_experience": "beginner",
+      "source_url": "https://www.nikonusa.com/p/z-5/1649/overview"
+    },
+    {
+      "id": "nikon_z6ii",
+      "label": "Nikon Z 6II (Mirrorless)",
+      "manufacturer": "Nikon",
+      "sensor_width_mm": 35.9,
+      "sensor_height_mm": 23.9,
+      "pixel_size_um": 5.94,
+      "resolution_w": 6048,
+      "resolution_h": 4024,
+      "type": "mirrorless_color",
+      "weight_kg": 0.615,
+      "cooling_supported": false,
+      "suggests_experience": "intermediate",
+      "source_url": "https://www.nikonusa.com/p/z-6ii/1663/overview"
+    }
+  ]
+}

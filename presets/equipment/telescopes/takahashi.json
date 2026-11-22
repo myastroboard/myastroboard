@@ -1,0 +1,17 @@
+{
+  "$schema": "../telescopes.schema.json",
+  "presets": [
+    {
+      "id": "takahashi_fs60cb",
+      "label": "FS-60CB",
+      "manufacturer": "Takahashi",
+      "aperture_mm": 60,
+      "focal_length_mm": 355,
+      "focal_ratio": 5.9,
+      "type": "apo",
+      "weight_kg": 2.2,
+      "suggests_experience": "advanced",
+      "source_url": "https://takahashiamerica.com/products/takahashi-fs-60cb-refractor-telescope"
+    }
+  ]
+}

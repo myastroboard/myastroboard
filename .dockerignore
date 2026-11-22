@@ -27,5 +27,6 @@ data
 # Not part of the image
 tests
 docs
+presets
 *.md
 docker-compose*.yml

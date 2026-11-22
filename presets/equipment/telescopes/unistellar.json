@@ -1,0 +1,73 @@
+{
+  "$schema": "../telescopes.schema.json",
+  "presets": [
+    {
+      "id": "unistellar_equinox2",
+      "label": "eQuinox 2",
+      "manufacturer": "Unistellar",
+      "aperture_mm": 114,
+      "focal_length_mm": 450,
+      "focal_ratio": 4.0,
+      "type": "reflector",
+      "weight_kg": 7.0,
+      "suggests_experience": "beginner",
+      "source_url": "https://shop.eu.unistellar.com/products/equinox-2",
+      "auto_combination": true,
+      "bundle": [
+        "unistellar_equinox2_camera",
+        "unistellar_equinox2_mount"
+      ]
+    },
+    {
+      "id": "unistellar_evscope2",
+      "label": "eVscope 2",
+      "manufacturer": "Unistellar",
+      "aperture_mm": 114,
+      "focal_length_mm": 450,
+      "focal_ratio": 4.0,
+      "type": "reflector",
+      "weight_kg": 7.0,
+      "suggests_experience": "beginner",
+      "source_url": "https://shop.eu.unistellar.com/products/evscope-2",
+      "auto_combination": true,
+      "bundle": [
+        "unistellar_evscope2_camera",
+        "unistellar_evscope2_mount"
+      ]
+    },
+    {
+      "id": "unistellar_odyssey",
+      "label": "Odyssey",
+      "manufacturer": "Unistellar",
+      "aperture_mm": 85,
+      "focal_length_mm": 320,
+      "focal_ratio": 3.9,
+      "type": "reflector",
+      "weight_kg": 4.0,
+      "suggests_experience": "beginner",
+      "source_url": "https://shop.eu.unistellar.com/products/odyssey",
+      "auto_combination": true,
+      "bundle": [
+        "unistellar_odyssey_camera",
+        "unistellar_odyssey_mount"
+      ]
+    },
+    {
+      "id": "unistellar_odyssey_pro",
+      "label": "Odyssey Pro",
+      "manufacturer": "Unistellar",
+      "aperture_mm": 85,
+      "focal_length_mm": 320,
+      "focal_ratio": 3.9,
+      "type": "reflector",
+      "weight_kg": 4.0,
+      "suggests_experience": "beginner",
+      "source_url": "https://shop.eu.unistellar.com/products/odyssey-pro",
+      "auto_combination": true,
+      "bundle": [
+        "unistellar_odyssey_pro_camera",
+        "unistellar_odyssey_pro_mount"
+      ]
+    }
+  ]
+}

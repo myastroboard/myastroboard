@@ -12,7 +12,8 @@
 #   dependencies  lavender                dependencies + one per ecosystem (Dependabot)
 #
 # The component list mirrors the "Component" dropdown of both issue templates,
-# mapped in .github/workflows/issue-automation.yml.
+# mapped in .github/workflows/issue-automation.yml; "component: equipment-presets"
+# is set by the Equipment preset template itself.
 
 # Type
 - name: bug
@@ -85,6 +86,9 @@
 - name: "component: equipment"
   color: c5def5
   description: Equipment, combinations and field of view
+- name: "component: equipment-presets"
+  color: c5def5
+  description: Equipment preset data - adding a preset or fixing one of its values
 - name: "component: weather"
   color: c5def5
   description: Weather forecast and observation conditions

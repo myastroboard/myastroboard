@@ -1,0 +1,59 @@
+{
+  "$schema": "../accessories.schema.json",
+  "presets": [
+    {
+      "id": "zwo_eaf",
+      "label": "EAF (Electronic Auto Focuser)",
+      "manufacturer": "ZWO",
+      "accessory_type": "Electronic Focuser",
+      "weight_kg": 0.277,
+      "suggests_experience": "intermediate",
+      "source_url": "https://www.zwoastro.com/product/eaf/"
+    },
+    {
+      "id": "zwo_efw_7x36",
+      "label": "EFW 7x36mm Filter Wheel",
+      "manufacturer": "ZWO",
+      "accessory_type": "Filter Wheel",
+      "weight_kg": 0.4,
+      "suggests_experience": "intermediate",
+      "source_url": "https://www.zwoastro.com/product/efw-filter-wheels/"
+    },
+    {
+      "id": "zwo_mini_guide_scope",
+      "label": "30mm Mini Guide Scope",
+      "manufacturer": "ZWO",
+      "accessory_type": "Guide Scope",
+      "weight_kg": 0.25,
+      "suggests_experience": "beginner",
+      "source_url": "https://www.zwoastro.com/product/zwo-30f4-mini-guide-scope/"
+    },
+    {
+      "id": "zwo_oag_l",
+      "label": "OAG-L Off-Axis Guider",
+      "manufacturer": "ZWO",
+      "accessory_type": "Off-Axis Guider",
+      "weight_kg": 0.7,
+      "suggests_experience": "advanced",
+      "source_url": "https://us.zwoastro.com/products/zwo-off-axis-guider"
+    },
+    {
+      "id": "zwo_seestar_tc20_tripod",
+      "label": "Seestar TC20 Carbon Fiber Tripod",
+      "manufacturer": "ZWO",
+      "accessory_type": "Tripod",
+      "weight_kg": 0.6,
+      "suggests_experience": "beginner",
+      "source_url": "https://www.seestar.com/products/tc20-carbon-fiber-tripod-for-seestar"
+    },
+    {
+      "id": "zwo_seestar_th10_head",
+      "label": "Seestar TH10 Fluid Tripod Head",
+      "manufacturer": "ZWO",
+      "accessory_type": "Tripod Head",
+      "weight_kg": 0.411,
+      "suggests_experience": "beginner",
+      "source_url": "https://www.seestar.com/products/seestar-th10-fluid-tripod-head"
+    }
+  ]
+}

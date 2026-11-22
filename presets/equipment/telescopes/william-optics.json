@@ -1,0 +1,101 @@
+{
+  "$schema": "../telescopes.schema.json",
+  "presets": [
+    {
+      "id": "william_optics_z61",
+      "label": "Zenithstar 61 II",
+      "manufacturer": "William Optics",
+      "aperture_mm": 61,
+      "focal_length_mm": 360,
+      "focal_ratio": 5.9,
+      "type": "apo",
+      "weight_kg": 2.3,
+      "suggests_experience": "intermediate",
+      "source_url": "https://williamoptics.com/products/zenithstar-61ii"
+    },
+    {
+      "id": "williamoptics_cat61",
+      "label": "Cat 61 WIFD (RedCat 61)",
+      "manufacturer": "William Optics",
+      "aperture_mm": 61,
+      "focal_length_mm": 300,
+      "focal_ratio": 4.9,
+      "type": "apo",
+      "weight_kg": 2.47,
+      "suggests_experience": "beginner",
+      "source_url": "https://williamoptics.com/products/cat-61"
+    },
+    {
+      "id": "williamoptics_flt91",
+      "label": "Fluorostar 91",
+      "manufacturer": "William Optics",
+      "aperture_mm": 91,
+      "focal_length_mm": 540,
+      "focal_ratio": 5.9,
+      "type": "apo",
+      "weight_kg": 4.16,
+      "suggests_experience": "advanced",
+      "source_url": "https://williamoptics.com/products/fluorostar-91"
+    },
+    {
+      "id": "williamoptics_gt71",
+      "label": "GT71 (Gran Turismo 71)",
+      "manufacturer": "William Optics",
+      "aperture_mm": 71,
+      "focal_length_mm": 419,
+      "focal_ratio": 5.9,
+      "type": "apo",
+      "weight_kg": 3.6,
+      "suggests_experience": "intermediate",
+      "source_url": "https://williamoptics.com/products/gran-turismo-71-apo"
+    },
+    {
+      "id": "williamoptics_gt81_iv",
+      "label": "Gran Turismo 81 IV",
+      "manufacturer": "William Optics",
+      "aperture_mm": 81,
+      "focal_length_mm": 478,
+      "focal_ratio": 5.9,
+      "type": "apo",
+      "weight_kg": 3.9,
+      "suggests_experience": "intermediate",
+      "source_url": "https://williamoptics.com/products/gran-turismo-81-iv"
+    },
+    {
+      "id": "williamoptics_pleiades68",
+      "label": "Pleiades 68",
+      "manufacturer": "William Optics",
+      "aperture_mm": 68,
+      "focal_length_mm": 260,
+      "focal_ratio": 3.8,
+      "type": "apo",
+      "weight_kg": 2.98,
+      "suggests_experience": "intermediate",
+      "source_url": "https://williamoptics.com/products/pleiades-68"
+    },
+    {
+      "id": "williamoptics_redcat51",
+      "label": "RedCat 51 III",
+      "manufacturer": "William Optics",
+      "aperture_mm": 51,
+      "focal_length_mm": 250,
+      "focal_ratio": 4.9,
+      "type": "apo",
+      "weight_kg": 2.55,
+      "suggests_experience": "intermediate",
+      "source_url": "https://williamoptics.com/products/cat-51"
+    },
+    {
+      "id": "williamoptics_zs81",
+      "label": "Zenithstar 81 WIFD",
+      "manufacturer": "William Optics",
+      "aperture_mm": 81,
+      "focal_length_mm": 559,
+      "focal_ratio": 6.9,
+      "type": "apo",
+      "weight_kg": 3.55,
+      "suggests_experience": "beginner",
+      "source_url": "https://williamoptics.com/products/zenithstar-81"
+    }
+  ]
+}

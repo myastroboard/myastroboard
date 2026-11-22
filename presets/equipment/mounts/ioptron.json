@@ -1,0 +1,33 @@
+{
+  "$schema": "../mounts.schema.json",
+  "presets": [
+    {
+      "id": "ioptron_cem70",
+      "label": "CEM70",
+      "manufacturer": "iOptron",
+      "mount_type": "Equatorial",
+      "payload_capacity_kg": 31.8,
+      "tracking_accuracy_arcsec": 3.5,
+      "guiding_supported": true,
+      "meridian_flip_required": true,
+      "meridian_flip_delay_min": 15,
+      "meridian_flip_duration_min": 4,
+      "suggests_experience": "advanced",
+      "source_url": "https://www.ioptron.com/product-p/c70aw.htm"
+    },
+    {
+      "id": "ioptron_gem45",
+      "label": "GEM45",
+      "manufacturer": "iOptron",
+      "mount_type": "Equatorial",
+      "payload_capacity_kg": 20.4,
+      "tracking_accuracy_arcsec": 7,
+      "guiding_supported": true,
+      "meridian_flip_required": true,
+      "meridian_flip_delay_min": 15,
+      "meridian_flip_duration_min": 4,
+      "suggests_experience": "intermediate",
+      "source_url": "https://www.ioptron.com/product-p/7603a.htm"
+    }
+  ]
+}

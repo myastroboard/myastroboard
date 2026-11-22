@@ -1,0 +1,90 @@
+{
+  "$schema": "../telescopes.schema.json",
+  "presets": [
+    {
+      "id": "vaonis_atlas",
+      "label": "Atlas (80 mm module)",
+      "manufacturer": "Vaonis",
+      "aperture_mm": 80,
+      "focal_length_mm": 360,
+      "focal_ratio": 4.5,
+      "type": "refractor",
+      "weight_kg": 6.5,
+      "suggests_experience": "intermediate",
+      "source_url": "https://vaonis.com/pages/product/atlas",
+      "auto_combination": true,
+      "bundle": [
+        "vaonis_atlas_camera",
+        "vaonis_atlas_mount"
+      ]
+    },
+    {
+      "id": "vaonis_atlas_twin",
+      "label": "Atlas Twin (2 x 80 mm modules)",
+      "manufacturer": "Vaonis",
+      "aperture_mm": 80,
+      "focal_length_mm": 360,
+      "focal_ratio": 4.5,
+      "type": "refractor",
+      "weight_kg": 9.5,
+      "suggests_experience": "intermediate",
+      "source_url": "https://vaonis.com/pages/product/atlas",
+      "auto_combination": true,
+      "bundle": [
+        "vaonis_atlas_twin_camera",
+        "vaonis_atlas_twin_mount"
+      ]
+    },
+    {
+      "id": "vaonis_vespera2",
+      "label": "Vespera II",
+      "manufacturer": "Vaonis",
+      "aperture_mm": 50,
+      "focal_length_mm": 250,
+      "focal_ratio": 5.0,
+      "type": "refractor",
+      "weight_kg": 5.0,
+      "suggests_experience": "beginner",
+      "source_url": "https://vaonis.com/products/vespera-2",
+      "auto_combination": true,
+      "bundle": [
+        "vaonis_vespera2_camera",
+        "vaonis_vespera2_mount"
+      ]
+    },
+    {
+      "id": "vaonis_vespera3",
+      "label": "Vespera 3",
+      "manufacturer": "Vaonis",
+      "aperture_mm": 50,
+      "focal_length_mm": 245,
+      "focal_ratio": 4.9,
+      "type": "refractor",
+      "weight_kg": 5.0,
+      "suggests_experience": "beginner",
+      "source_url": "https://vaonis.com/pages/vespera-new-generation",
+      "auto_combination": true,
+      "bundle": [
+        "vaonis_vespera3_camera",
+        "vaonis_vespera3_mount"
+      ]
+    },
+    {
+      "id": "vaonis_vespera_pro2",
+      "label": "Vespera Pro 2",
+      "manufacturer": "Vaonis",
+      "aperture_mm": 50,
+      "focal_length_mm": 245,
+      "focal_ratio": 4.9,
+      "type": "refractor",
+      "weight_kg": 5.0,
+      "suggests_experience": "beginner",
+      "source_url": "https://vaonis.com/pages/vespera-new-generation",
+      "auto_combination": true,
+      "bundle": [
+        "vaonis_vespera_pro2_camera",
+        "vaonis_vespera_pro2_mount"
+      ]
+    }
+  ]
+}

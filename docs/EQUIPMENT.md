@@ -162,7 +162,9 @@ Disabled or invalid combinations (see [Disabling equipment](#disabling-equipment
 
 ## Presets
 
-**File**: `static/data/equipment_presets.json` (static asset, no backend involvement - fetched directly by the frontend)
+**Sources**: `presets/equipment/<type>/<manufacturer>.json`, one small file per gear type and manufacturer.
+**Generated file**: `static/data/equipment_presets.json` (static asset, no backend involvement - fetched
+directly by the frontend), built from the sources by `scripts/build_equipment_presets.py`. Never edit it by hand.
 
 A curated list of real-world gear (telescopes, cameras, mounts, filters, accessories) that lets users
 skip manual data entry for common models. Each entry has an `id`, a `label`, a `manufacturer`, a
@@ -179,37 +181,69 @@ Consumed in two places:
   a "Start from a preset" dropdown prefills the form, which remains fully editable afterward. Only shown when
   adding a new item, not when editing an existing one.
 
-To add a preset, append an entry to the relevant array in the JSON file - no code change or restart needed
-(it's fetched fresh by the browser). A wrong key or enum value raises no error in the browser: the field is
-left empty or replaced by a default. `tests/equipment/test_equipment_presets.py` checks every entry against
-the rules below; run it after any edit.
+### Adding or editing a preset
+
+No code change or restart is needed: the browser fetches the generated file fresh. To ask for a preset
+without editing it yourself, open an
+[Equipment preset issue](https://github.com/myastroboard/myastroboard/issues/new?template=equipment_preset.yml)
+with the maker's spec page; it is labelled `component: equipment-presets`.
+
+1. Open the file of the gear type and manufacturer, for example `presets/equipment/telescopes/zwo.json`,
+   or create it. The file name is the manufacturer in lowercase, every run of other characters replaced
+   by a hyphen (`Sky-Watcher` -> `sky-watcher.json`, `William Optics` -> `william-optics.json`), and the
+   file holds that manufacturer only:
+
+   ```json
+   {
+     "$schema": "../telescopes.schema.json",
+     "presets": [
+       { "id": "zwo_seestar_s50", "label": "Seestar S50", "manufacturer": "ZWO", "...": "..." }
+     ]
+   }
+   ```
+
+   The `$schema` line gives completion and inline errors in VS Code and most editors. The schemas
+   (`presets/equipment/<type>.schema.json`) are generated from the same rules the script checks.
+2. Fill the entry with the keys of the [preset field reference](#preset-field-reference) below.
+3. Run `python scripts/build_equipment_presets.py`. It formats the sources (2-space indent, presets
+   sorted by `id`), rebuilds the generated file and the schemas, then lists every problem it finds, with
+   the file and the preset id. Commit the sources and the generated files together.
+
+A wrong key or enum value raises no error in the browser: the field is left empty or replaced by a default.
+That is why the script checks every rule below; the *Validate equipment presets* CI job runs
+`python scripts/build_equipment_presets.py --check` (no write) when a preset file or a source it reads
+changes, and fails a pull request whose sources and generated files disagree.
 
 ### Bundles (smart telescopes)
 
-A **telescope** preset can declare a `bundle`: an array of sibling equipment items that ship built into the
-same physical unit - most commonly an all-in-one "smart telescope" (Seestar, Dwarf, Vespera, ...) whose fixed
-built-in camera sensor has no other way to be represented, since a plain telescope preset only carries
-optical specs (aperture/focal length), not sensor data.
+A **telescope** preset can declare a `bundle`: the ids of the equipment that ships in the box with it -
+most commonly an all-in-one "smart telescope" (Seestar, Dwarf, Vespera, ...) whose fixed built-in camera
+sensor has no other way to be represented, since a plain telescope preset only carries optical specs
+(aperture/focal length), not sensor data. Each item is a normal preset in the file of its own type:
 
 ```json
-{
-  "id": "seestar_s50",
-  "...": "... normal telescope fields ...",
-  "auto_combination": true,
-  "bundle": [
-    { "kind": "camera", "label": "Seestar S50 built-in camera (Sony IMX462)", "sensor_width_mm": 3.15, "...": "..." },
-    { "kind": "mount", "label": "Seestar S50 built-in AZ mount/tripod", "mount_type": "Alt-Azimuth", "...": "..." },
-    { "kind": "filter", "label": "Seestar S50 Solar Filter", "filter_type": "Solar", "...": "..." }
-  ]
-}
+// presets/equipment/telescopes/zwo.json
+{ "id": "seestar_s50", "...": "... normal telescope fields ...", "auto_combination": true,
+  "bundle": ["seestar_s50_camera", "seestar_s50_mount", "seestar_s50_solar_filter"] }
+
+// presets/equipment/cameras/zwo.json
+{ "id": "seestar_s50_camera", "label": "Seestar S50 built-in camera (Sony IMX462)", "built_in": true,
+  "weight_kg": 0, "sensor_width_mm": 3.15, "...": "..." }
 ```
 
-- `kind` is one of `camera` / `mount` / `filter` / `accessory`; the rest of each bundle entry's fields match
-  that kind's normal preset shape one-to-one (same as a standalone entry in the `cameras`/`mounts`/
-  `filters`/`accessories` arrays above).
-- Set **`weight_kg: 0`** on every bundle entry - the parent telescope's own `weight_kg` already represents
-  the whole fused unit's mass; giving bundle items their own non-zero weight would multiply-count it in a
-  combination card's total payload calculation.
+- A bundle references one **camera**, at most one **mount**, and any number of filters and accessories,
+  each listed once. It describes what ships in the box: an accessory sold separately (the Seestar TC20
+  tripod, the TH10 tripod head) is a standalone accessory preset, not part of a bundle.
+- **`"built_in": true`** marks an item that is part of the unit and not sold on its own (a smart telescope's
+  camera, mount, bundled solar filter). It is left out of the standalone preset lists and reaches the app only
+  through the bundles that reference it; it must be referenced by at least one bundle, needs no
+  `source_url` / `suggests_experience`, and has **`weight_kg: 0`** - the telescope's own `weight_kg` is the
+  whole unit's mass, so a non-zero weight would count it twice in a combination card's payload. A bundled
+  item without `built_in` (a camera also sold separately) keeps its own list entry and its real weight.
+- The generated file replaces every reference by the item itself, with a `kind` field
+  (`camera` / `mount` / `filter` / `accessory`): the frontend reads the bundle as a list of objects.
+- The bundle mount must carry what the combination card adds up - the telescope, the bundled camera and
+  the bundled accessories - within its recommended load (75 % of `payload_capacity_kg`).
 - `auto_combination: true` on the parent makes picking that preset create every bundle item alongside
   the telescope and link them all into one combination (`static/js/equipment_bundles.js`):
   - in the **guided setup wizard** (`static/js/first_run.js`), always - the wizard's separate camera
@@ -217,9 +251,9 @@ optical specs (aperture/focal length), not sensor data.
   - in the **Equipment tab**'s "New Telescope" form, through an option shown under the preset picker,
     ticked by default. Without the built-in camera, the framing simulator and the field of view of the
     combination cannot be computed.
-- The bundle **cameras** are also offered in the Equipment tab's "New Camera" preset picker, so a smart
-  telescope saved without its camera (before bundles existed, or with the option unticked) can be
-  completed: add the camera, then select it in the combination. Mounts and filters of a bundle are not
+- The bundle **cameras** are also offered in the Equipment tab's "New Camera" preset picker (once each), so
+  a smart telescope saved without its camera (before bundles existed, or with the option unticked) can be
+  completed: add the camera, then select it in the combination. Built-in mounts and filters are not
   offered separately.
 - **Orientation**: give a bundle camera's `sensor_width_mm` / `sensor_height_mm` and `resolution_w` /
   `resolution_h` in the orientation the device delivers its images, since the framing simulator draws the
@@ -231,6 +265,14 @@ optical specs (aperture/focal length), not sensor data.
 - A sensor size the maker does not publish is derived as resolution x pixel size (Seestar S50 Pro:
   2160 x 3840 px at 2.9 um = 6.26 x 11.14 mm; Seestar S30 Plus: 1440 x 2560 px at 2.9 um = 4.18 x 7.42 mm).
   A published size must agree with resolution x pixel size within 2 %, on each axis.
+- A pixel size the maker does not publish (camera bodies, as a rule) is derived as sensor width /
+  resolution width (Nikon Z 6II: 35.9 mm / 6048 px = 5.94 um), with the resolution of the largest RAW image.
+  A body's `weight_kg` is the weight with battery and card when the maker gives both, since that is what the
+  mount carries; it is left out when the maker publishes none (Canon EOS 6D Mark II, EOS 2000D).
+- Sony's UK and Australian spec pages omit the Alpha 7 IV image size; its 7008 x 4672 px comes from the spec
+  page of the official Sony Thailand store
+  (<https://store.sony.co.th/th/blogs/en_7149167116331_40893409230891/en_7149167116331_40893409230891_specifications/?locale=en>),
+  and `source_url` stays the Sony UK page that gives every other value.
 - When the maker publishes neither the sensor size nor its resolution, but does publish the field of view,
   the focal length and the pixel size (Unistellar Odyssey: 45 x 33.6 arcmin, 320 mm, 1.45 um), the sensor
   size is derived as focal length x field of view in radians (4.19 x 3.13 mm), and the resolution as sensor
@@ -251,10 +293,10 @@ The exact keys the frontend reads from a preset (`static/js/equipment.js`, `equi
 `first_run.js`). Any other key is ignored; a key under its stored name (`name`, `telescope_type`,
 `sensor_type`, `resolution_width_px`) is ignored too, which leaves the field empty.
 
-**Every entry**: `id` (unique snake_case across the whole file, bundle items included), `label` (becomes
-the item's `name`), `manufacturer`, `source_url` (the maker's official spec page) and `suggests_experience`
-(`beginner` / `intermediate` / `advanced`). Bundle items also carry `kind` and may leave out `source_url`
-and `suggests_experience`.
+**Every entry**: `id` (unique snake_case across every preset file), `label` (becomes the item's `name`),
+`manufacturer`, `source_url` (the maker's official spec page) and `suggests_experience` (`beginner` /
+`intermediate` / `advanced`). A camera, mount, filter or accessory may carry `"built_in": true` (see
+[Bundles](#bundles-smart-telescopes)), and may then leave out `source_url` and `suggests_experience`.
 
 | Preset | Key in the preset | Stored as | Notes |
 |--------|-------------------|-----------|-------|
@@ -280,10 +322,11 @@ Exposure Calculator needs them), a telescope's `reducer_barlow_factor` (always 1
 1. Take every value from the maker's official spec page, and put that page in `source_url`. Never estimate
    a value; a sensor size the maker does not publish is derived as described above.
 2. Use the preset keys and codes of the table above, not the stored field names.
-3. For a smart telescope: a `bundle` with exactly one `camera` and at most one `mount`, `weight_kg: 0` on
-   every bundle item, the bundle camera in the orientation the device delivers its images, and a mount
+3. For a smart telescope: put its camera, mount and boxed filters in the files of their own types with
+   `"built_in": true` and `weight_kg: 0`, and list their ids in the telescope's `bundle` (exactly one camera,
+   at most one mount). Give the camera in the orientation the device delivers its images, and the mount a
    `payload_capacity_kg` of at least the unit's `weight_kg` / 0.75.
-4. Run `pytest tests/equipment/test_equipment_presets.py tests/equipment/test_framing.py`.
+4. Run `python scripts/build_equipment_presets.py` and fix every problem it lists.
 
 ---
 

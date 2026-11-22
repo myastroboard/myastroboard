@@ -1,0 +1,61 @@
+{
+  "$schema": "../cameras.schema.json",
+  "presets": [
+    {
+      "id": "unistellar_equinox2_camera",
+      "label": "eQuinox 2 built-in camera",
+      "manufacturer": "Unistellar",
+      "sensor_width_mm": 5.97,
+      "sensor_height_mm": 4.48,
+      "pixel_size_um": 2.9,
+      "resolution_w": 2059,
+      "resolution_h": 1545,
+      "type": "cmos_color",
+      "weight_kg": 0,
+      "source_url": "https://shop.eu.unistellar.com/products/equinox-2",
+      "built_in": true
+    },
+    {
+      "id": "unistellar_evscope2_camera",
+      "label": "eVscope 2 built-in camera",
+      "manufacturer": "Unistellar",
+      "sensor_width_mm": 5.97,
+      "sensor_height_mm": 4.48,
+      "pixel_size_um": 2.9,
+      "resolution_w": 2059,
+      "resolution_h": 1545,
+      "type": "cmos_color",
+      "weight_kg": 0,
+      "source_url": "https://shop.eu.unistellar.com/products/evscope-2",
+      "built_in": true
+    },
+    {
+      "id": "unistellar_odyssey_camera",
+      "label": "Odyssey built-in camera",
+      "manufacturer": "Unistellar",
+      "sensor_width_mm": 4.19,
+      "sensor_height_mm": 3.13,
+      "pixel_size_um": 1.45,
+      "resolution_w": 2890,
+      "resolution_h": 2159,
+      "type": "cmos_color",
+      "weight_kg": 0,
+      "source_url": "https://shop.eu.unistellar.com/products/odyssey",
+      "built_in": true
+    },
+    {
+      "id": "unistellar_odyssey_pro_camera",
+      "label": "Odyssey Pro built-in camera",
+      "manufacturer": "Unistellar",
+      "sensor_width_mm": 4.19,
+      "sensor_height_mm": 3.13,
+      "pixel_size_um": 1.45,
+      "resolution_w": 2890,
+      "resolution_h": 2159,
+      "type": "cmos_color",
+      "weight_kg": 0,
+      "source_url": "https://shop.eu.unistellar.com/products/odyssey-pro",
+      "built_in": true
+    }
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "$schema": "../cameras.schema.json",
+  "presets": [
+    {
+      "id": "vaonis_atlas_camera",
+      "label": "Atlas 80 mm module built-in camera (Sony IMX585)",
+      "manufacturer": "Vaonis",
+      "sensor_width_mm": 11.2,
+      "sensor_height_mm": 6.3,
+      "pixel_size_um": 2.9,
+      "resolution_w": 3840,
+      "resolution_h": 2160,
+      "type": "cmos_color",
+      "weight_kg": 0,
+      "source_url": "https://vaonis.com/pages/product/atlas",
+      "built_in": true
+    },
+    {
+      "id": "vaonis_atlas_twin_camera",
+      "label": "Atlas Twin 80 mm module built-in camera (Sony IMX585)",
+      "manufacturer": "Vaonis",
+      "sensor_width_mm": 11.2,
+      "sensor_height_mm": 6.3,
+      "pixel_size_um": 2.9,
+      "resolution_w": 3840,
+      "resolution_h": 2160,
+      "type": "cmos_color",
+      "weight_kg": 0,
+      "source_url": "https://vaonis.com/pages/product/atlas",
+      "built_in": true
+    },
+    {
+      "id": "vaonis_vespera2_camera",
+      "label": "Vespera II built-in camera (Sony IMX585)",
+      "manufacturer": "Vaonis",
+      "sensor_width_mm": 11.2,
+      "sensor_height_mm": 6.3,
+      "pixel_size_um": 2.9,
+      "resolution_w": 3840,
+      "resolution_h": 2160,
+      "type": "cmos_color",
+      "weight_kg": 0,
+      "source_url": "https://vaonis.com/pages/product/vespera-ii",
+      "built_in": true
+    },
+    {
+      "id": "vaonis_vespera3_camera",
+      "label": "Vespera 3 built-in camera (Sony IMX585)",
+      "manufacturer": "Vaonis",
+      "sensor_width_mm": 11.2,
+      "sensor_height_mm": 6.3,
+      "pixel_size_um": 2.9,
+      "resolution_w": 3840,
+      "resolution_h": 2160,
+      "type": "cmos_color",
+      "weight_kg": 0,
+      "source_url": "https://vaonis.com/pages/vespera-new-generation",
+      "built_in": true
+    },
+    {
+      "id": "vaonis_vespera_pro2_camera",
+      "label": "Vespera Pro 2 built-in camera (Sony IMX676)",
+      "manufacturer": "Vaonis",
+      "sensor_width_mm": 7.0,
+      "sensor_height_mm": 7.0,
+      "pixel_size_um": 2.0,
+      "resolution_w": 3536,
+      "resolution_h": 3536,
+      "type": "cmos_color",
+      "weight_kg": 0,
+      "source_url": "https://vaonis.com/pages/vespera-new-generation",
+      "built_in": true
+    }
+  ]
+}

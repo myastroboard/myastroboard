@@ -1,0 +1,19 @@
+{
+  "$schema": "../cameras.schema.json",
+  "presets": [
+    {
+      "id": "celestron_origin_mk2_camera",
+      "label": "Origin Mark II built-in camera (Origin 678C, Sony IMX678)",
+      "manufacturer": "Celestron",
+      "sensor_width_mm": 7.71,
+      "sensor_height_mm": 4.36,
+      "pixel_size_um": 2.0,
+      "resolution_w": 3856,
+      "resolution_h": 2180,
+      "type": "cmos_color",
+      "weight_kg": 0,
+      "source_url": "https://www.celestron.com/products/celestron-origin-intelligent-home-observatory",
+      "built_in": true
+    }
+  ]
+}
