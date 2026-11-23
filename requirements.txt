@@ -31,7 +31,7 @@ psutil===7.2.2
 # Authentication and security
 Flask-Login===0.6.3
 # TOTP two-factor authentication (pure Python, no transitive dependencies)
-pyotp===2.12.0
+pyotp===2.12.1
 
 # Storage (SQLite database + schema migrations)
 SQLAlchemy===2.1.9
