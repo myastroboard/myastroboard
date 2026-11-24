@@ -8,6 +8,20 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Features
 
+- None.
+
+### Fixes
+
+- None.
+
+### Breaking changes
+
+- None.
+
+## 1.9.2 (2026-11-24)
+
+### Features
+
 - Moon: supermoons, micromoons, Blue Moons and the traditional Full Moon names ("Beaver Supermoon") are
   computed and shown in the Moon report, the phase calendar and the upcoming events
   ([ASTROPHOTOGRAPHY.md](docs/ASTROPHOTOGRAPHY.md#full-moons-astroweatherfull_moonspy)).
