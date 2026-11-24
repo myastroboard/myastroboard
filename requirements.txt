@@ -21,7 +21,7 @@ pandas===3.1.1
 
 # HTTP and API
 requests===2.34.2
-openmeteo-requests===1.7.5
+openmeteo-requests===1.7.6
 requests-cache===1.3.3
 retry-requests===2.0.0
 
@@ -31,14 +31,14 @@ psutil===7.2.2
 # Authentication and security
 Flask-Login===0.6.3
 # TOTP two-factor authentication (pure Python, no transitive dependencies)
-pyotp===2.12.0
+pyotp===2.12.1
 
 # Storage (SQLite database + schema migrations)
 SQLAlchemy===2.1.9
 alembic===1.20.1
 
 # Version comparison
-packaging===26.3
+packaging===26.4
 
 # Web Push notifications
 pywebpush===2.5.0
