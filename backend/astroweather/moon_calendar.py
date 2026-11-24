@@ -3,7 +3,9 @@
 Pure ephemeris: for a given calendar month it returns, per day, the Moon's
 illumination and waxing/waning state derived from the phase angle (same engine
 and formula as the live Moon report), plus the exact local timestamps of that
-month's principal phases (new / first quarter / full / last quarter).
+month's principal phases (new / first quarter / full / last quarter). A Full
+Moon event also carries ``full_moon``: its distance, supermoon / micromoon /
+Blue Moon flags and traditional name (see ``astroweather.full_moons``).
 
 Each day is sampled at a fixed night hour (23:00 local) - a calendar of Moon
 phases is a night-observation planning aid, so every cell shows the Moon as it
@@ -43,6 +45,8 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from astronomy import MoonPhase, NextMoonQuarter, SearchMoonQuarter, Time
+
+from astroweather.full_moons import describe_full_moon
 
 # Astronomy Engine MoonQuarter.quarter -> phase name used by this module and i18n.
 _QUARTER_TYPES = {0: "new", 1: "first_quarter", 2: "full", 3: "last_quarter"}
@@ -128,21 +132,24 @@ def build_phase_calendar(year: int, month: int, timezone: str) -> dict[str, Any]
         if (instant_local.year, instant_local.month) == (year, month):
             phase_type = _QUARTER_TYPES[quarter.quarter]
             local_iso = instant_local.isoformat(timespec="minutes")
-            events_by_day[instant_local.day] = {"type": phase_type, "time": local_iso}
-            principal_phases.append({"type": phase_type, "date": instant_local.date().isoformat(), "time": local_iso})
+            event: dict[str, Any] = {"type": phase_type, "time": local_iso}
+            if phase_type == "full":
+                # Supermoon / micromoon / Blue Moon / traditional name (astroweather.full_moons).
+                event["full_moon"] = describe_full_moon(quarter.time, timezone)
+            events_by_day[instant_local.day] = event
+            principal_phases.append({**event, "date": instant_local.date().isoformat()})
         quarter = NextMoonQuarter(quarter)
 
     # --- per-day phase state, sampled at the same night hour for every day ---
     days: list[dict[str, Any]] = []
     for day in range(1, days_in_month + 1):
         night_local = datetime.datetime(year, month, day, _SAMPLE_HOUR, tzinfo=tz)
-        event: dict[str, Any] | None = events_by_day.get(day)
         days.append(
             {
                 "date": datetime.date(year, month, day).isoformat(),
                 "day": day,
                 **phase_at(night_local),
-                "phase_event": event,
+                "phase_event": events_by_day.get(day),
             }
         )
 

@@ -918,6 +918,80 @@ class TestExtractMoonPhaseEvents:
         assert len(events) == 1
         assert "full_moon" in events[0].id
 
+    def _full_moon(self, aggregator, days: int, **flags) -> dict:
+        """A full_moons entry ``days`` from now, with the given flags."""
+        peak = (aggregator.local_now + timedelta(days=days)).replace(second=0, microsecond=0)
+        details = {
+            "time": peak.isoformat(timespec="minutes"),
+            "date": peak.date().isoformat(),
+            "distance_km": 360754,
+            "angular_diameter_arcmin": 33.1,
+            "size_vs_mean_percent": 6.6,
+            "supermoon": False,
+            "micromoon": False,
+            "blue_moon": False,
+            "folk_name": "beaver",
+        }
+        details.update(flags)
+        return details
+
+    def test_exact_full_moons_replace_the_illumination_heuristic(self, aggregator):
+        """With 'full_moons', the >= 98% nights no longer produce Full Moon events."""
+        night = (aggregator.local_now + timedelta(days=2)).date().isoformat()
+        data = {
+            "next_7_nights": [{"date": night, "moon": {"illumination_percent": 99}}],
+            "full_moons": [self._full_moon(aggregator, 2)],
+        }
+        events = aggregator._extract_moon_phase_events(data)
+        assert len(events) == 1
+        assert events[0].title == "Beaver Moon"
+        assert events[0].importance == EventImportance.MEDIUM.value
+        assert events[0].peak_time == data["full_moons"][0]["time"]
+
+    def test_supermoon_event_is_high_importance(self, aggregator):
+        """A supermoon gets its own title, HIGH importance and a distance description."""
+        data = {"next_7_nights": [], "full_moons": [self._full_moon(aggregator, 1, supermoon=True)]}
+        event = aggregator._extract_moon_phase_events(data)[0]
+        assert event.title == "Beaver Supermoon"
+        assert event.importance == EventImportance.HIGH.value
+        assert "360,754 km" in event.description
+        assert "6.6%" in event.description
+
+    def test_supermoon_title_is_translated(self, aggregator_french):
+        """French: 'Super lune du Castor'."""
+        data = {"next_7_nights": [], "full_moons": [self._full_moon(aggregator_french, 1, supermoon=True)]}
+        event = aggregator_french._extract_moon_phase_events(data)[0]
+        assert event.title == "Super lune du Castor"
+
+    def test_micromoon_and_blue_moon(self, aggregator):
+        """A micromoon keeps MEDIUM importance; a Blue Moon adds a note to the description."""
+        data = {
+            "next_7_nights": [],
+            "full_moons": [self._full_moon(aggregator, 3, micromoon=True, blue_moon=True, folk_name="flower")],
+        }
+        event = aggregator._extract_moon_phase_events(data)[0]
+        assert event.title == "Flower Micromoon"
+        assert event.importance == EventImportance.MEDIUM.value
+        assert "Blue Moon" in event.description
+
+    def test_full_moons_outside_the_week_are_skipped(self, aggregator):
+        """Past Full Moons and those more than 7 days ahead produce no event."""
+        data = {
+            "next_7_nights": [],
+            "full_moons": [self._full_moon(aggregator, -2), self._full_moon(aggregator, 20)],
+        }
+        assert aggregator._extract_moon_phase_events(data) == []
+
+    def test_malformed_full_moon_entries_are_skipped(self, aggregator):
+        """Entries without a parseable time are ignored, not raised."""
+        data = {"next_7_nights": [], "full_moons": [{"time": None}, {"time": "not-a-date"}]}
+        assert aggregator._extract_moon_phase_events(data) == []
+
+    def test_full_moon_without_folk_name_uses_plain_title(self, aggregator):
+        """No folk_name: the plain 'Full Moon' label."""
+        data = {"next_7_nights": [], "full_moons": [self._full_moon(aggregator, 1, folk_name=None)]}
+        assert aggregator._extract_moon_phase_events(data)[0].title == "Full Moon"
+
     def test_next_7_nights_new_moon(self, aggregator):
         """Detects New Moon from next_7_nights illumination <= 2%."""
         date_str = (aggregator.local_now + timedelta(days=4)).isoformat()

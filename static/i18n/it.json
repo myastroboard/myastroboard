@@ -287,7 +287,29 @@
     "eclipse_chart_footer": "Gradi (°) | Ora locale",
     "footer_source_report": "Fonte dati: calcoli astronomici 100% locali (effemeridi lunari ed eventi derivati).",
     "footer_source_planner": "Fonte dati: calcoli MyAstroBoard 100% locali per le prossime notti e punteggio astrofotografico.",
-    "footer_source_best_window": "Fonte dati: calcoli MyAstroBoard 100% locali per dark-window e best-window."
+    "footer_source_best_window": "Fonte dati: calcoli MyAstroBoard 100% locali per dark-window e best-window.",
+    "folk_name": {
+      "wolf": "del Lupo",
+      "snow": "della Neve",
+      "worm": "del Verme",
+      "pink": "Rosa",
+      "flower": "dei Fiori",
+      "strawberry": "delle Fragole",
+      "buck": "del Cervo",
+      "sturgeon": "dello Storione",
+      "corn": "del Mais",
+      "harvest": "del Raccolto",
+      "hunters": "del Cacciatore",
+      "beaver": "del Castoro",
+      "cold": "Fredda"
+    },
+    "full_moon_named": "Luna piena {name}",
+    "supermoon_named": "Superluna {name}",
+    "micromoon_named": "Microluna {name}",
+    "supermoon": "Superluna",
+    "micromoon": "Microluna",
+    "blue_moon": "Luna blu",
+    "full_moon_size": "{diameter}' di diametro, {size}% rispetto alla distanza media"
   },
   "sun": {
     "tab_description": "La notte astronomica inizia quando il Sole scende sotto i -18° di altitudine (la fase di crepuscolo più buia) e termina quando risale sopra di essa - questa è la finestra in cui il cielo è abbastanza scuro per la ripresa del cielo profondo.",
@@ -2429,7 +2451,9 @@
       "zodiacal_light_description": "Debole cono di luce della polvere interplanetaria visibile durante il crepuscolo. Migliore osservazione sotto cieli bui.",
       "zodiacal_viewing_evening": "sera",
       "zodiacal_viewing_morning": "mattina"
-    }
+    },
+    "supermoon_description": "La luna piena è vicina al perigeo: a {distance} km, il {size}% più grande che alla distanza media. Buon momento per {activity}.",
+    "blue_moon_note": "È una luna blu, la seconda luna piena del mese."
   },
   "weather_alerts": {
     "section_title": "Avvisi meteorologici",

@@ -287,7 +287,29 @@
     "eclipse_chart_footer": "Degrés (°) | Heure Locale",
     "footer_source_report": "Source des données : calculs astronomiques 100% locaux (éphémérides lunaires et événements dérivés).",
     "footer_source_planner": "Source des données : calculs MyAstroBoard 100% locaux pour les prochaines nuits et le score astrophotographie.",
-    "footer_source_best_window": "Source des données : calculs MyAstroBoard 100% locaux pour dark-window et best-window."
+    "footer_source_best_window": "Source des données : calculs MyAstroBoard 100% locaux pour dark-window et best-window.",
+    "folk_name": {
+      "wolf": "du Loup",
+      "snow": "des Neiges",
+      "worm": "du Ver",
+      "pink": "Rose",
+      "flower": "des Fleurs",
+      "strawberry": "des Fraises",
+      "buck": "du Cerf",
+      "sturgeon": "de l'Esturgeon",
+      "corn": "du Maïs",
+      "harvest": "des Moissons",
+      "hunters": "du Chasseur",
+      "beaver": "du Castor",
+      "cold": "Froide"
+    },
+    "full_moon_named": "Pleine lune {name}",
+    "supermoon_named": "Super lune {name}",
+    "micromoon_named": "Micro lune {name}",
+    "supermoon": "Super lune",
+    "micromoon": "Micro lune",
+    "blue_moon": "Lune bleue",
+    "full_moon_size": "{diameter}' de diamètre, {size}% par rapport à la distance moyenne"
   },
   "sun": {
     "tab_description": "La nuit astronomique commence lorsque le Soleil descend sous -18° d'altitude (le stade de crépuscule le plus sombre) et se termine lorsqu'il remonte au-dessus - c'est durant cette fenêtre que le ciel est assez sombre pour l'imagerie du ciel profond.",
@@ -2429,7 +2451,9 @@
       "zodiacal_light_description": "Faible cône lumineux de poussière interplanétaire visible au crépuscule. Observation optimale sous un ciel sombre.",
       "zodiacal_viewing_evening": "soir",
       "zodiacal_viewing_morning": "matin"
-    }
+    },
+    "supermoon_description": "La pleine lune est proche du périgée : à {distance} km, {size}% plus grande qu'à distance moyenne. Bon moment pour {activity}.",
+    "blue_moon_note": "C'est une lune bleue, la deuxième pleine lune du mois."
   },
   "weather_alerts": {
     "section_title": "Alertes Météo",

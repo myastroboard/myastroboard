@@ -765,7 +765,17 @@ class EventsAggregator:
                 events.append(event)
             return events
 
-        # 2. Adapted for 'next_7_nights' format
+        # 2. Adapted for 'next_7_nights' format. When the planner cache also carries the
+        # exact Full Moon instants ('full_moons'), Full Moons come from there - with their
+        # supermoon / Blue Moon / name details - instead of the illumination heuristic.
+        full_moons = moon_data.get("full_moons")
+        exact_full_moons = isinstance(full_moons, list)
+        if exact_full_moons:
+            for details in full_moons:
+                event = self._full_moon_event(details, moon_data)
+                if event is not None:
+                    events.append(event)
+
         nights = moon_data.get("next_7_nights", [])
         for night in nights:
             date_str = night.get("date")
@@ -775,6 +785,8 @@ class EventsAggregator:
                 continue
             # Heuristic: Full Moon >98%, New Moon <2%, else ignore
             if illumination >= 98:
+                if exact_full_moons:
+                    continue
                 phase_type = "Full Moon"
                 importance = EventImportance.MEDIUM.value
             elif illumination <= 2:
@@ -808,6 +820,76 @@ class EventsAggregator:
             )
             events.append(event)
         return events
+
+    def _full_moon_title(self, details: dict[str, Any]) -> str:
+        """Localized Full Moon title: 'Beaver Supermoon', 'Pleine lune du Castor', ..."""
+        folk_key = details.get("folk_name")
+        if not folk_key:
+            return self._get_moon_phase_translation("Full Moon")
+        name = self._t(f"moon.folk_name.{folk_key}", str(folk_key).capitalize())
+        if details.get("supermoon"):
+            return self._t("moon.supermoon_named", f"{name} Supermoon", name=name)
+        if details.get("micromoon"):
+            return self._t("moon.micromoon_named", f"{name} Micromoon", name=name)
+        return self._t("moon.full_moon_named", f"{name} Moon", name=name)
+
+    def _full_moon_event(self, details: dict[str, Any], moon_data: dict[str, Any]) -> AstronomicalEvent | None:
+        """One Full Moon event from an ``astroweather.full_moons`` entry, or None when
+        it is malformed or outside the 7-day window. A supermoon is HIGH importance."""
+        time_str = details.get("time")
+        if not isinstance(time_str, str):
+            return None
+        try:
+            peak = datetime.datetime.fromisoformat(time_str).astimezone(self.timezone)
+        except ValueError:
+            return None
+        days_until = (peak.date() - self.local_now.date()).days
+        if days_until < 0 or days_until > 7:
+            return None
+
+        supermoon = bool(details.get("supermoon"))
+        importance = EventImportance.HIGH.value if supermoon else EventImportance.MEDIUM.value
+        activity = self._get_moon_phase_activity("Full Moon")
+        if supermoon:
+            distance = f"{int(details.get('distance_km') or 0):,}"
+            size = details.get("size_vs_mean_percent")
+            description = self._t(
+                "events_api.supermoon_description",
+                f"The Full Moon is close to perigee: {distance} km away, {size}% larger than at "
+                f"mean distance. Good time for {activity}.",
+                distance=distance,
+                size=size,
+                activity=activity,
+            )
+        else:
+            phase = self._get_moon_phase_translation("Full Moon")
+            description = self._t(
+                "events_api.moon_phase_description",
+                f"Full Moon occurs. Good time for {activity}.",
+                phase=phase,
+                activity=activity,
+            )
+        if details.get("blue_moon"):
+            note = self._t("events_api.blue_moon_note", "It is a Blue Moon, the second Full Moon of the month.")
+            description = f"{description} {note}"
+
+        return AstronomicalEvent(
+            id=f"moon_phase_{peak.date().isoformat()}_full_moon",
+            event_type=EventType.MOON_PHASE.value,
+            icon_class=self._phase_icon_class("Full Moon"),
+            icon_color_class=self._importance_icon_color_class(importance),
+            title=self._full_moon_title(details),
+            description=description,
+            start_time=None,
+            peak_time=peak.isoformat(timespec="minutes"),
+            end_time=None,
+            days_until_event=days_until,
+            visibility=True,
+            importance=importance,
+            score=None,
+            raw_data=moon_data,
+            structure_key="moon",
+        )
 
     def _extract_iss_pass_events(self, iss_data: dict[str, Any]) -> list[AstronomicalEvent]:
         """Extract ISS visible pass, solar transit, and lunar transit events occurring in the next 7 days."""

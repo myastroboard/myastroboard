@@ -233,3 +233,20 @@ class TestNextAstronomicalDarkWindow:
             result = svc._next_astronomical_dark_window(start)
 
         assert result == ("Not found", "Not found")
+
+
+class TestGetReportFullMoonDetails:
+    """get_report() adds the next Full Moon's supermoon / name details."""
+
+    def test_report_includes_next_full_moon_details(self):
+        """The details describe the same Full Moon as next_full_moon."""
+        from unittest.mock import patch
+
+        svc = MoonService(48.85, 2.35, 'Europe/Paris')
+        with patch.object(svc, '_next_astronomical_dark_window', return_value=("Not found", "Not found")):
+            report = svc.get_report()
+        details = report.next_full_moon_details
+        assert details is not None
+        assert details["time"] == report.next_full_moon
+        assert isinstance(details["supermoon"], bool)
+        assert details["folk_name"]

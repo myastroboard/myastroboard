@@ -147,3 +147,26 @@ class TestTimezoneBucketing:
         for phase in result["principal_phases"]:
             assert datetime.date.fromisoformat(phase["date"]).month == 3
         assert "2025-02-28" not in [p["time"][:10] for p in result["principal_phases"]]
+
+
+class TestFullMoonDetails:
+    """Full Moon events carry the astroweather.full_moons details."""
+
+    def test_full_moon_event_carries_supermoon_details(self):
+        """November 2026: the Full Moon cell and footer entry hold the Beaver supermoon."""
+        result = build_phase_calendar(2026, 11, PARIS)
+        day_24 = result["days"][23]
+        assert day_24["phase_event"]["type"] == "full"
+        details = day_24["phase_event"]["full_moon"]
+        assert details["supermoon"] is True
+        assert details["folk_name"] == "beaver"
+        full = next(p for p in result["principal_phases"] if p["type"] == "full")
+        assert full["full_moon"] == details
+        assert full["date"] == "2026-11-24"
+
+    def test_other_principal_phases_have_no_full_moon_details(self):
+        """New Moon and quarters stay {type, time} (+ date in the footer list)."""
+        result = build_phase_calendar(2026, 11, PARIS)
+        for phase in result["principal_phases"]:
+            if phase["type"] != "full":
+                assert "full_moon" not in phase

@@ -212,11 +212,22 @@ async function loadMoon() {
         const next_new_moon_txt = moon.next_new_moon === 'Not found' ? i18n.t('best_window.not_found') : formatTimeThenDate(new Date(moon.next_new_moon));
         const next_dark_night_start_txt = moon.next_dark_night_start === 'Not found' ? i18n.t('best_window.not_found') : formatTimeThenDate(new Date(moon.next_dark_night_start));
 
-        row.appendChild(createCard('bi bi-calendar-event text-danger icon-inline', i18n.t('moon.next_events'), [
+        const nextEventLines = [
             { labelIcon: 'bi bi-moon-stars-fill icon-inline', labelText: i18n.t('moon.next_full_moon'), value: next_full_moon_txt },
+        ];
+        const fullMoonDetails = moon.next_full_moon_details;
+        if (fullMoonDetails) {
+            nextEventLines.push({
+                labelIcon: `${fullMoonDetails.supermoon ? 'bi bi-brightness-high-fill' : 'bi bi-moon-stars'} icon-inline`,
+                labelText: fullMoonTitle(fullMoonDetails),
+                value: `${Number(fullMoonDetails.distance_km).toLocaleString()} ${i18n.t('units.km')}`,
+            });
+        }
+        nextEventLines.push(
             { labelIcon: 'bi bi-moon-fill icon-inline', labelText: i18n.t('moon.next_new_moon'), value: next_new_moon_txt },
             { labelIcon: 'bi bi-stars icon-inline', labelText: i18n.t('moon.next_dark_night'), value: next_dark_night_start_txt }
-        ]));
+        );
+        row.appendChild(createCard('bi bi-calendar-event text-danger icon-inline', i18n.t('moon.next_events'), nextEventLines));
 
         container.appendChild(header);
         container.appendChild(row);
@@ -338,6 +349,36 @@ const MOON_PHASE_ICONS = {
 };
 
 /**
+ * Localized title of a Full Moon ('Beaver Supermoon', 'Pleine lune du Castor', ...),
+ * with ' - Blue Moon' appended when it is the month's second Full Moon.
+ * @param {Object|null} details A Full Moon entry from astroweather.full_moons.
+ * @returns {string}
+ */
+function fullMoonTitle(details) {
+    if (!details || !details.folk_name) return i18n.t('moon.full_moon');
+    const name = i18n.t(`moon.folk_name.${details.folk_name}`);
+    let key = 'moon.full_moon_named';
+    if (details.supermoon) key = 'moon.supermoon_named';
+    else if (details.micromoon) key = 'moon.micromoon_named';
+    const title = i18n.t(key, { name });
+    return details.blue_moon ? `${title} - ${i18n.t('moon.blue_moon')}` : title;
+}
+
+/**
+ * Distance and apparent size of a Full Moon, e.g. '360,754 km - 33.1' wide, +6.6% vs mean distance'.
+ * @param {Object} details A Full Moon entry from astroweather.full_moons.
+ * @param {string} locale BCP-47 locale for number formatting.
+ * @returns {string}
+ */
+function fullMoonSummary(details, locale) {
+    const size = Number(details.size_vs_mean_percent);
+    const sizeText = `${size > 0 ? '+' : ''}${size.toLocaleString(locale)}`;
+    const distance = `${Number(details.distance_km).toLocaleString(locale)} ${i18n.t('units.km')}`;
+    const diameter = Number(details.angular_diameter_arcmin).toLocaleString(locale);
+    return `${distance} - ${i18n.t('moon.full_moon_size', { diameter, size: sizeText })}`;
+}
+
+/**
  * Build one day cell for the Moon-phase calendar, including its phase drawing.
  * @param {Object} day A day entry from /api/moon/phase-calendar.
  * @param {Object} data The full calendar payload (for today / month context).
@@ -350,8 +391,10 @@ async function buildMoonPhaseCalendarCell(day, data, locale) {
     if (data.is_current_month && day.date === data.today) {
         cell.classList.add('moon-phase-cal-today');
     }
+    const fullMoon = day.phase_event?.full_moon || null;
     if (day.phase_event) {
         cell.classList.add(`moon-phase-cal-cell--${day.phase_event.type.replace('_', '-')}`);
+        if (fullMoon?.supermoon) cell.classList.add('moon-phase-cal-cell--supermoon');
     } else if (day.moonless) {
         cell.classList.add('moon-phase-cal-cell--moonless');
     }
@@ -373,14 +416,18 @@ async function buildMoonPhaseCalendarCell(day, data, locale) {
 
     let label = `${day.date} - ${i18n.t('moon.illumination')} ${Math.round(day.illumination_percent)}%`;
     if (day.phase_event) {
-        const phaseName = i18n.t(MOON_PHASE_LABEL_KEYS[day.phase_event.type]);
+        const phaseName = fullMoon ? fullMoonTitle(fullMoon) : i18n.t(MOON_PHASE_LABEL_KEYS[day.phase_event.type]);
         const tag = document.createElement('div');
         tag.className = 'moon-phase-cal-tag';
         tag.appendChild(DOMUtils.createIcon(`${MOON_PHASE_ICONS[day.phase_event.type]} icon-inline`));
+        if (fullMoon?.supermoon) {
+            tag.appendChild(DOMUtils.createIcon('bi bi-arrows-angle-expand icon-inline moon-phase-cal-supermoon-icon'));
+        }
         cell.appendChild(tag);
         const eventTime = new Date(day.phase_event.time);
         const eventClock = eventTime.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
         label = `${day.date} - ${phaseName} ${eventClock}`;
+        if (fullMoon) label += ` - ${fullMoonSummary(fullMoon, locale)}`;
     } else if (day.moonless) {
         label += ` - ${i18n.t('moon.phase_calendar_moonless')}`;
     }
@@ -502,8 +549,9 @@ async function buildMoonPhaseCalendarCard(data, locale, startOnMonday) {
             DOMUtils.append(
                 item,
                 DOMUtils.createIcon(`${MOON_PHASE_ICONS[phase.type]} icon-inline`),
-                `${i18n.t(MOON_PHASE_LABEL_KEYS[phase.type])} ${phaseDate.toLocaleDateString(locale, { day: 'numeric', month: 'short' })}`
+                `${phase.full_moon ? fullMoonTitle(phase.full_moon) : i18n.t(MOON_PHASE_LABEL_KEYS[phase.type])} ${phaseDate.toLocaleDateString(locale, { day: 'numeric', month: 'short' })}`
             );
+            if (phase.full_moon) item.title = fullMoonSummary(phase.full_moon, locale);
             footer.appendChild(item);
         });
     }

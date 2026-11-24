@@ -287,7 +287,29 @@
     "eclipse_chart_footer": "Degrees (°) | Local Time",
     "footer_source_report": "Data source: 100% local astronomical calculations (Moon ephemeris and derived events).",
     "footer_source_planner": "Data source: 100% local MyAstroBoard calculations for next nights and astrophotography score.",
-    "footer_source_best_window": "Data source: 100% local MyAstroBoard dark-window and best-window calculations."
+    "footer_source_best_window": "Data source: 100% local MyAstroBoard dark-window and best-window calculations.",
+    "folk_name": {
+      "wolf": "Wolf",
+      "snow": "Snow",
+      "worm": "Worm",
+      "pink": "Pink",
+      "flower": "Flower",
+      "strawberry": "Strawberry",
+      "buck": "Buck",
+      "sturgeon": "Sturgeon",
+      "corn": "Corn",
+      "harvest": "Harvest",
+      "hunters": "Hunter's",
+      "beaver": "Beaver",
+      "cold": "Cold"
+    },
+    "full_moon_named": "{name} Moon",
+    "supermoon_named": "{name} Supermoon",
+    "micromoon_named": "{name} Micromoon",
+    "supermoon": "Supermoon",
+    "micromoon": "Micromoon",
+    "blue_moon": "Blue Moon",
+    "full_moon_size": "{diameter}' wide, {size}% vs mean distance"
   },
   "sun": {
     "tab_description": "Astronomical night starts once the Sun drops below -18° altitude (the darkest twilight stage) and ends when it climbs back above it - that window is when the sky is dark enough for deep-sky imaging.",
@@ -2429,7 +2451,9 @@
       "zodiacal_light_description": "Faint cone of light from interplanetary dust visible during twilight. Best viewed in dark skies.",
       "zodiacal_viewing_evening": "Evening",
       "zodiacal_viewing_morning": "Morning"
-    }
+    },
+    "supermoon_description": "The Full Moon is close to perigee: {distance} km away, {size}% larger than at mean distance. Good time for {activity}.",
+    "blue_moon_note": "It is a Blue Moon, the second Full Moon of the month."
   },
   "weather_alerts": {
     "section_title": "Weather Alerts",

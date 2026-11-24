@@ -287,7 +287,29 @@
     "eclipse_chart_footer": "Grad (°) | Ortszeit",
     "footer_source_report": "Datenquelle: 100% lokale astronomische Berechnungen (Mond-Ephemeriden und abgeleitete Ereignisse).",
     "footer_source_planner": "Datenquelle: 100% lokale MyAstroBoard-Berechnungen für kommende Nächte und Astrofotografie-Score.",
-    "footer_source_best_window": "Datenquelle: 100% lokale MyAstroBoard-Berechnungen für Dark-Window und Best-Window."
+    "footer_source_best_window": "Datenquelle: 100% lokale MyAstroBoard-Berechnungen für Dark-Window und Best-Window.",
+    "folk_name": {
+      "wolf": "Wolfsmond",
+      "snow": "Schneemond",
+      "worm": "Wurmmond",
+      "pink": "Rosa Mond",
+      "flower": "Blumenmond",
+      "strawberry": "Erdbeermond",
+      "buck": "Hirschmond",
+      "sturgeon": "Störmond",
+      "corn": "Maismond",
+      "harvest": "Erntemond",
+      "hunters": "Jägermond",
+      "beaver": "Bibermond",
+      "cold": "Kalter Mond"
+    },
+    "full_moon_named": "{name}",
+    "supermoon_named": "Supermond ({name})",
+    "micromoon_named": "Minimond ({name})",
+    "supermoon": "Supermond",
+    "micromoon": "Minimond",
+    "blue_moon": "Blue Moon",
+    "full_moon_size": "{diameter}' Durchmesser, {size}% gegenüber der mittleren Entfernung"
   },
   "sun": {
     "tab_description": "Die astronomische Nacht beginnt, sobald die Sonne unter -18° Höhe sinkt (die dunkelste Dämmerungsstufe), und endet, wenn sie wieder darüber steigt - in diesem Zeitfenster ist der Himmel dunkel genug für Deep-Sky-Astrofotografie.",
@@ -2429,7 +2451,9 @@
       "zodiacal_light_description": "Schwacher Lichtkegel aus interplanetarem Staub in der Dämmerung sichtbar. Am besten unter dunklem Himmel.",
       "zodiacal_viewing_evening": "abends",
       "zodiacal_viewing_morning": "morgens"
-    }
+    },
+    "supermoon_description": "Der Vollmond steht nahe dem Perigäum: {distance} km entfernt, {size}% größer als bei mittlerer Entfernung. Gute Zeit für {activity}.",
+    "blue_moon_note": "Es ist ein Blue Moon, der zweite Vollmond des Monats."
   },
   "weather_alerts": {
     "section_title": "Wetterwarnungen",

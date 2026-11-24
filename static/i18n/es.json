@@ -287,7 +287,29 @@
     "eclipse_chart_footer": "Grados (°) | Hora local",
     "footer_source_report": "Fuente de datos: cálculos astronómicos 100% locales (efemérides lunares y eventos derivados).",
     "footer_source_planner": "Fuente de datos: cálculos 100% locales de MyAstroBoard para próximas noches y puntuación astrofotográfica.",
-    "footer_source_best_window": "Fuente de datos: cálculos 100% locales de MyAstroBoard para dark-window y best-window."
+    "footer_source_best_window": "Fuente de datos: cálculos 100% locales de MyAstroBoard para dark-window y best-window.",
+    "folk_name": {
+      "wolf": "del Lobo",
+      "snow": "de Nieve",
+      "worm": "del Gusano",
+      "pink": "Rosa",
+      "flower": "de las Flores",
+      "strawberry": "de las Fresas",
+      "buck": "del Ciervo",
+      "sturgeon": "del Esturión",
+      "corn": "del Maíz",
+      "harvest": "de la Cosecha",
+      "hunters": "del Cazador",
+      "beaver": "del Castor",
+      "cold": "Fría"
+    },
+    "full_moon_named": "Luna llena {name}",
+    "supermoon_named": "Superluna {name}",
+    "micromoon_named": "Microluna {name}",
+    "supermoon": "Superluna",
+    "micromoon": "Microluna",
+    "blue_moon": "Luna azul",
+    "full_moon_size": "{diameter}' de diámetro, {size}% respecto a la distancia media"
   },
   "sun": {
     "tab_description": "La noche astronómica comienza cuando el Sol desciende por debajo de -18° de altitud (la fase de crepúsculo más oscura) y termina cuando vuelve a subir por encima - esa ventana es cuando el cielo está lo bastante oscuro para la astrofotografía de cielo profundo.",
@@ -2429,7 +2451,9 @@
       "zodiacal_light_description": "Débil cono de luz de polvo interplanetario visible durante el crepúsculo. Se observa mejor con cielos oscuros.",
       "zodiacal_viewing_evening": "tarde",
       "zodiacal_viewing_morning": "mañana"
-    }
+    },
+    "supermoon_description": "La luna llena está cerca del perigeo: a {distance} km, un {size}% más grande que a la distancia media. Buen momento para {activity}.",
+    "blue_moon_note": "Es una luna azul, la segunda luna llena del mes."
   },
   "weather_alerts": {
     "section_title": "Alertas meteorológicas",

@@ -30,7 +30,8 @@ Example output for current Moon status (on API call):
     "next_full_moon": "2026-02-01 17:32",
     "next_new_moon": "2026-02-16 03:10",
     "next_dark_night_start": "2026-01-30 22:15",
-    "next_dark_night_end": "2026-01-31 04:40"
+    "next_dark_night_end": "2026-01-31 04:40",
+    "next_full_moon_details": {"distance_km": 405120, "supermoon": false, "folk_name": "snow", ...}
   }
 }
 
@@ -58,6 +59,8 @@ from astronomy import (
 from astropy.coordinates import AltAz, EarthLocation, get_body, get_sun
 from astropy.time import Time as AstroTime
 
+from astroweather.full_moons import describe_full_moon
+
 
 @dataclass
 class MoonAstroPhotoInfo:
@@ -77,11 +80,16 @@ class MoonAstroPhotoInfo:
     next_dark_night_start: str
     next_dark_night_end: str
 
+    # Supermoon / micromoon / Blue Moon / traditional name of the next Full Moon
+    # (astroweather.full_moons.describe_full_moon), None when it was not found.
+    next_full_moon_details: dict[str, Any] | None = None
+
 
 class MoonService:
     def __init__(self, latitude: float, longitude: float, timezone: str):
         self.latitude = latitude
         self.longitude = longitude
+        self.timezone_name = timezone
         self.timezone = ZoneInfo(timezone)
 
         self.observer = Observer(latitude, longitude, 0)
@@ -133,6 +141,7 @@ class MoonService:
             next_new_moon=self._fmt(next_new),
             next_dark_night_start=dark_start,
             next_dark_night_end=dark_end,
+            next_full_moon_details=describe_full_moon(next_full, self.timezone_name) if next_full else None,
         )
 
     def _phase_name(self, angle: float) -> str:
