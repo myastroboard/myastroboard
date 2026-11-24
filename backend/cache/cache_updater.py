@@ -14,8 +14,10 @@ from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from astroweather.aurora_predictions import get_aurora_report
+from astroweather.full_moons import upcoming_full_moons
 from astroweather.horizon_graph import HorizonGraphService
 from astroweather.moon_astrotonight import AstroTonightService
 from astroweather.moon_eclipse import LunarEclipseService
@@ -226,10 +228,14 @@ def update_moon_planner_cache(config: dict[str, Any] | None = None, location: di
         )
 
         nights = planner.next_7_nights()
+        # Exact Full Moon instants with their supermoon / Blue Moon / name details; the
+        # events aggregator turns the ones inside the 7-night window into events.
+        full_moons = upcoming_full_moons(datetime.now(ZoneInfo(location["timezone"])), 2, location["timezone"])
 
         response = {
             "location": location,
             "next_7_nights": nights,
+            "full_moons": full_moons,
             "units": {"dark_hours": "hours", "altitude": "degrees", "illumination": "percent"},
         }
 
@@ -248,7 +254,6 @@ def _next_astronomical_dusk_utc(sun_service: SunService, tz_name: str) -> str | 
     when the cache refreshes after midnight UTC (before local dusk has passed).
     """
     from datetime import datetime as _dt
-    from zoneinfo import ZoneInfo
 
     tz = ZoneInfo(tz_name)
     now_utc = _dt.now(UTC)

@@ -708,6 +708,17 @@
     box-shadow: 0 0 16px rgba(253, 224, 138, 0.45);
 }
 
+/* Supermoon: a Full Moon near perigee (astroweather.full_moons) - warmer, stronger glow. */
+.moon-phase-cal-cell--full.moon-phase-cal-cell--supermoon {
+    background: rgba(251, 191, 36, 0.32);
+    border-color: rgba(251, 191, 36, 0.9);
+    box-shadow: 0 0 20px rgba(251, 191, 36, 0.6);
+}
+
+.moon-phase-cal-supermoon-icon {
+    margin-left: 0.15rem;
+}
+
 .moon-phase-cal-cell--first-quarter,
 .moon-phase-cal-cell--last-quarter {
     background: rgba(148, 197, 233, 0.24);

@@ -8,6 +8,9 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Features
 
+- Moon: supermoons, micromoons, Blue Moons and the traditional Full Moon names ("Beaver Supermoon") are
+  computed and shown in the Moon report, the phase calendar and the upcoming events
+  ([ASTROPHOTOGRAPHY.md](docs/ASTROPHOTOGRAPHY.md#full-moons-astroweatherfull_moonspy)).
 - Equipment presets: Vaonis Atlas Twin, Unistellar Odyssey, Odyssey Pro, eVscope 2 and eQuinox 2, DWARFLAB Draco
   and Celestron Origin Mark II smart telescopes, each with its built-in camera and mount ([EQUIPMENT.md](docs/EQUIPMENT.md#bundles-smart-telescopes)).
 - Equipment presets: ZWO Seestar TC20 tripod and TH10 tripod head accessories.

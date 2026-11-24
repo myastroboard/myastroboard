@@ -555,6 +555,25 @@ class TestAdditionalCachePaths:
         mock_cache_store.update_location_cache.assert_called()
 
     @patch("cache.cache_updater.cache_store")
+    @patch("cache.cache_updater.upcoming_full_moons")
+    @patch("cache.cache_updater.MoonPlanner")
+    @patch("cache.cache_updater.load_config")
+    def test_update_moon_planner_cache_stores_full_moons(
+        self, mock_load_config, mock_planner, mock_full_moons, mock_cache_store, mock_config
+    ):
+        """The planner payload carries the next two exact Full Moons for the events aggregator."""
+        from cache.cache_updater import update_moon_planner_cache
+
+        mock_load_config.return_value = mock_config
+        mock_planner.return_value.next_7_nights.return_value = []
+        mock_full_moons.return_value = [{"time": "2026-11-24T15:54+01:00", "supermoon": True}]
+
+        update_moon_planner_cache()
+        assert mock_full_moons.call_args.args[1] == 2
+        payload = _loc_payload(mock_cache_store, "moon_planner")
+        assert payload["full_moons"] == mock_full_moons.return_value
+
+    @patch("cache.cache_updater.cache_store")
     @patch("cache.cache_updater.SunService")
     @patch("cache.cache_updater.load_config")
     def test_update_sun_report_cache_success(self, mock_load_config, mock_sun, mock_cache_store, mock_config):

@@ -287,7 +287,29 @@
     "eclipse_chart_footer": "Graus (°) | Hora local",
     "footer_source_report": "Fonte de dados: cálculos astronômicos 100% locais (efemérides lunares e eventos derivados).",
     "footer_source_planner": "Fonte de dados: cálculos MyAstroBoard 100% locais para as próximas noites e pontuação astrofotográfica.",
-    "footer_source_best_window": "Fonte de dados: cálculos MyAstroBoard 100% locais para dark-window e best-window."
+    "footer_source_best_window": "Fonte de dados: cálculos MyAstroBoard 100% locais para dark-window e best-window.",
+    "folk_name": {
+      "wolf": "do Lobo",
+      "snow": "da Neve",
+      "worm": "da Minhoca",
+      "pink": "Rosa",
+      "flower": "das Flores",
+      "strawberry": "dos Morangos",
+      "buck": "do Cervo",
+      "sturgeon": "do Esturjão",
+      "corn": "do Milho",
+      "harvest": "da Colheita",
+      "hunters": "do Caçador",
+      "beaver": "do Castor",
+      "cold": "Fria"
+    },
+    "full_moon_named": "Lua cheia {name}",
+    "supermoon_named": "Superlua {name}",
+    "micromoon_named": "Microlua {name}",
+    "supermoon": "Superlua",
+    "micromoon": "Microlua",
+    "blue_moon": "Lua azul",
+    "full_moon_size": "{diameter}' de diâmetro, {size}% em relação à distância média"
   },
   "sun": {
     "tab_description": "A noite astronômica começa quando o Sol desce abaixo de -18° de altitude (o estágio de crepúsculo mais escuro) e termina quando ele volta a subir acima disso - essa janela é quando o céu está escuro o suficiente para a captura de céu profundo.",
@@ -2429,7 +2451,9 @@
       "zodiacal_light_description": "Tênue cone de luz da poeira interplanetária visível durante o crepúsculo. Melhor observada sob céus escuros.",
       "zodiacal_viewing_evening": "entardecer",
       "zodiacal_viewing_morning": "amanhecer"
-    }
+    },
+    "supermoon_description": "A lua cheia está perto do perigeu: a {distance} km, {size}% maior do que à distância média. Bom momento para {activity}.",
+    "blue_moon_note": "É uma lua azul, a segunda lua cheia do mês."
   },
   "weather_alerts": {
     "section_title": "Alertas meteorológicos",

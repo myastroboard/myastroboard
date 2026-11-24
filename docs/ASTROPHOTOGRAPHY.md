@@ -90,6 +90,7 @@ The window score (0-100) reflects how good the dark window is:
 | `next_moonrise` / `next_moonset` | Next rise and set times |
 | `next_full_moon` / `next_new_moon` | Timestamps of next phase extremes |
 | `next_dark_night_start/end` | Next window where Sun < −18° AND Moon below horizon |
+| `next_full_moon_details` | Supermoon / micromoon / Blue Moon flags and traditional name of the next Full Moon (see [Full Moons](#full-moons-astroweatherfull_moonspy)) |
 
 **Libraries used**: `astronomy` (Astronomy Engine) for rise/set and phase search; `astropy` for AltAz position.
 
@@ -115,7 +116,32 @@ the day (that one is a "right now" readout); the two converge at night.
 
 **API**: `GET /api/moon/phase-calendar?year=<yyyy>&month=<1-12>` - `year` / `month` are clamped to the
 allowed window; missing or malformed values fall back to the current month. The response also carries
-`is_current_month`, `can_go_prev`, `can_go_next`, `today` and `principal_phases`.
+`is_current_month`, `can_go_prev`, `can_go_next`, `today` and `principal_phases`. A Full Moon
+entry (`phase_event` of its day, and its `principal_phases` item) adds a `full_moon` object with the
+[Full Moon details](#full-moons-astroweatherfull_moonspy).
+
+### Full Moons (`astroweather/full_moons.py`)
+
+Every Full Moon shown by the app (Moon report, phase calendar, upcoming events) carries these details,
+all computed with Astronomy Engine:
+
+| Field | Description |
+|-------|-------------|
+| `distance_km` | Geocentric Earth-Moon distance at the Full Moon instant |
+| `angular_diameter_arcmin` / `size_vs_mean_percent` | Apparent diameter, and how much larger (or smaller) the disk looks than at the mean distance of 384,400 km |
+| `supermoon` | Within 10% of the perigee distance of its own orbit (Richard Nolle's definition). The orbit is bounded by the perigee and apogee nearest to the Full Moon (`SearchLunarApsis`), so the threshold follows the real orbit |
+| `micromoon` | The same, measured from the apogee |
+| `blue_moon` | Second Full Moon of the same local calendar month |
+| `folk_name` | North American traditional name (Farmer's Almanac): Wolf, Snow, Worm, Pink, Flower, Strawberry, Buck, Sturgeon, Corn, Harvest, Hunter's, Beaver, Cold |
+
+The traditional names are folklore, one per month. Only two of them are computed: the Harvest Moon
+is the Full Moon nearest the September equinox (it can fall in early October, and September's Full
+Moon is then the Corn Moon), and the Hunter's Moon is the one after it. The names come from the
+northern-hemisphere tradition and are shown as they are everywhere.
+
+In the upcoming events, a Full Moon uses its exact instant and its name ("Beaver Supermoon"); a
+supermoon is HIGH importance, any other Full Moon MEDIUM. In the phase calendar a supermoon cell
+glows brighter, and the tooltip gives the distance and apparent size.
 
 ### Lunar eclipse (`astroweather/moon_eclipse.py`)
 

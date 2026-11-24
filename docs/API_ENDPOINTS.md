@@ -145,8 +145,8 @@ This page lists the HTTP routes currently declared across `backend/blueprints/*.
 - `GET /api/seeing-forecast`
 - `GET /api/moon/report`
 - `GET /api/moon/dark-window`
-- `GET /api/moon/next-7-nights`
-- `GET /api/moon/phase-calendar` - Full calendar month of Moon phases (illumination, waxing/waning, near-new-moon flag) plus the month's principal phase timestamps, for the active location. Params: `year`, `month` (1-12); both are clamped to the allowed 2-month window (current month and the next one), and missing or malformed values fall back to the current month. Response includes `is_current_month`, `can_go_prev`, `can_go_next`, `today`, `days`, `principal_phases`.
+- `GET /api/moon/next-7-nights` - Moon planner for the next 7 nights (`next_7_nights`), plus `full_moons`: the next two Full Moons with their details (see [ASTROPHOTOGRAPHY.md](ASTROPHOTOGRAPHY.md#full-moons-astroweatherfull_moonspy)).
+- `GET /api/moon/phase-calendar` - Full calendar month of Moon phases (illumination, waxing/waning, near-new-moon flag) plus the month's principal phase timestamps, for the active location. Params: `year`, `month` (1-12); both are clamped to the allowed 2-month window (current month and the next one), and missing or malformed values fall back to the current month. Response includes `is_current_month`, `can_go_prev`, `can_go_next`, `today`, `days`, `principal_phases`. A Full Moon entry carries `full_moon` (distance, `supermoon` / `micromoon` / `blue_moon`, `folk_name`; see [ASTROPHOTOGRAPHY.md](ASTROPHOTOGRAPHY.md#full-moons-astroweatherfull_moonspy)).
 - `GET /api/aurora/predictions`
 - `GET /api/iss/passes` - Returns ISS passes, solar transits, and lunar transits; all times in configured local TZ. Response includes `passes`, `solar_transits`, `lunar_transits`, `next_visible_passage`, `next_solar_transit`, `next_lunar_transit`, `total_passes`, `total_solar_transits`, `total_lunar_transits`.
 - `GET /api/iss/location`
