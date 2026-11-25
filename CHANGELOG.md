@@ -16,6 +16,8 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Upcoming events: a Full Moon (or supermoon) no longer drops out of the timeline on its own evening once
   its exact peak time has passed ([ASTROPHOTOGRAPHY.md](docs/ASTROPHOTOGRAPHY.md#full-moons-astroweatherfull_moonspy)).
+- Events: "next event" (events page, MQTT `next_event` used by lovelace-myastroboard-card) no
+  longer picks a comet whose brightness peak is already past while it is still listed.
 
 ### Breaking changes
 

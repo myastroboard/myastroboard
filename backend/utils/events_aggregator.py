@@ -505,12 +505,21 @@ class EventsAggregator:
         # keep whatever order they were extracted in instead of their actual time.
         events.sort(key=lambda x: self._parse_iso_time(x.peak_time) if x.peak_time else self.local_now)
 
+        # An event still inside its window (a comet within +/-30 days of perihelion) can have
+        # its peak in the past and so sorts first; "next" is the first one whose peak is still
+        # ahead. Fall back to the first event so the events page keeps its timeline when every
+        # remaining event is already past its peak.
+        next_event = next(
+            (e for e in events if not e.peak_time or self._parse_iso_time(e.peak_time) >= self.local_now),
+            events[0] if events else None,
+        )
+
         # Prepare results
         result = {
             "aggregation_time": self.local_now.isoformat(),
             "upcoming_events": [asdict(e) for e in events],
             "events_count": len(events),
-            "next_event": asdict(events[0]) if events else None,
+            "next_event": asdict(next_event) if next_event else None,
             "events_next_7_days": [asdict(e) for e in events if e.days_until_event <= 7],
             "events_next_30_days": [asdict(e) for e in events if e.days_until_event <= 30],
         }
