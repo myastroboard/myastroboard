@@ -2001,6 +2001,35 @@ class TestAggregateAllEventsWithValidData:
         assert result["events_count"] >= 1
         assert result["next_event"] is not None
 
+    def test_next_event_skips_event_whose_peak_has_passed(self, aggregator):
+        """An ongoing comet whose brightness peak is already past is listed, but next_event
+        is the first event whose peak is still ahead."""
+        past_peak = (aggregator.local_now - timedelta(days=28)).isoformat()
+        future_peak = (aggregator.local_now + timedelta(days=2)).isoformat()
+        result = aggregator.aggregate_all_events(
+            solar_system_events_data={
+                "events": [
+                    {"peak_time": past_peak, "event_type": "Comet Appearance", "title": "161P at Peak Brightness"},
+                    {"peak_time": future_peak, "event_type": "Meteor Shower", "title": "Geminids Peak"},
+                ]
+            }
+        )
+        assert result["events_count"] == 2
+        assert result["upcoming_events"][0]["event_type"] == "Comet Appearance"
+        assert result["next_event"]["event_type"] == "Meteor Shower"
+
+    def test_next_event_falls_back_to_first_event_when_every_peak_has_passed(self, aggregator):
+        """With only past-peak events left, next_event is still the first one, so the events
+        page keeps showing its timeline."""
+        past_peak = (aggregator.local_now - timedelta(days=5)).isoformat()
+        result = aggregator.aggregate_all_events(
+            solar_system_events_data={
+                "events": [{"peak_time": past_peak, "event_type": "Comet Appearance", "title": "161P"}]
+            }
+        )
+        assert result["next_event"] is not None
+        assert result["next_event"]["event_type"] == "Comet Appearance"
+
     def test_aggregate_events_count_and_next_7_days(self, aggregator):
         """Events within 7 days appear in events_next_7_days."""
         peak = (aggregator.local_now + timedelta(days=3)).isoformat()
