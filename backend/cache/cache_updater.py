@@ -229,8 +229,12 @@ def update_moon_planner_cache(config: dict[str, Any] | None = None, location: di
 
         nights = planner.next_7_nights()
         # Exact Full Moon instants with their supermoon / Blue Moon / name details; the
-        # events aggregator turns the ones inside the 7-night window into events.
-        full_moons = upcoming_full_moons(datetime.now(ZoneInfo(location["timezone"])), 2, location["timezone"])
+        # events aggregator turns the ones inside the 7-night window into events. The search
+        # starts at local midnight, not now: a Full Moon that peaked this afternoon is still
+        # tonight's event, and a cache refreshed in the evening must keep it.
+        tz = ZoneInfo(location["timezone"])
+        today_start = datetime.now(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+        full_moons = upcoming_full_moons(today_start, 2, location["timezone"])
 
         response = {
             "location": location,

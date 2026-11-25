@@ -452,7 +452,7 @@ SKY_COMPONENTS = [
     sensor("moon_distance", "Moon distance", device_class="distance", unit="km", precision=0),
     sensor("next_moonrise", "Next moonrise", device_class="timestamp"),
     sensor("next_moonset", "Next moonset", device_class="timestamp"),
-    sensor("next_full_moon", "Next full moon", device_class="timestamp", icon="mdi:moon-full"),
+    sensor("next_full_moon", "Next full moon", device_class="timestamp", icon="mdi:moon-full", attributes=True),
     sensor("next_new_moon", "Next new moon", device_class="timestamp", icon="mdi:moon-new"),
     sensor("dark_window_start", "Dark window start", device_class="timestamp"),
     sensor("dark_window_end", "Dark window end", device_class="timestamp"),
@@ -556,6 +556,7 @@ def _sky_state(location: dict[str, Any], now: datetime) -> dict[str, Any]:
     tz = _tz(location.get("timezone"))
     state: dict[str, Any] = {key: None for key, _ in SKY_COMPONENTS}
     state["top_target_attributes"] = {}
+    state["next_full_moon_attributes"] = {}
 
     sun_data, _ = _location_cache("sun_report", lid)
     sun = (sun_data or {}).get("sun") or {}
@@ -598,6 +599,19 @@ def _sky_state(location: dict[str, Any], now: datetime) -> dict[str, Any]:
     state["moon_distance"] = num(moon.get("distance_km"), 0)
     for key in ("next_moonrise", "next_moonset", "next_full_moon", "next_new_moon"):
         state[key] = to_iso(moon.get(key), tz)
+    # Untranslated details of the next Full Moon (astroweather.full_moons), so a client
+    # can show "Beaver Supermoon" in its own language. Empty with an older moon_report cache.
+    full_moon = moon.get("next_full_moon_details") or {}
+    if full_moon:
+        state["next_full_moon_attributes"] = {
+            "folk_name": text(full_moon.get("folk_name")),
+            "supermoon": full_moon.get("supermoon"),
+            "micromoon": full_moon.get("micromoon"),
+            "blue_moon": full_moon.get("blue_moon"),
+            "distance_km": num(full_moon.get("distance_km"), 0),
+            "angular_diameter_arcmin": num(full_moon.get("angular_diameter_arcmin"), 1),
+            "size_vs_mean_percent": num(full_moon.get("size_vs_mean_percent"), 1),
+        }
 
     dark_data, _ = _location_cache("dark_window", lid)
     dark = (dark_data or {}).get("next_dark_night") or {}
@@ -823,6 +837,11 @@ def _events_state(location: dict[str, Any], config: dict[str, Any], now: datetim
                 "planet2": text(nxt.get("planet2")),
                 "shower_name": text(nxt.get("shower_name")),
                 "comet_name": text(nxt.get("comet_name")),
+                # Full Moon only (event_type "Moon Phase"): traditional name key and flags.
+                "folk_name": text(nxt.get("folk_name")),
+                "supermoon": nxt.get("supermoon"),
+                "micromoon": nxt.get("micromoon"),
+                "blue_moon": nxt.get("blue_moon"),
             }
     except Exception as exc:
         logger.debug("MQTT: events aggregation for %s failed: %s", lid, exc)

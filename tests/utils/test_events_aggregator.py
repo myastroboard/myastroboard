@@ -954,6 +954,9 @@ class TestExtractMoonPhaseEvents:
         event = aggregator._extract_moon_phase_events(data)[0]
         assert event.title == "Beaver Supermoon"
         assert event.importance == EventImportance.HIGH.value
+        # Untranslated pieces for MQTT / API clients that name the Full Moon themselves.
+        assert event.folk_name == "beaver"
+        assert event.supermoon is True and event.micromoon is False and event.blue_moon is False
         assert "360,754 km" in event.description
         assert "6.6%" in event.description
 
@@ -991,6 +994,13 @@ class TestExtractMoonPhaseEvents:
         """No folk_name: the plain 'Full Moon' label."""
         data = {"next_7_nights": [], "full_moons": [self._full_moon(aggregator, 1, folk_name=None)]}
         assert aggregator._extract_moon_phase_events(data)[0].title == "Full Moon"
+
+    def test_heuristic_full_moon_has_no_raw_details(self, aggregator):
+        """Without 'full_moons' the Full Moon event leaves folk_name and the flags unset."""
+        date_str = (aggregator.local_now + timedelta(days=2)).isoformat()
+        data = {"next_7_nights": [{"date": date_str, "moon": {"illumination_percent": 99}}]}
+        event = aggregator._extract_moon_phase_events(data)[0]
+        assert event.folk_name is None and event.supermoon is None and event.blue_moon is None
 
     def test_next_7_nights_new_moon(self, aggregator):
         """Detects New Moon from next_7_nights illumination <= 2%."""

@@ -415,6 +415,37 @@ class TestLocationDevice:
                 assert f"{key}_attributes" in s
         assert device.discovery["cmps"]["sky_period"]["ops"] == mp.SKY_PERIOD_OPTIONS
 
+    def test_next_full_moon_attributes_carry_the_untranslated_details(self, caches, monkeypatch):
+        """next_full_moon publishes the Full Moon details as attributes for client-side naming."""
+        _plant_sky(caches, monkeypatch)
+        caches[("moon_report", "loc-1")]["moon"]["next_full_moon_details"] = {
+            "time": "2026-11-24T15:54+01:00",
+            "date": "2026-11-24",
+            "distance_km": 360754,
+            "angular_diameter_arcmin": 33.1,
+            "size_vs_mean_percent": 6.6,
+            "supermoon": True,
+            "micromoon": False,
+            "blue_moon": False,
+            "folk_name": "beaver",
+        }
+        s = mp.build_location_device(_connector(["sky_conditions"]), {}, LOCATION, NOW).state
+        assert s["next_full_moon_attributes"] == {
+            "folk_name": "beaver",
+            "supermoon": True,
+            "micromoon": False,
+            "blue_moon": False,
+            "distance_km": 360754,
+            "angular_diameter_arcmin": 33.1,
+            "size_vs_mean_percent": 6.6,
+        }
+
+    def test_next_full_moon_attributes_empty_without_details(self, caches, monkeypatch):
+        """An older moon_report cache without the details publishes empty attributes."""
+        _plant_sky(caches, monkeypatch)
+        s = mp.build_location_device(_connector(["sky_conditions"]), {}, LOCATION, NOW).state
+        assert s["next_full_moon_attributes"] == {}
+
     def test_sky_conditions_with_empty_caches_is_all_null_but_complete(self, caches, no_skytonight):
         device = mp.build_location_device(_connector(["sky_conditions"]), {}, LOCATION, NOW)
         assert device is not None
@@ -583,6 +614,7 @@ class TestLocationDevice:
         assert s["next_event_attributes"]["eclipse_type"] == "Partial"
         assert s["next_event_attributes"]["planet"] == "Jupiter"
         assert s["next_event_attributes"]["shower_name"] is None and s["next_event_attributes"]["comet_name"] is None
+        assert s["next_event_attributes"]["folk_name"] is None and s["next_event_attributes"]["supermoon"] is None
         assert set(device.discovery["cmps"]) <= set(s)
 
         # A "language" key in the connector config is dead: MQTT is a background publish

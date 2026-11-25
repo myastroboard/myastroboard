@@ -118,6 +118,13 @@ class AstronomicalEvent:
     planet2: str | None = None
     shower_name: str | None = None
     comet_name: str | None = None
+    # Full Moon (astroweather.full_moons): traditional name key ("beaver"), supermoon /
+    # micromoon / Blue Moon flags. None for every other event, and for a Full Moon
+    # detected without the exact details (old cache without 'full_moons').
+    folk_name: str | None = None
+    supermoon: bool | None = None
+    micromoon: bool | None = None
+    blue_moon: bool | None = None
 
 
 class EventsAggregator:
@@ -889,6 +896,10 @@ class EventsAggregator:
             score=None,
             raw_data=moon_data,
             structure_key="moon",
+            folk_name=details.get("folk_name") or None,
+            supermoon=supermoon,
+            micromoon=bool(details.get("micromoon")),
+            blue_moon=bool(details.get("blue_moon")),
         )
 
     def _extract_iss_pass_events(self, iss_data: dict[str, Any]) -> list[AstronomicalEvent]:
