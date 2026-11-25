@@ -574,6 +574,40 @@ class TestAdditionalCachePaths:
         assert payload["full_moons"] == mock_full_moons.return_value
 
     @patch("cache.cache_updater.cache_store")
+    @patch("cache.cache_updater.MoonPlanner")
+    @patch("cache.cache_updater.load_config")
+    def test_moon_planner_keeps_todays_full_moon_after_its_peak(
+        self, mock_load_config, mock_planner, mock_cache_store, mock_config
+    ):
+        """A refresh in the evening keeps the Full Moon that peaked this afternoon.
+
+        The 2026-11-24 Full Moon peaks at 15:54 Paris time; a cache rebuilt at 20:00 that
+        evening, when people go out to see it, must still list it first.
+        """
+        from datetime import datetime as real_datetime
+        from zoneinfo import ZoneInfo
+
+        from cache.cache_updater import update_moon_planner_cache
+
+        class _EveningOfTheSupermoon(real_datetime):
+            @classmethod
+            def now(cls, tz=None):
+                evening = real_datetime(2026, 11, 24, 20, 0, tzinfo=ZoneInfo("Europe/Paris"))
+                return evening.astimezone(tz) if tz else evening.replace(tzinfo=None)
+
+        config = dict(mock_config)
+        mock_load_config.return_value = config
+        mock_planner.return_value.next_7_nights.return_value = []
+        location = {"id": "loc-1", "latitude": 48.85, "longitude": 2.35, "timezone": "Europe/Paris"}
+
+        with patch("cache.cache_updater.datetime", _EveningOfTheSupermoon):
+            update_moon_planner_cache(config=config, location=location)
+
+        full_moons = _loc_payload(mock_cache_store, "moon_planner")["full_moons"]
+        assert [moon["date"] for moon in full_moons] == ["2026-11-24", "2026-12-24"]
+        assert full_moons[0]["supermoon"] is True
+
+    @patch("cache.cache_updater.cache_store")
     @patch("cache.cache_updater.SunService")
     @patch("cache.cache_updater.load_config")
     def test_update_sun_report_cache_success(self, mock_load_config, mock_sun, mock_cache_store, mock_config):

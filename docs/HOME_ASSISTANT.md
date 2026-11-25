@@ -253,7 +253,7 @@ tables below are generated from `backend/connectors/mqtt_payloads.py`.
 | `moon_distance` | Moon distance | sensor (distance, km) |  |
 | `next_moonrise` | Next moonrise | sensor (timestamp) |  |
 | `next_moonset` | Next moonset | sensor (timestamp) |  |
-| `next_full_moon` | Next full moon | sensor (timestamp) |  |
+| `next_full_moon` | Next full moon | sensor (timestamp) | attributes (untranslated): `folk_name` (traditional name key: `wolf`, `snow`, `worm`, `pink`, `flower`, `strawberry`, `buck`, `sturgeon`, `corn`, `harvest`, `hunters`, `beaver`, `cold`), `supermoon`, `micromoon`, `blue_moon`, `distance_km` (geocentric), `angular_diameter_arcmin`, `size_vs_mean_percent`; see [ASTROPHOTOGRAPHY.md](ASTROPHOTOGRAPHY.md#full-moons-astroweatherfull_moonspy) |
 | `next_new_moon` | Next new moon | sensor (timestamp) |  |
 | `dark_window_start` | Dark window start | sensor (timestamp) | next moonless astronomical night |
 | `dark_window_end` | Dark window end | sensor (timestamp) |  |
@@ -302,7 +302,7 @@ Nearest hourly forecast row plus the astro analysis.
 
 | Key | Entity name | Kind | Notes |
 |---|---|---|---|
-| `next_event` | Next event | sensor | same "next event" as the dashboard banner; attributes: event_type, description, start / peak / end, importance, events_count, plus the event's raw (untranslated) variable piece where applicable - `eclipse_type` (solar/lunar eclipses), `planet`/`planet2` (planetary conjunction/opposition/elongation/retrograde, moon conjunction), `shower_name` (meteor showers), `comet_name` (comet appearances); state and `description` are English-only by design (MQTT is a background publish loop with no session language to read) - clients that want a localized display should translate client-side off `event_type` and these attributes, the same way `top_target_attributes.object_type` already needs to be |
+| `next_event` | Next event | sensor | same "next event" as the dashboard banner; attributes: event_type, description, start / peak / end, importance, events_count, plus the event's raw (untranslated) variable piece where applicable - `eclipse_type` (solar/lunar eclipses), `planet`/`planet2` (planetary conjunction/opposition/elongation/retrograde, moon conjunction), `shower_name` (meteor showers), `comet_name` (comet appearances), `folk_name` / `supermoon` / `micromoon` / `blue_moon` (Full Moon, `event_type` "Moon Phase"; same values as the `next_full_moon` attributes, null for any other event); state and `description` are English-only by design (MQTT is a background publish loop with no session language to read) - clients that want a localized display should translate client-side off `event_type` and these attributes, the same way `top_target_attributes.object_type` already needs to be |
 | `next_event_at` | Next event at | sensor (timestamp) |  |
 | `next_iss_pass_at` | Next ISS pass | sensor (timestamp) |  |
 | `next_iss_pass_peak_altitude` | Next ISS pass peak altitude | sensor (°) |  |

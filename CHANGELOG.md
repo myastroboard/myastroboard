@@ -8,11 +8,14 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Features
 
-- None.
+- MQTT / Home Assistant: the next Full Moon's traditional name and supermoon / micromoon / Blue Moon flags are
+  published as `next_full_moon` and `next_event` attributes, for lovelace-myastroboard-card
+  ([HOME_ASSISTANT.md](docs/HOME_ASSISTANT.md)).
 
 ### Fixes
 
-- None.
+- Upcoming events: a Full Moon (or supermoon) no longer drops out of the timeline on its own evening once
+  its exact peak time has passed ([ASTROPHOTOGRAPHY.md](docs/ASTROPHOTOGRAPHY.md#full-moons-astroweatherfull_moonspy)).
 
 ### Breaking changes
 
